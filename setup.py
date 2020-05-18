@@ -28,7 +28,6 @@ setup(
     
     packages=["pytest_inmanta_lsm"],
     package_dir={"": "src"},
-    python_requires="",
     install_requires=[
         "pytest-inmanta",
         "pytest-inmanta-extensions"
