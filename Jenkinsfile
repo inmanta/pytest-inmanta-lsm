@@ -20,12 +20,12 @@ pipeline {
     stage("setup"){
       steps{
         script{
-          sh """
+          sh '''
           python3 -m venv ${env.WORKSPACE}/env
           pip install -U setuptools pip ${get_pip_options()}
           pip install -U requirements.dev.txt ${get_pip_options()}
           pip install -U -c requirements.txt . ${get_pip_options()}
-          """
+          '''
         }
       }
     }
