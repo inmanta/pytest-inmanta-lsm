@@ -22,9 +22,9 @@ pipeline {
         script{
           sh """
           python3 -m venv ${env.WORKSPACE}/env
-          pip install -U setuptools pip ${get_pip_options()}
-          pip install -U requirements.dev.txt ${get_pip_options()}
-          pip install -U -c requirements.txt . ${get_pip_options()}
+          ${WORKSPACE}/env/bin/pip install -U setuptools pip ${get_pip_options()}
+          ${WORKSPACE}/env/bin/pip install -U requirements.dev.txt ${get_pip_options()}
+          ${WORKSPACE}/env/bin/pip install -U -c requirements.txt . ${get_pip_options()}
           """
         }
       }
