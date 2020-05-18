@@ -33,7 +33,7 @@ pipeline {
       steps{
         script{
           sh'''
-          ${WORKSPACE}/env/bin/flake8 *.py src tests
+          ${WORKSPACE}/env/bin/flake8 src tests examples *.py
           '''
         }
       }

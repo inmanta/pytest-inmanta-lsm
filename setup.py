@@ -16,22 +16,15 @@ setup(
     name="pytest-inmanta-lsm",
     version="0.0.1",
     python_requires=">=3.6",  # also update classifiers
-
     author="Inmanta",
     author_email="code@inmanta.com",
     license="inmanta EULA",
     url="https://github.com/inmanta/pytest-inmanta-lsm",
-
-    
     description="Common fixtures for inmanta LSM related modules",
     long_description=read("README.md"),
-    
     packages=["pytest_inmanta_lsm"],
     package_dir={"": "src"},
-    install_requires=[
-        "pytest-inmanta",
-        "pytest-inmanta-extensions"
-    ],
+    install_requires=["pytest-inmanta", "pytest-inmanta-extensions"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Framework :: Pytest",
