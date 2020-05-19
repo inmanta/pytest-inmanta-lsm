@@ -17,7 +17,6 @@ pipeline {
     booleanParam(name:"pytest_inmanta_dev" ,defaultValue: true, description: 'Changes the index used to install pytest-inmanta to the inmanta dev index')
   }
   environment{
-     INMANTA_MODULE_REPO="git@github.com:inmanta/"
      INMANTA_LSM_HOST="192.168.2.102"
   }
   stages {
@@ -26,9 +25,9 @@ pipeline {
         script{
           sh """
           python3 -m venv ${env.WORKSPACE}/env
-          ${WORKSPACE}/env/bin/pip install -U setuptools pip ${get_pip_options()}
-          ${WORKSPACE}/env/bin/pip install -U -r requirements.dev.txt ${get_pip_options()}
-          ${WORKSPACE}/env/bin/pip install -U -c requirements.txt . ${get_pip_options()}
+          ${env.WORKSPACE}/env/bin/pip install -U setuptools pip ${get_pip_options()}
+          ${env.WORKSPACE}/env/bin/pip install -U -r requirements.dev.txt ${get_pip_options()}
+          ${env.WORKSPACE}/env/bin/pip install -U -c requirements.txt . ${get_pip_options()}
           """
         }
       }
@@ -44,12 +43,14 @@ pipeline {
     }
     stage("tests"){
       steps{
-        sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f', 'inmantaci']) {
-          script{
-            sh'''
-            ${WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
-            '''
-            junit 'junit.xml'
+        sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
+          withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
+            script{
+              sh"""
+              INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
+              """
+              junit 'junit.xml'
+            }
           }
         }
       }
