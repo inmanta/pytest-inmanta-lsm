@@ -31,3 +31,17 @@ def test_full_cycle(project, remote_orchestrator):
         },
         wait_for_state="up"
     )
+
+    # make validation fail by creating a duplicate
+    remote_orchestrator.get_managed_instance(SERVICE_NAME).create(
+        attributes={
+            "router_ip":"192.168.222.254",
+            "interface_name":"eth1",
+            "address":"10.10.14.254/24",
+            "vlan_id": 14
+        },
+        wait_for_state="rejected"
+    )
+
+    # break it down
+    service_instance.delete()

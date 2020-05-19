@@ -16,6 +16,10 @@ pipeline {
   parameters {
     booleanParam(name:"pytest_inmanta_dev" ,defaultValue: true, description: 'Changes the index used to install pytest-inmanta to the inmanta dev index')
   }
+  environment{
+     INMANTA_MODULE_REPO="git@github.com:inmanta/"
+     INMANTA_LSM_HOST=192.168.2.102
+  }
   stages {
     stage("setup"){
       steps{
@@ -40,12 +44,13 @@ pipeline {
     }
     stage("tests"){
       steps{
-        script{
-          sh'''
-          ${WORKSPACE}/env/bin/pytest" tests -v -s --junitxml=junit.xml --cov=inmanta_plugins.yang  --cov-report term --cov-report xml:coverage.xml
-          '''
-          junit 'junit.xml'
-          cobertura coberturaReportFile: 'coverage.xml'
+        sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
+          script{
+            sh'''
+            ${WORKSPACE}/env/bin/pytest" tests -v -s --junitxml=junit.xml
+            '''
+            junit 'junit.xml'
+          }
         }
       }
     }

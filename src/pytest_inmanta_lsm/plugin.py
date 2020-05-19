@@ -460,10 +460,24 @@ class ManagedServiceInstance:
 
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
-    def delete(self, current_version: int) -> None:
+    def delete(self, 
+            current_version: Optional[int] = None,
+            wait_for_state: str = "terminated",
+            version: Optional[int] = None,
+            bad_states: List[str] = ["rejected", "failed"],
+    ) -> None:
         """ Delete the connection
         """
-        LOGGER.info("Deleting connection")
+        if current_version is None:
+            response = self.remote_orchestrator.client.lsm_services_get(
+                 tid=self.remote_orchestrator.environment,
+                service_entity=self.service_entity_name,
+                service_id=self._instance_id,
+            )
+            assert response.code == 200
+            current_version = response.result["data"]["version"]
+
+        LOGGER.info("Deleting service instance %s", self._instance_id)
         response = self.remote_orchestrator.client.lsm_services_delete(
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
@@ -471,6 +485,7 @@ class ManagedServiceInstance:
             current_version=current_version,
         )
         assert response.code == 200
+        self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
     def wait_for_state(
          self,
