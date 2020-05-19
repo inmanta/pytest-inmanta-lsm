@@ -18,6 +18,9 @@ pipeline {
   }
   environment{
      INMANTA_LSM_HOST="192.168.2.102"
+     PIP_INDEX_URL="https://artifacts.internal.inmanta.com/inmanta/dev"
+     PIP_PRE="true"
+
   }
   stages {
     stage("setup"){
@@ -47,6 +50,7 @@ pipeline {
           withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
             script{
               sh"""
+              
               INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
               """
               junit 'junit.xml'
