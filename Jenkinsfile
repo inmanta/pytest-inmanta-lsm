@@ -47,7 +47,7 @@ pipeline {
         sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
           script{
             sh'''
-            ${WORKSPACE}/env/bin/pytest" tests -v -s --junitxml=junit.xml
+            ${WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
             '''
             junit 'junit.xml'
           }
