@@ -44,7 +44,7 @@ pipeline {
     }
     stage("tests"){
       steps{
-        sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
+        sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f', 'inmantaci']) {
           script{
             sh'''
             ${WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml

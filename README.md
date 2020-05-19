@@ -8,40 +8,61 @@ A pytest plugin to test inmanta modules that use lsm, it is built on top of `pyt
 pip install pytest-inmanta-lsm
 ```
 
+## Context
+
+This plugin is used to push code to a remote orchestrator and interact with it, via the LSM north-bound-api
+It requires an LSM enabled orchestrator, with no ssl or authentication enabled, in a default setup and ssh access to the orchestrator machine, with a user that has sudo permissions.
+
 ## Usage
 
- - setup requirements
- - lsm: compile-export-create-wait
+This plugin is built around the remote_orchestrator fixture. 
+It offers features to 
 
-```
-remote.sync(project)
-```
+A typical testcase using this plugin looks as follows:
+```python
 
+def test_full_cycle(project, remote_orchestrator):
+    # get connection to remote_orchestrator
+    client = remote_orchestrator.client
 
-```
- # enable auto transfer
-        self.client.lsm_service_entity_config_set(
-            tid=self.environment,
-            service_entity="cloudconnect",
-            values={
-                "auto_creating": True,
-                "auto_designed": True,
-                "auto_update_designed": True,
-                "auto_update_inprogress": True,
-            },
-        )
+    # setup project
+    project.compile(
+        """
+        import quickstart
+        """
+    )
+
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
+
+    # verify the service is in the catalog
+    result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
+    assert result.code == 200
+
+    # get a ManagedInstance object, to simplifies interacting with a specific service instance
+    service_instance = remote_orchestrator.get_managed_instance(SERVICE_NAME)
+
+    # create an instance an wait for it to be up
+    service_instance.create(
+        attributes={"router_ip": "192.168.222.254", "interface_name": "eth1", "address": "10.10.14.254/24", "vlan_id": 14},
+        wait_for_state="up",
+    )
+
+    # make validation fail by creating a duplicate
+    remote_orchestrator.get_managed_instance(SERVICE_NAME).create(
+        attributes={"router_ip": "192.168.222.254", "interface_name": "eth1", "address": "10.10.14.254/24", "vlan_id": 14},
+        wait_for_state="rejected",
+    )
+
+    # break it down
+    service_instance.delete()
+
 ```
 ## Options
 
 The following options are available.
 
- * `--venv`: folder in which to place the virtual env for tests (will be shared by all tests), overrides `INMANTA_TEST_ENV`.
-   This options depends on symlink support. This does not work on all windows versions. On windows 10 you need to run pytest in an
-   admin shell.
- * `--use-module-in-place`: makes inmanta add the parent directory of your module directory to it's directory path, instead of copying your
-    module to a temporary libs directory.
- * `--module_repo`: location to download modules from, overrides `INMANTA_MODULE_REPO`. The default value is the inmanta github organisation.
- * `--install_mode`: install mode to use for modules downloaded during this test, overrides `INMANTA_INSTALL_MODE`  
- 
- Use the generic pytest options `--log-cli-level` to show Inmanta logger to see any setup or cleanup warnings. For example,
- `--log-cli-level=INFO`
+ * `--lsm_host` remote orchestrator to use for the remote_orchestrator fixture, overrides INMANTA_LSM_HOST
+ * `--lsm_user` username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER
+ * `--lsm_environment` the environment to use on the remote server (it is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT
+ * `--lsm_noclean` Don't cleanup the orchestrator after last test (for debugging purposes)
