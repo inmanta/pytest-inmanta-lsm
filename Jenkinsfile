@@ -19,8 +19,6 @@ pipeline {
   environment{
      INMANTA_LSM_HOST="192.168.2.102"
      PIP_INDEX_URL="https://artifacts.internal.inmanta.com/inmanta/dev"
-     PIP_PRE="true"
-
   }
   stages {
     stage("setup"){
