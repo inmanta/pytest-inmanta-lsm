@@ -15,10 +15,9 @@
 
     Contact: code@inmanta.com
 """
-import pytest
+
 
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
-
 def test_basic_example(testdir):
     """Make sure that our plugin works."""
 

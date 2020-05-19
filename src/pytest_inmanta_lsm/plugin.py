@@ -4,13 +4,13 @@ import os.path
 import subprocess
 import time
 from pprint import pformat
-from typing import Any, Dict, List, Optional, Iterator
-from pytest_inmanta.plugin import Project
+from typing import Any, Dict, Iterator, List, Optional
 
 import pytest
 import yaml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.endpoints import SyncClient
+from pytest_inmanta.plugin import Project
 
 from pytest_inmanta_lsm import retry_limited
 
@@ -65,12 +65,13 @@ def pytest_addoption(parser):
     )
 
 
-def get_opt_or_env_or(config, key: str, default:str) -> str:
+def get_opt_or_env_or(config, key: str, default: str) -> str:
     if config.getoption(key):
         return config.getoption(key)
     if option_to_env[key] in os.environ:
         return os.environ[option_to_env[key]]
     return default
+
 
 @pytest.fixture
 def remote_orchestrator(project: Project, request) -> "Iterator[RemoteOrchestrator]":
@@ -89,6 +90,7 @@ def remote_orchestrator(project: Project, request) -> "Iterator[RemoteOrchestrat
 
     if not noclean:
         remote_orchestrator.clean()
+
 
 class RemoteOrchestrator:
     def __init__(self, host: str, ssh_user: str, environment: str, project: Project) -> None:
@@ -311,14 +313,14 @@ class RemoteOrchestrator:
             assert resource["status"] == desired_state
 
     def wait_for_state(
-         self,
-         service_entity_name:str, 
-         service_instance_id: str,
-         state: str, 
-         version: Optional[int] = None, 
-         timeout: int = 600, 
-         bad_states: List[str] = ["rejected", "failed"],
-        ) -> None:
+        self,
+        service_entity_name: str,
+        service_instance_id: str,
+        state: str,
+        version: Optional[int] = None,
+        timeout: int = 600,
+        bad_states: List[str] = ["rejected", "failed"],
+    ) -> None:
         """ Wait for the connection to reach the given state
 
             :param state: Poll until the connection reaches this state
@@ -376,7 +378,7 @@ class RemoteOrchestrator:
 
         LOGGER.info(f"Connection reached state {state} with version {version}")
 
-    def get_validation_failure_message(self, service_entity_name:str, service_instance_id: str,) -> Optional[str]:
+    def get_validation_failure_message(self, service_entity_name: str, service_instance_id: str,) -> Optional[str]:
         """
         Get the compiler error for a validation failure for a specific service entity
         """
@@ -461,19 +463,18 @@ class ManagedServiceInstance:
 
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
-    def delete(self, 
-            current_version: Optional[int] = None,
-            wait_for_state: str = "terminated",
-            version: Optional[int] = None,
-            bad_states: List[str] = ["rejected", "failed"],
+    def delete(
+        self,
+        current_version: Optional[int] = None,
+        wait_for_state: str = "terminated",
+        version: Optional[int] = None,
+        bad_states: List[str] = ["rejected", "failed"],
     ) -> None:
         """ Delete the connection
         """
         if current_version is None:
             response = self.remote_orchestrator.client.lsm_services_get(
-                 tid=self.remote_orchestrator.environment,
-                service_entity=self.service_entity_name,
-                service_id=self._instance_id,
+                tid=self.remote_orchestrator.environment, service_entity=self.service_entity_name, service_id=self._instance_id,
             )
             assert response.code == 200
             current_version = response.result["data"]["version"]
@@ -489,11 +490,7 @@ class ManagedServiceInstance:
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
     def wait_for_state(
-         self,
-         state: str, 
-         version: Optional[int] = None, 
-         timeout: int = 600, 
-         bad_states: List[str] = ["rejected", "failed"],
+        self, state: str, version: Optional[int] = None, timeout: int = 600, bad_states: List[str] = ["rejected", "failed"],
     ) -> None:
         """ Wait for the connection to reach the given state
 
@@ -516,6 +513,5 @@ class ManagedServiceInstance:
     def get_validation_failure_message(self) -> Optional[str]:
         assert self._instance_id is not None
         return self.remote_orchestrator.get_validation_failure_message(
-            service_entity_name=self.service_entity_name,
-            service_instance_id=self._instance_id,
+            service_entity_name=self.service_entity_name, service_instance_id=self._instance_id,
         )

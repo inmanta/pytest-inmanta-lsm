@@ -1,15 +1,16 @@
-import pytest
-import pytest_inmanta.plugin
 import os
 import sys
+
 import pkg_resources
+import pytest
+import pytest_inmanta.plugin
 
 pytest_plugins = ["pytester"]
 
 
 @pytest.fixture(autouse=True)
 def set_cwd(testdir):
-    pytest_inmanta.plugin.CURDIR =  os.getcwd()
+    pytest_inmanta.plugin.CURDIR = os.getcwd()
 
 
 @pytest.fixture(scope="function", autouse=True)

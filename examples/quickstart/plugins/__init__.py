@@ -19,9 +19,10 @@
 from inmanta import resources
 from inmanta.agent import handler
 
-KEY_PREFIX="unittest_"
+KEY_PREFIX = "unittest_"
 
 DATA = {}
+
 
 @resources.resource("quickstart::NullResource", id_attribute="name", agent="agent")
 class Resource(resources.PurgeableResource):
