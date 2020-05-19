@@ -4,7 +4,8 @@ import os.path
 import subprocess
 import time
 from pprint import pformat
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Iterator
+from pytest_inmanta.plugin import Project
 
 import pytest
 import yaml
@@ -64,7 +65,7 @@ def pytest_addoption(parser):
     )
 
 
-def get_opt_or_env_or(config, key, default):
+def get_opt_or_env_or(config, key: str, default:str) -> str:
     if config.getoption(key):
         return config.getoption(key)
     if option_to_env[key] in os.environ:
@@ -72,13 +73,13 @@ def get_opt_or_env_or(config, key, default):
     return default
 
 @pytest.fixture
-def remote_orchestrator(project, request):
+def remote_orchestrator(project: Project, request) -> "Iterator[RemoteOrchestrator]":
     LOGGER.info("Setting up remote orchestrator")
 
     env = get_opt_or_env_or(request.config, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
     host = get_opt_or_env_or(request.config, "inm_lsm_remote_host", "127.0.0.1")
     user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
-    noclean = bool(get_opt_or_env_or(request.config, "inm_lsm_noclean", False))
+    noclean = bool(get_opt_or_env_or(request.config, "inm_lsm_noclean", "false"))
 
     remote_orchestrator = RemoteOrchestrator(host, user, env, project)
     remote_orchestrator.clean()
@@ -90,7 +91,7 @@ def remote_orchestrator(project, request):
         remote_orchestrator.clean()
 
 class RemoteOrchestrator:
-    def __init__(self, host: str, ssh_user: str, environment: str, project) -> None:
+    def __init__(self, host: str, ssh_user: str, environment: str, project: Project) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
 
@@ -296,7 +297,7 @@ class RemoteOrchestrator:
         client = self.client
         environment = self.environment
 
-        def is_deployment_finished():
+        def is_deployment_finished() -> bool:
             response = client.get_version(environment, version)
             LOGGER.info(
                 "Deployed %s of %s resources", response.result["model"]["done"], response.result["model"]["total"],
@@ -336,8 +337,8 @@ class RemoteOrchestrator:
                 tid=self.environment, service_entity=service_entity_name, service_id=service_instance_id,
             )
             assert response.code == 200
-            instance_state = response.result["data"]["state"]
-            instance_version = response.result["data"]["version"]
+            instance_state: str = response.result["data"]["state"]
+            instance_version: int = response.result["data"]["version"]
 
             if previous_state != instance_state:
                 LOGGER.info(
@@ -502,6 +503,7 @@ class ManagedServiceInstance:
             :param bad_state: States that should not be reached, if these are reached,
                waiting is aborted (if the target state is in bad_states, it considered to be good.)
         """
+        assert self._instance_id is not None
         self.remote_orchestrator.wait_for_state(
             service_entity_name=self.service_entity_name,
             service_instance_id=self._instance_id,
@@ -512,6 +514,7 @@ class ManagedServiceInstance:
         )
 
     def get_validation_failure_message(self) -> Optional[str]:
+        assert self._instance_id is not None
         return self.remote_orchestrator.get_validation_failure_message(
             service_entity_name=self.service_entity_name,
             service_instance_id=self._instance_id,
