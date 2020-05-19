@@ -18,7 +18,7 @@ pipeline {
   }
   environment{
      INMANTA_MODULE_REPO="git@github.com:inmanta/"
-     INMANTA_LSM_HOST=192.168.2.102
+     INMANTA_LSM_HOST="192.168.2.102"
   }
   stages {
     stage("setup"){
