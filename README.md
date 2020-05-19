@@ -10,6 +10,27 @@ pip install pytest-inmanta-lsm
 
 ## Usage
 
+ - setup requirements
+ - lsm: compile-export-create-wait
+
+```
+remote.sync(project)
+```
+
+
+```
+ # enable auto transfer
+        self.client.lsm_service_entity_config_set(
+            tid=self.environment,
+            service_entity="cloudconnect",
+            values={
+                "auto_creating": True,
+                "auto_designed": True,
+                "auto_update_designed": True,
+                "auto_update_inprogress": True,
+            },
+        )
+```
 ## Options
 
 The following options are available.
