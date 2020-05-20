@@ -42,7 +42,7 @@ def test_full_cycle(project, remote_orchestrator):
     # get a ManagedInstance object, to simplifies interacting with a specific service instance
     service_instance = remote_orchestrator.get_managed_instance(SERVICE_NAME)
 
-    # create an instance an wait for it to be up
+    # create an instance and wait for it to be up
     service_instance.create(
         attributes={"router_ip": "192.168.222.254", "interface_name": "eth1", "address": "10.10.14.254/24", "vlan_id": 14},
         wait_for_state="up",
