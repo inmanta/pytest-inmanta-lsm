@@ -9,8 +9,6 @@
 from inmanta import resources
 from inmanta.agent import handler
 
-KEY_PREFIX = "unittest_"
-
 DATA = {}
 
 

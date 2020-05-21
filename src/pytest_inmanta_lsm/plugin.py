@@ -66,7 +66,7 @@ def pytest_addoption(parser):
     group.addoption(
         "--lsm_environment",
         dest="inm_lsm_env",
-        help="the environment to use on the remote server (it created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT",
+        help="the environment to use on the remote server (is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT",
     )
     group.addoption(
         "--lsm_noclean", dest="inm_lsm_noclean", help="Don't cleanup the orchestrator after tests (for debugging purposes)",
@@ -159,10 +159,10 @@ class RemoteOrchestrator:
 
         result = client.get_environment(self._env)
         if result.code == 200:
-            # environment exits
+            # environment exists
             return
 
-        # environment does not exits, find project
+        # environment does not exists, find project
 
         def ensure_project(project_name: str) -> str:
             result = client.project_list()
@@ -301,8 +301,8 @@ class RemoteOrchestrator:
         """
         :param version: Version number which will be checked on orchestrator
         :param timeout: Value of timeout in seconds
-        :param desired_state: Expected start of deployment when it will be ready
-        :raise:AssertionError: In case of wrong state or timeout expiration
+        :param desired_state: Expected state of each resource when the deployment is ready
+        :raise AssertionError: In case of wrong state or timeout expiration
         """
         client = self.client
         environment = self.environment
@@ -342,6 +342,7 @@ class RemoteOrchestrator:
         LOGGER.info("Waiting for service instance  to go to state %s", state)
         start_time = time.time()
 
+        # we keep the previous state to be able to output log lines for states changes only, not for every time we poll
         previous_state = None
 
         while True:
