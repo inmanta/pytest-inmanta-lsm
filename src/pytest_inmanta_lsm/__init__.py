@@ -1,3 +1,11 @@
+"""
+    Pytest Inmanta LSM
+
+    :copyright: 2020 Inmanta
+    :contact: code@inmanta.com
+    :license: Inmanta EULA
+"""
+
 import logging
 import time
 from typing import Callable

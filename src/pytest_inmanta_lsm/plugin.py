@@ -1,3 +1,11 @@
+"""
+    Pytest Inmanta LSM
+
+    :copyright: 2020 Inmanta
+    :contact: code@inmanta.com
+    :license: Inmanta EULA
+"""
+
 import logging
 import os
 import os.path
@@ -11,6 +19,7 @@ import yaml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.endpoints import SyncClient
 from pytest_inmanta.plugin import Project
+
 from pytest_inmanta_lsm import retry_limited
 
 try:
@@ -320,15 +329,17 @@ class RemoteOrchestrator:
         timeout: int = 600,
         bad_states: List[str] = ["rejected", "failed"],
     ) -> None:
-        """ Wait for the connection to reach the given state
+        """ Wait for the service instance to reach the given state
 
-            :param state: Poll until the connection reaches this state
-            :param version: In this state the connection should have this version
+            :param service_entity_name: the name of the service entity (type)
+            :param service_instance_id: the service is of the service instance
+            :param state: Poll until the service instance  reaches this state
+            :param version: In this state the service instance  should have this version
             :param timeout: How long can we wait for service to achieve given state (in seconds)
             :param bad_state: States that should not be reached, if these are reached,
                waiting is aborted (if the target state is in bad_states, it considered to be good.)
         """
-        LOGGER.info("Waiting for connection to go to state %s", state)
+        LOGGER.info("Waiting for service instance  to go to state %s", state)
         start_time = time.time()
 
         previous_state = None
@@ -369,13 +380,13 @@ class RemoteOrchestrator:
             if time.time() - start_time > timeout:
                 # TODO: last error with AWS was when instance_state=deleting, state=terminated (just slow AWS?)
                 raise RuntimeError(
-                    f"Timeout {timeout} second exceed waiting for connection (ID: {service_instance_id}, "
+                    f"Timeout {timeout} second exceed waiting for service instance  (ID: {service_instance_id}, "
                     f"version: {version}) to go to state {state}. LSM state: {instance_state}"
                 )
 
             time.sleep(1)
 
-        LOGGER.info(f"Connection reached state {state} with version {version}")
+        LOGGER.info(f"service instance  reached state {state} with version {version}")
 
     def get_validation_failure_message(self, service_entity_name: str, service_instance_id: str,) -> Optional[str]:
         """
@@ -423,7 +434,7 @@ class ManagedServiceInstance:
         self, remote_orchestrator: RemoteOrchestrator, service_entity_name: str, service_id: Optional[str] = None,
     ) -> None:
         """
-            :param lab: remote_orchestrator to create the connection on
+            :param remote_orchestrator: remote_orchestrator to create the service instance  on
             :param service_entity_name: name of the service entity
         """
         self.remote_orchestrator = remote_orchestrator
@@ -441,9 +452,12 @@ class ManagedServiceInstance:
             have version {version}
 
             :param attributes: service attributes to set
+            :param wait_for_state: wait for this state to be reached
+            :param bad_state: stop waiting and fail if any of these states are reached
+            :param version: the target state should have this version number
         """
         client = self.remote_orchestrator.client
-        LOGGER.info(f"LSM for Cloudconnect creation parameters:\n{pformat(attributes)}")
+        LOGGER.info(f"LSM {self.service_entity_name} creation parameters:\n{pformat(attributes)}")
         response = client.lsm_services_create(
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
@@ -469,7 +483,11 @@ class ManagedServiceInstance:
         version: Optional[int] = None,
         bad_states: List[str] = ["rejected", "failed"],
     ) -> None:
-        """ Delete the connection
+        """
+            :param current_version: the version the service is in now
+            :param wait_for_state: wait for this state to be reached
+            :param bad_state: stop waiting and fail if any of these states are reached
+            :param version: the target state should have this version number
         """
         if current_version is None:
             response = self.remote_orchestrator.client.lsm_services_get(
@@ -491,10 +509,10 @@ class ManagedServiceInstance:
     def wait_for_state(
         self, state: str, version: Optional[int] = None, timeout: int = 600, bad_states: List[str] = ["rejected", "failed"],
     ) -> None:
-        """ Wait for the connection to reach the given state
+        """ Wait for the service instance  to reach the given state
 
-            :param state: Poll until the connection reaches this state
-            :param version: In this state the connection should have this version
+            :param state: Poll until the service instance  reaches this state
+            :param version: In this state the service instance  should have this version
             :param timeout: How long can we wait for service to achieve given state (in seconds)
             :param bad_state: States that should not be reached, if these are reached,
                waiting is aborted (if the target state is in bad_states, it considered to be good.)
