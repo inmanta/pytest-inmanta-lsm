@@ -16,15 +16,19 @@ pipeline {
   parameters {
     booleanParam(name:"pytest_inmanta_dev" ,defaultValue: true, description: 'Changes the index used to install pytest-inmanta to the inmanta dev index')
   }
+  environment{
+     INMANTA_LSM_HOST="192.168.2.102"
+     PIP_INDEX_URL="https://artifacts.internal.inmanta.com/inmanta/dev"
+  }
   stages {
     stage("setup"){
       steps{
         script{
           sh """
           python3 -m venv ${env.WORKSPACE}/env
-          pip install -U setuptools pip ${get_pip_options()}
-          pip install -U requirements.dev.txt ${get_pip_options()}
-          pip install -U -c requirements.txt . ${get_pip_options()}
+          ${env.WORKSPACE}/env/bin/pip install -U setuptools pip ${get_pip_options()}
+          ${env.WORKSPACE}/env/bin/pip install -U -r requirements.dev.txt ${get_pip_options()}
+          ${env.WORKSPACE}/env/bin/pip install -U -c requirements.txt . ${get_pip_options()}
           """
         }
       }
@@ -33,19 +37,23 @@ pipeline {
       steps{
         script{
           sh'''
-          ${WORKSPACE}/env/bin/flake8 *.py src tests
+          ${WORKSPACE}/env/bin/flake8 src tests examples *.py
           '''
         }
       }
     }
     stage("tests"){
       steps{
-        script{
-          sh'''
-          ${WORKSPACE}/env/bin/pytest" tests -v -s --junitxml=junit.xml --cov=inmanta_plugins.yang  --cov-report term --cov-report xml:coverage.xml
-          '''
-          junit 'junit.xml'
-          cobertura coberturaReportFile: 'coverage.xml'
+        sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
+          withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
+            script{
+              sh"""
+              
+              INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
+              """
+              junit 'junit.xml'
+            }
+          }
         }
       }
     }
@@ -79,7 +87,7 @@ pipeline {
       script {
         sh'''
         echo "Cleanup"
-        rm -rf ${env.WORKSPACE}/env
+        rm -rf ${WORKSPACE}/env
         echo "Cleanup finished"
         '''
       }

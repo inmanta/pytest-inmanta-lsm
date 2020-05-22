@@ -1,5 +1,5 @@
 mypy
-pytest-cov
+lxml
 flake8
 flake8-black
 flake8-isort
