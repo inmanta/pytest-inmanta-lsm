@@ -87,7 +87,7 @@ def remote_orchestrator(project: Project, request) -> "Iterator[RemoteOrchestrat
     env = get_opt_or_env_or(request.config, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
     host = get_opt_or_env_or(request.config, "inm_lsm_remote_host", "127.0.0.1")
     user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
-    noclean = bool(get_opt_or_env_or(request.config, "inm_lsm_noclean", "false"))
+    noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
 
     remote_orchestrator = RemoteOrchestrator(host, user, env, project)
     remote_orchestrator.clean()
@@ -335,7 +335,7 @@ class RemoteOrchestrator:
             :param state: Poll until the service instance  reaches this state
             :param version: In this state the service instance  should have this version
             :param timeout: How long can we wait for service to achieve given state (in seconds)
-            :param bad_state: States that should not be reached, if these are reached,
+            :param bad_states: States that should not be reached, if these are reached,
                waiting is aborted (if the target state is in bad_states, it considered to be good.)
         """
         LOGGER.info("Waiting for service instance  to go to state %s", state)
@@ -453,7 +453,7 @@ class ManagedServiceInstance:
 
             :param attributes: service attributes to set
             :param wait_for_state: wait for this state to be reached
-            :param bad_state: stop waiting and fail if any of these states are reached
+            :param bad_states: stop waiting and fail if any of these states are reached
             :param version: the target state should have this version number
         """
         client = self.remote_orchestrator.client
@@ -486,7 +486,7 @@ class ManagedServiceInstance:
         """
             :param current_version: the version the service is in now
             :param wait_for_state: wait for this state to be reached
-            :param bad_state: stop waiting and fail if any of these states are reached
+            :param bad_states: stop waiting and fail if any of these states are reached
             :param version: the target state should have this version number
         """
         if current_version is None:
@@ -514,7 +514,7 @@ class ManagedServiceInstance:
             :param state: Poll until the service instance  reaches this state
             :param version: In this state the service instance  should have this version
             :param timeout: How long can we wait for service to achieve given state (in seconds)
-            :param bad_state: States that should not be reached, if these are reached,
+            :param bad_states: States that should not be reached, if these are reached,
                waiting is aborted (if the target state is in bad_states, it considered to be good.)
         """
         assert self._instance_id is not None
