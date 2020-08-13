@@ -19,6 +19,7 @@ import yaml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.endpoints import SyncClient
 from pytest_inmanta.plugin import Project
+
 from pytest_inmanta_lsm import retry_limited
 
 try:
