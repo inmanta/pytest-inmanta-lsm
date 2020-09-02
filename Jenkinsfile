@@ -25,7 +25,6 @@ pipeline {
       steps{
         script{
           sh """
-          rm -rf ${env.WORKSPACE}/env
           python3 -m venv ${env.WORKSPACE}/env
           ${env.WORKSPACE}/env/bin/pip install -U setuptools pip ${get_pip_options()}
           ${env.WORKSPACE}/env/bin/pip install -U -r requirements.dev.txt ${get_pip_options()}
