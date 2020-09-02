@@ -24,7 +24,7 @@ setup(
     long_description=read("README.md"),
     packages=["pytest_inmanta_lsm"],
     package_dir={"": "src"},
-    install_requires=["pytest-inmanta"],
+    install_requires=["pytest-inmanta", "inmanta-lsm"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Framework :: Pytest",
