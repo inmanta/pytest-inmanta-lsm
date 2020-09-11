@@ -69,7 +69,9 @@ def pytest_addoption(parser):
         help="the environment to use on the remote server (is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT",
     )
     group.addoption(
-        "--lsm_noclean", dest="inm_lsm_noclean", help="Don't cleanup the orchestrator after tests (for debugging purposes)",
+        "--lsm_noclean",
+        dest="inm_lsm_noclean",
+        help="Don't cleanup the orchestrator after tests (for debugging purposes)",
     )
 
 
@@ -147,14 +149,12 @@ class RemoteOrchestrator:
         return self._host
 
     def export_service_entities(self) -> None:
-        """ Initialize the remote orchestrator with the service model and check if all preconditions hold
-        """
+        """Initialize the remote orchestrator with the service model and check if all preconditions hold"""
         self.sync_project()
         self._project._exporter.run_export_plugin("service_entities_exporter")
 
     def _ensure_environment(self) -> None:
-        """ Make sure the environment exists
-        """
+        """Make sure the environment exists"""
         client = self.client
 
         result = client.get_environment(self._env)
@@ -176,12 +176,13 @@ class RemoteOrchestrator:
             return result.result["data"]["id"]
 
         result = client.create_environment(
-            project_id=ensure_project("pytest-inmanta-lsm"), name="pytest-inmanta-lsm", environment_id=self._env,
+            project_id=ensure_project("pytest-inmanta-lsm"),
+            name="pytest-inmanta-lsm",
+            environment_id=self._env,
         )
 
     def sync_project(self) -> None:
-        """ Synchronize the project to the lab orchestrator
-        """
+        """Synchronize the project to the lab orchestrator"""
         project = self._project
 
         LOGGER.info("Sending service model to the lab orchestrator")
@@ -192,7 +193,8 @@ class RemoteOrchestrator:
         modules_path = project_data.get("modulepath", [])
         if isinstance(modules_path, str):
             LOGGER.warning(
-                "modulepath in project.yaml was a string and not and array! Got %s", modules_path,
+                "modulepath in project.yaml was a string and not and array! Got %s",
+                modules_path,
             )
             modules_path = [modules_path]
 
@@ -289,15 +291,19 @@ class RemoteOrchestrator:
         self.client.set_setting(self._env, "autostart_agent_repair_interval", 0)
 
     def cache_project(self) -> None:
-        """ Cache the project on the server so that a sync can be faster.
-        """
+        """Cache the project on the server so that a sync can be faster."""
         LOGGER.info(f"Caching project on server ({self._server_path}) to cache dir: {self._server_cache_path}")
         subprocess.check_output(
             SSH_CMD + [f"{self._ssh_user}@{self.host}", f"sudo cp -a {self._server_path} {self._server_cache_path}"],
             stderr=subprocess.PIPE,
         )
 
-    def wait_until_deployment_finishes(self, version: int, timeout: int = 600, desired_state: str = "deployed",) -> None:
+    def wait_until_deployment_finishes(
+        self,
+        version: int,
+        timeout: int = 600,
+        desired_state: str = "deployed",
+    ) -> None:
         """
         :param version: Version number which will be checked on orchestrator
         :param timeout: Value of timeout in seconds
@@ -310,7 +316,9 @@ class RemoteOrchestrator:
         def is_deployment_finished() -> bool:
             response = client.get_version(environment, version)
             LOGGER.info(
-                "Deployed %s of %s resources", response.result["model"]["done"], response.result["model"]["total"],
+                "Deployed %s of %s resources",
+                response.result["model"]["done"],
+                response.result["model"]["total"],
             )
             return response.result["model"]["total"] - response.result["model"]["done"] <= 0
 
@@ -329,15 +337,15 @@ class RemoteOrchestrator:
         timeout: int = 600,
         bad_states: List[str] = ["rejected", "failed"],
     ) -> None:
-        """ Wait for the service instance to reach the given state
+        """Wait for the service instance to reach the given state
 
-            :param service_entity_name: the name of the service entity (type)
-            :param service_instance_id: the service is of the service instance
-            :param state: Poll until the service instance  reaches this state
-            :param version: In this state the service instance  should have this version
-            :param timeout: How long can we wait for service to achieve given state (in seconds)
-            :param bad_states: States that should not be reached, if these are reached,
-               waiting is aborted (if the target state is in bad_states, it considered to be good.)
+        :param service_entity_name: the name of the service entity (type)
+        :param service_instance_id: the service is of the service instance
+        :param state: Poll until the service instance  reaches this state
+        :param version: In this state the service instance  should have this version
+        :param timeout: How long can we wait for service to achieve given state (in seconds)
+        :param bad_states: States that should not be reached, if these are reached,
+           waiting is aborted (if the target state is in bad_states, it considered to be good.)
         """
         LOGGER.info("Waiting for service instance  to go to state %s", state)
         start_time = time.time()
@@ -347,7 +355,9 @@ class RemoteOrchestrator:
 
         while True:
             response = self.client.lsm_services_get(
-                tid=self.environment, service_entity=service_entity_name, service_id=service_instance_id,
+                tid=self.environment,
+                service_entity=service_entity_name,
+                service_id=service_instance_id,
             )
             assert response.code == 200
             instance_state: str = response.result["data"]["state"]
@@ -389,7 +399,11 @@ class RemoteOrchestrator:
 
         LOGGER.info(f"service instance  reached state {state} with version {version}")
 
-    def get_validation_failure_message(self, service_entity_name: str, service_instance_id: str,) -> Optional[str]:
+    def get_validation_failure_message(
+        self,
+        service_entity_name: str,
+        service_instance_id: str,
+    ) -> Optional[str]:
         """
         Get the compiler error for a validation failure for a specific service entity
         """
@@ -398,7 +412,9 @@ class RemoteOrchestrator:
 
         # get service log
         result = client.lsm_service_log_list(
-            tid=environment, service_entity=service_entity_name, service_id=service_instance_id,
+            tid=environment,
+            service_entity=service_entity_name,
+            service_id=service_instance_id,
         )
         assert result.code == 200
         # get events that led to final state
@@ -427,16 +443,19 @@ class RemoteOrchestrator:
 
 
 class ManagedServiceInstance:
-    """ Object that represents a service instance that contains the method to
-        push it through its lifecycle and verify its status
+    """Object that represents a service instance that contains the method to
+    push it through its lifecycle and verify its status
     """
 
     def __init__(
-        self, remote_orchestrator: RemoteOrchestrator, service_entity_name: str, service_id: Optional[str] = None,
+        self,
+        remote_orchestrator: RemoteOrchestrator,
+        service_entity_name: str,
+        service_id: Optional[str] = None,
     ) -> None:
         """
-            :param remote_orchestrator: remote_orchestrator to create the service instance  on
-            :param service_entity_name: name of the service entity
+        :param remote_orchestrator: remote_orchestrator to create the service instance  on
+        :param service_entity_name: name of the service entity
         """
         self.remote_orchestrator = remote_orchestrator
         self.service_entity_name = service_entity_name
@@ -449,13 +468,13 @@ class ManagedServiceInstance:
         version: Optional[int] = None,
         bad_states: List[str] = ["rejected", "failed"],
     ) -> None:
-        """ Create the service instance and wait for it to go into {wait_for_state} and
-            have version {version}
+        """Create the service instance and wait for it to go into {wait_for_state} and
+        have version {version}
 
-            :param attributes: service attributes to set
-            :param wait_for_state: wait for this state to be reached
-            :param bad_states: stop waiting and fail if any of these states are reached
-            :param version: the target state should have this version number
+        :param attributes: service attributes to set
+        :param wait_for_state: wait for this state to be reached
+        :param bad_states: stop waiting and fail if any of these states are reached
+        :param version: the target state should have this version number
         """
         client = self.remote_orchestrator.client
         LOGGER.info(f"LSM {self.service_entity_name} creation parameters:\n{pformat(attributes)}")
@@ -466,7 +485,9 @@ class ManagedServiceInstance:
             service_instance_id=self._instance_id,
         )
         LOGGER.info(
-            "Created instance with status code %d, got response %s", response.code, response.result,
+            "Created instance with status code %d, got response %s",
+            response.code,
+            response.result,
         )
         if "message" in response.result:
             LOGGER.info(response.result["message"])
@@ -485,14 +506,16 @@ class ManagedServiceInstance:
         bad_states: List[str] = ["rejected", "failed"],
     ) -> None:
         """
-            :param current_version: the version the service is in now
-            :param wait_for_state: wait for this state to be reached
-            :param bad_states: stop waiting and fail if any of these states are reached
-            :param version: the target state should have this version number
+        :param current_version: the version the service is in now
+        :param wait_for_state: wait for this state to be reached
+        :param bad_states: stop waiting and fail if any of these states are reached
+        :param version: the target state should have this version number
         """
         if current_version is None:
             response = self.remote_orchestrator.client.lsm_services_get(
-                tid=self.remote_orchestrator.environment, service_entity=self.service_entity_name, service_id=self._instance_id,
+                tid=self.remote_orchestrator.environment,
+                service_entity=self.service_entity_name,
+                service_id=self._instance_id,
             )
             assert response.code == 200
             current_version = response.result["data"]["version"]
@@ -508,15 +531,19 @@ class ManagedServiceInstance:
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
     def wait_for_state(
-        self, state: str, version: Optional[int] = None, timeout: int = 600, bad_states: List[str] = ["rejected", "failed"],
+        self,
+        state: str,
+        version: Optional[int] = None,
+        timeout: int = 600,
+        bad_states: List[str] = ["rejected", "failed"],
     ) -> None:
-        """ Wait for the service instance  to reach the given state
+        """Wait for the service instance  to reach the given state
 
-            :param state: Poll until the service instance  reaches this state
-            :param version: In this state the service instance  should have this version
-            :param timeout: How long can we wait for service to achieve given state (in seconds)
-            :param bad_states: States that should not be reached, if these are reached,
-               waiting is aborted (if the target state is in bad_states, it considered to be good.)
+        :param state: Poll until the service instance  reaches this state
+        :param version: In this state the service instance  should have this version
+        :param timeout: How long can we wait for service to achieve given state (in seconds)
+        :param bad_states: States that should not be reached, if these are reached,
+           waiting is aborted (if the target state is in bad_states, it considered to be good.)
         """
         assert self._instance_id is not None
         self.remote_orchestrator.wait_for_state(
@@ -531,5 +558,6 @@ class ManagedServiceInstance:
     def get_validation_failure_message(self) -> Optional[str]:
         assert self._instance_id is not None
         return self.remote_orchestrator.get_validation_failure_message(
-            service_entity_name=self.service_entity_name, service_instance_id=self._instance_id,
+            service_entity_name=self.service_entity_name,
+            service_instance_id=self._instance_id,
         )
