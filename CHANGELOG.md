@@ -1,3 +1,8 @@
-# 0.0.1
+# V 0.0.2 (?)
 Changes in this release:
- - Initial import
+- Fixed bug where `--lsm_noclean` defaults to True (#3)
+- Various dependency improvements (#4, #18)
+
+# V 0.0.1
+Changes in this release:
+- Initial import
