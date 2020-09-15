@@ -22,6 +22,7 @@ setup(
     url="https://github.com/inmanta/pytest-inmanta-lsm",
     description="Common fixtures for inmanta LSM related modules",
     long_description=read("README.md"),
+    long_description_content_type='text/markdown',
     packages=["pytest_inmanta_lsm"],
     package_dir={"": "src"},
     install_requires=["pytest-inmanta", "inmanta-lsm"],
