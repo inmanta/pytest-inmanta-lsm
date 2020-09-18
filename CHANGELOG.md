@@ -1,3 +1,6 @@
+# v 0.1.0 (?)
+Changes in this release:
+
 # V 0.0.2 (20-09-18)
 Changes in this release:
 - Fixed bug where `--lsm_noclean` defaults to True (#3)
