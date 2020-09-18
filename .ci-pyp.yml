@@ -1,2 +1,3 @@
 pipeline_template: ci/inmanta-tools/Jenkinsfile-pyp
 repo_name: pytest-inmanta-lsm
+public: false
