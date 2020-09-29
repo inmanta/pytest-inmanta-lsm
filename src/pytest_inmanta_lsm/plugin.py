@@ -17,6 +17,7 @@ from typing import Any, Dict, Iterator, List, Optional
 import pytest
 import yaml
 from inmanta.agent import config as inmanta_config
+from inmanta.const import ResourceAction, ResourceState
 from inmanta.protocol.endpoints import SyncClient
 from pytest_inmanta.plugin import Project
 
@@ -385,6 +386,10 @@ class RemoteOrchestrator:
                 if msg:
                     LOGGER.warning(f"Validation Failure due to: {msg}")
                     assert False, f"validation failure! {msg}"
+                msg = self.get_deployment_failure_report(service_entity_name, service_instance_id)
+                if msg:
+                    LOGGER.warning(f"Deployment Failure due to: {msg}")
+                    assert False, f"Deployment failure! {msg}"
 
                 assert False, f"Returned state {instance_state} in {bad_states}"
 
@@ -398,6 +403,58 @@ class RemoteOrchestrator:
             time.sleep(1)
 
         LOGGER.info(f"service instance  reached state {state} with version {version}")
+
+    def get_deployment_failure_report(
+        self, service_entity_name: str, instance_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Return the deployment failure report for the given service instance.
+
+        :param client: The Inmanta client.
+        :param env_id: The ID of the environment of the given service instance.
+        :param service_entity_name: The name of the service entity the service instance belongs to.
+        :param instance_id: The ID of the service instance.
+        :return: A dictionary containing the latest deployment failure report or None when no failure report was found.
+        """
+        client = self.client
+        env_id: str = self.environment
+
+        # Get latest version service instance
+        result = client.lsm_services_get(
+            tid=env_id, service_entity=service_entity_name, service_id=instance_id
+        )
+        assert result.code == 200
+        current_version = result.result["data"]["version"]
+
+        # Get resource ids of failed resources
+        result = client.lsm_services_resources_list(
+            tid=env_id,
+            service_entity=service_entity_name,
+            service_id=instance_id,
+            current_version=current_version,
+        )
+        assert result.code == 200
+        resource_ids_failed_resources = [
+            r["resource_id"]
+            for r in result.result["data"]
+            if r["resource_state"] == ResourceState.failed.value
+        ]
+
+        # Find the latest log message with the ERROR log level
+        for rid in resource_ids_failed_resources:
+            result = client.get_resource(
+                tid=env_id, id=rid, logs=True, log_action=ResourceAction.deploy
+            )
+            assert result.code == 200
+            for resource_action in result.result["logs"]:
+                error_logs = [
+                    msg for msg in resource_action["messages"] if msg["level"] == "ERROR"
+                ]
+                if error_logs:
+                    # TODO: return which resource as well: result.result["resource"]
+                    return error_logs[0]
+
+        return None
 
     def get_validation_failure_message(
         self,
