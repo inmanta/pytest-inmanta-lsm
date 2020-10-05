@@ -17,7 +17,7 @@ pipeline {
     booleanParam(name:"pytest_inmanta_dev", defaultValue: true, description: 'Changes the index used to install pytest-inmanta to the inmanta dev index')
   }
   environment{
-     INMANTA_LSM_HOST="http://iso3-test.ci.inmanta.com/	"
+     INMANTA_LSM_HOST="iso3-test.ci.inmanta.com"
      PIP_INDEX_URL="https://artifacts.internal.inmanta.com/inmanta/dev"
   }
   stages {
