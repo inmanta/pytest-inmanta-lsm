@@ -604,8 +604,8 @@ class ManagedServiceInstance:
         ), f"Failed to delete for ID: {self._instance_id}, response code: {response.code}\n{response.result}"
 
         return self.wait_for_state(
-            wait_for_state, 
-            version=version, 
+            wait_for_state,
+            version=version,
             bad_states=bad_states,
         )
 
