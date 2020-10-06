@@ -12,7 +12,7 @@ import os.path
 import subprocess
 import time
 from pprint import pformat
-from typing import Any, Dict, Iterator, List, Optional, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import pytest
 import yaml
@@ -336,7 +336,7 @@ class RemoteOrchestrator:
         version: Optional[int] = None,
         timeout: int = 600,
         bad_states: List[str] = ["rejected", "failed"],
-    ) -> None:
+    ) -> Tuple[str, int]:
         """Wait for the service instance to reach the given state
 
         :param service_entity_name: the name of the service entity (type)
@@ -353,6 +353,9 @@ class RemoteOrchestrator:
         # we keep the previous state to be able to output log lines for states changes only, not for every time we poll
         previous_state = None
 
+        instance_state: str = ""
+        instance_version: int = -1
+
         while True:
             response = self.client.lsm_services_get(
                 tid=self.environment,
@@ -360,8 +363,8 @@ class RemoteOrchestrator:
                 service_id=service_instance_id,
             )
             assert response.code == 200
-            instance_state: str = response.result["data"]["state"]
-            instance_version: int = response.result["data"]["version"]
+            instance_state = response.result["data"]["state"]
+            instance_version = response.result["data"]["version"]
 
             if previous_state != instance_state:
                 LOGGER.info(
@@ -397,7 +400,8 @@ class RemoteOrchestrator:
 
             time.sleep(1)
 
-        LOGGER.info(f"service instance  reached state {state} with version {version}")
+        LOGGER.info(f"service instance  reached state {instance_state} with version {instance_version}")
+        return instance_state, instance_version
 
     def get_validation_failure_message(
         self,
@@ -483,7 +487,7 @@ class ManagedServiceInstance:
         wait_for_state: str = "start",
         version: Optional[int] = None,
         bad_states: List[str] = CREATE_FLOW_BAD_STATES,
-    ) -> None:
+    ) -> Tuple[str, int]:
         """Create the service instance and wait for it to go into {wait_for_state} and
         have version {version}
 
@@ -518,7 +522,7 @@ class ManagedServiceInstance:
             # Nothing more to be done
             pass
 
-        self.wait_for_state(wait_for_state, version, bad_states=bad_states)
+        return self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
     def update(
         self,
@@ -527,7 +531,7 @@ class ManagedServiceInstance:
         new_version: int = None,
         attribute_updates: Dict[str, Union[str, int]] = {},
         bad_states: List[str] = UPDATE_FLOW_BAD_STATES,
-    ) -> None:
+    ) -> Tuple[str, int]:
         """
         Update Connection with given parameters 'attribute_update'
         This method will wait for the provided state to verify the update
@@ -546,9 +550,11 @@ class ManagedServiceInstance:
             attributes=attribute_updates,
             current_version=version,
         )
-        assert response.code == 200, f"Failed to update for ID: {self._instance_id}, response code: {response.code}"
+        assert (
+            response.code == 200
+        ), f"Failed to update for ID: {self._instance_id}, response code: {response.code}\n{response.result}"
 
-        self.wait_for_state(
+        return self.wait_for_state(
             wait_for_state,
             version=new_version,
             bad_states=bad_states,
@@ -560,7 +566,7 @@ class ManagedServiceInstance:
         wait_for_state: str = "terminated",
         version: Optional[int] = None,
         bad_states: List[str] = DELETE_FLOW_BAD_STATES,
-    ) -> None:
+    ) -> Tuple[str, int]:
         """
         :param current_version: the version the service is in now
         :param wait_for_state: wait for this state to be reached
@@ -584,7 +590,7 @@ class ManagedServiceInstance:
             current_version=current_version,
         )
         assert response.code == 200, f"failed to delete connection: {response.result}"
-        self.wait_for_state(wait_for_state, version, bad_states=bad_states)
+        return self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
     def wait_for_state(
         self,
@@ -592,7 +598,7 @@ class ManagedServiceInstance:
         version: Optional[int] = None,
         timeout: int = 600,
         bad_states: List[str] = ALL_BAD_STATES,
-    ) -> None:
+    ) -> Tuple[str, int]:
         """Wait for the service instance  to reach the given state
 
         :param state: Poll until the service instance  reaches this state
@@ -602,7 +608,7 @@ class ManagedServiceInstance:
            waiting is aborted (if the target state is in bad_states, it considered to be good.)
         """
         assert self._instance_id is not None
-        self.remote_orchestrator.wait_for_state(
+        return self.remote_orchestrator.wait_for_state(
             service_entity_name=self.service_entity_name,
             service_instance_id=self._instance_id,
             state=state,
