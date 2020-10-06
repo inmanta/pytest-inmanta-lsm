@@ -12,7 +12,7 @@ import os.path
 import subprocess
 import time
 from pprint import pformat
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 import pytest
 import yaml
