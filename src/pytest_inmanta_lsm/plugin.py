@@ -103,6 +103,7 @@ def remote_orchestrator(project: Project, request) -> "Iterator[RemoteOrchestrat
 
 
 class RemoteOrchestrator:
+    
     def __init__(self, host: str, ssh_user: str, environment: str, project: Project) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
@@ -447,6 +448,27 @@ class ManagedServiceInstance:
     push it through its lifecycle and verify its status
     """
 
+    CREATE_FLOW_BAD_STATES = [
+        "order_rejected",
+        "create_failed",
+        "up_failed",
+        "warning",
+    ]
+
+    UPDATE_FLOW_BAD_STATES = [
+        "update_rejected",
+        "update_warning",
+        "update_failed",
+        "rollback_failed",
+        "warning",
+    ]
+
+    DELETE_FLOW_BAD_STATES = ["delete_failed", "deallocate_failed"]
+
+    ALL_BAD_STATES = list(
+        set(CREATE_FLOW_BAD_STATES + UPDATE_FLOW_BAD_STATES + DELETE_FLOW_BAD_STATES)
+    )
+
     def __init__(
         self,
         remote_orchestrator: RemoteOrchestrator,
@@ -466,7 +488,7 @@ class ManagedServiceInstance:
         attributes: Dict[str, Any],
         wait_for_state: str = "start",
         version: Optional[int] = None,
-        bad_states: List[str] = ["rejected", "failed"],
+        bad_states: List[str] = CREATE_FLOW_BAD_STATES,
     ) -> None:
         """Create the service instance and wait for it to go into {wait_for_state} and
         have version {version}
@@ -507,12 +529,52 @@ class ManagedServiceInstance:
 
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
+    def update(
+        self,
+        wait_for_state: str = "update_start",
+        version: int = None,
+        new_version: int = None,
+        attribute_updates: Dict[str, Union[str, int]] = {},
+        bad_states: List[str] = UPDATE_FLOW_BAD_STATES,
+    ) -> None:
+        """
+        Update Connection with given parameters 'attribute_update'
+        This method will wait for the provided state to verify the update
+
+        :param wait_for_state: which state to wait for when update is finished
+        :param version: current version
+        :param new_version: version when update has finished
+        :param attribute_updates: dictionary containing the key(s) and value(s) to be updates
+        :param bad_states: see Connection.wait_for_state parameter 'bad_states'
+        """
+        start_version = self.get_current_version()
+        if not version:
+            version = start_version
+
+        response = self.lab.client.lsm_services_update(
+            tid=self.lab.environment,
+            service_entity=conf.SERVICE_ENTITY,
+            service_id=self._instance_id,
+            attributes=attribute_updates,
+            current_version=version,
+        )
+        assert (
+            response.code == 200
+        ), f"Failed to update for ID: {self._instance_id}, response code: {response.code}"
+
+        self.wait_for_state(
+            wait_for_state,
+            version=new_version,
+            bad_states=bad_states,
+            start_version=start_version,
+        )    
+
     def delete(
         self,
         current_version: Optional[int] = None,
         wait_for_state: str = "terminated",
         version: Optional[int] = None,
-        bad_states: List[str] = ["rejected", "failed"],
+        bad_states: List[str] = DELETE_FLOW_BAD_STATES,
     ) -> None:
         """
         :param current_version: the version the service is in now
@@ -536,7 +598,7 @@ class ManagedServiceInstance:
             service_id=self._instance_id,
             current_version=current_version,
         )
-        assert response.code == 200
+        assert response.code == 200, f"failed to delete connection: {response.result}"
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
     def wait_for_state(
@@ -544,7 +606,7 @@ class ManagedServiceInstance:
         state: str,
         version: Optional[int] = None,
         timeout: int = 600,
-        bad_states: List[str] = ["rejected", "failed"],
+        bad_states: List[str] = ALL_BAD_STATES,
     ) -> None:
         """Wait for the service instance  to reach the given state
 
