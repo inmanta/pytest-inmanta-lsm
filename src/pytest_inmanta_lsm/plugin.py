@@ -125,11 +125,11 @@ class RemoteOrchestrator:
 
         self._project = project
 
-        self._client = None
+        self._client: SyncClient = None
 
         # cache the environment before a cleanup is done. This allows the sync to go faster.
-        self._server_path = None
-        self._server_cache_path = None
+        self._server_path: str = None
+        self._server_cache_path: str = None
 
         self._ensure_environment()
 
@@ -447,9 +447,9 @@ class ManagedServiceInstance:
     push it through its lifecycle and verify its status
     """
 
-    CREATE_FLOW_BAD_STATES = ["rejected", "failed"]
+    CREATE_FLOW_BAD_STATES: List[str] = ["rejected", "failed"]
 
-    UPDATE_FLOW_BAD_STATES = [
+    UPDATE_FLOW_BAD_STATES: List[str] = [
         "update_start_failed",
         "update_acknowledged_failed",
         "update_designed_failed",
@@ -459,7 +459,7 @@ class ManagedServiceInstance:
         "failed",
     ]
 
-    DELETE_FLOW_BAD_STATES = []
+    DELETE_FLOW_BAD_STATES: List[str] = []
 
     ALL_BAD_STATES = list(set(CREATE_FLOW_BAD_STATES + UPDATE_FLOW_BAD_STATES + DELETE_FLOW_BAD_STATES))
 
@@ -538,12 +538,9 @@ class ManagedServiceInstance:
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates
         :param bad_states: see Connection.wait_for_state parameter 'bad_states'
         """
-        start_version = self.get_current_version()
-        if not version:
-            version = start_version
-
-        response = self.lab.client.lsm_services_update(
-            tid=self.lab.environment,
+        client = self.remote_orchestrator.client
+        response = client.lsm_services_update(
+            tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             service_id=self._instance_id,
             attributes=attribute_updates,
@@ -555,7 +552,6 @@ class ManagedServiceInstance:
             wait_for_state,
             version=new_version,
             bad_states=bad_states,
-            start_version=start_version,
         )
 
     def delete(
