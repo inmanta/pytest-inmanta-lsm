@@ -103,7 +103,6 @@ def remote_orchestrator(project: Project, request) -> "Iterator[RemoteOrchestrat
 
 
 class RemoteOrchestrator:
-    
     def __init__(self, host: str, ssh_user: str, environment: str, project: Project) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
@@ -448,23 +447,21 @@ class ManagedServiceInstance:
     push it through its lifecycle and verify its status
     """
 
-    CREATE_FLOW_BAD_STATES = [ "rejected", "failed" ]
+    CREATE_FLOW_BAD_STATES = ["rejected", "failed"]
 
     UPDATE_FLOW_BAD_STATES = [
-        "update_start_failed", 
-        "update_acknowledged_failed", 
-        "update_designed_failed", 
-        "update_rejected", 
-        "update_rejected_failed", 
-        "update_failed", 
+        "update_start_failed",
+        "update_acknowledged_failed",
+        "update_designed_failed",
+        "update_rejected",
+        "update_rejected_failed",
+        "update_failed",
         "failed",
     ]
 
-    DELETE_FLOW_BAD_STATES = ["delete_failed", "deallocate_failed"]
+    DELETE_FLOW_BAD_STATES = ["rejected", "failed"]
 
-    ALL_BAD_STATES = list(
-        set(CREATE_FLOW_BAD_STATES + UPDATE_FLOW_BAD_STATES + DELETE_FLOW_BAD_STATES)
-    )
+    ALL_BAD_STATES = list(set(CREATE_FLOW_BAD_STATES + UPDATE_FLOW_BAD_STATES + DELETE_FLOW_BAD_STATES))
 
     def __init__(
         self,
@@ -550,21 +547,19 @@ class ManagedServiceInstance:
 
         response = self.lab.client.lsm_services_update(
             tid=self.lab.environment,
-            service_entity=conf.SERVICE_ENTITY,
+            service_entity=self.service_entity_name,
             service_id=self._instance_id,
             attributes=attribute_updates,
             current_version=version,
         )
-        assert (
-            response.code == 200
-        ), f"Failed to update for ID: {self._instance_id}, response code: {response.code}"
+        assert response.code == 200, f"Failed to update for ID: {self._instance_id}, response code: {response.code}"
 
         self.wait_for_state(
             wait_for_state,
             version=new_version,
             bad_states=bad_states,
             start_version=start_version,
-        )    
+        )
 
     def delete(
         self,
