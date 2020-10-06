@@ -12,7 +12,7 @@ import os.path
 import subprocess
 import time
 from pprint import pformat
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import pytest
 import yaml
@@ -386,10 +386,12 @@ class RemoteOrchestrator:
                 if msg:
                     LOGGER.warning(f"Validation Failure due to: {msg}")
                     assert False, f"validation failure! {msg}"
-                msg = self.get_deployment_failure_report(service_entity_name, service_instance_id)
-                if msg:
-                    LOGGER.warning(f"Deployment Failure due to: {msg}")
-                    assert False, f"Deployment failure! {msg}"
+                result = self.get_deployment_failure_report(service_entity_name, service_instance_id)
+                if result is not None:
+                    msg, resource = result
+                    full_msg: str = f"Deployment Failure due to: {msg}.\n\nFailed resource: {resource}"
+                    LOGGER.warning(full_msgf)
+                    assert False, full_msg
 
                 assert False, f"Returned state {instance_state} in {bad_states}"
 
@@ -406,7 +408,7 @@ class RemoteOrchestrator:
 
     def get_deployment_failure_report(
         self, service_entity_name: str, instance_id: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[Tuple[Dict[str, Any], Dict]]:
         """
         Return the deployment failure report for the given service instance.
 
@@ -414,7 +416,8 @@ class RemoteOrchestrator:
         :param env_id: The ID of the environment of the given service instance.
         :param service_entity_name: The name of the service entity the service instance belongs to.
         :param instance_id: The ID of the service instance.
-        :return: A dictionary containing the latest deployment failure report or None when no failure report was found.
+        :return: A tuple of a dictionary containing the latest deployment failure report and the failed resource
+            or None when no failure report was found.
         """
         client = self.client
         env_id: str = self.environment
@@ -451,8 +454,7 @@ class RemoteOrchestrator:
                     msg for msg in resource_action["messages"] if msg["level"] == "ERROR"
                 ]
                 if error_logs:
-                    # TODO: return which resource as well: result.result["resource"]
-                    return error_logs[0]
+                    return error_logs[0], result.result["resource"]
 
         return None
 
