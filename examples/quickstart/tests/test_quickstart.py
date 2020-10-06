@@ -48,4 +48,6 @@ def test_full_cycle(project, remote_orchestrator):
     )
 
     # break it down
-    service_instance.delete()
+    service_instance.delete(
+        current_version=version,
+    )
