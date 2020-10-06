@@ -527,7 +527,7 @@ class ManagedServiceInstance:
     def update(
         self,
         wait_for_state: str = "update_start",
-        version: int = None,
+        current_version: Optional[int] = None,
         new_version: int = None,
         attribute_updates: Dict[str, Union[str, int]] = {},
         bad_states: List[str] = UPDATE_FLOW_BAD_STATES,
@@ -542,13 +542,23 @@ class ManagedServiceInstance:
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates
         :param bad_states: see Connection.wait_for_state parameter 'bad_states'
         """
+        if current_version is None:
+            response = self.remote_orchestrator.client.lsm_services_get(
+                tid=self.remote_orchestrator.environment,
+                service_entity=self.service_entity_name,
+                service_id=self._instance_id,
+            )
+            assert response.code == 200
+            current_version = response.result["data"]["version"]
+
+        LOGGER.info("Updating service instance %s", self._instance_id)
         client = self.remote_orchestrator.client
         response = client.lsm_services_update(
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             service_id=self._instance_id,
             attributes=attribute_updates,
-            current_version=version,
+            current_version=current_version,
         )
         assert (
             response.code == 200
@@ -589,8 +599,15 @@ class ManagedServiceInstance:
             service_id=self._instance_id,
             current_version=current_version,
         )
-        assert response.code == 200, f"failed to delete connection: {response.result}"
-        return self.wait_for_state(wait_for_state, version, bad_states=bad_states)
+        assert (
+            response.code == 200
+        ), f"Failed to delete for ID: {self._instance_id}, response code: {response.code}\n{response.result}"
+
+        return self.wait_for_state(
+            wait_for_state, 
+            version=version, 
+            bad_states=bad_states,
+        )
 
     def wait_for_state(
         self,

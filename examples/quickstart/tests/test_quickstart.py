@@ -30,7 +30,7 @@ def test_full_cycle(project, remote_orchestrator):
     service_instance = remote_orchestrator.get_managed_instance(SERVICE_NAME)
 
     # create an instance and wait for it to be up
-    state, version = service_instance.create(
+    _, version = service_instance.create(
         attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
         wait_for_state="up",
     )
@@ -41,9 +41,9 @@ def test_full_cycle(project, remote_orchestrator):
         wait_for_state="rejected",
     )
 
-    service_instance.update(
+    _, version = service_instance.update(
         attribute_updates={"vlan_id": 42},
-        version=version,
+        current_version=version,
         wait_for_state="up",
     )
 
