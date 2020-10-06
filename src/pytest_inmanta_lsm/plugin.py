@@ -515,7 +515,6 @@ class ManagedServiceInstance:
         LOGGER.info(f"Created instance has ID: {self._instance_id}")
 
         instance_state = response.result["data"]["state"]
-        assert instance_state == "ordered"
 
         if wait_for_state == "ordered":
             # Nothing more to be done
