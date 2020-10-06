@@ -448,12 +448,7 @@ class ManagedServiceInstance:
     push it through its lifecycle and verify its status
     """
 
-    CREATE_FLOW_BAD_STATES = [
-        "order_rejected",
-        "create_failed",
-        "up_failed",
-        "warning",
-    ]
+    CREATE_FLOW_BAD_STATES = [ "rejected", "failed" ]
 
     UPDATE_FLOW_BAD_STATES = [
         "update_rejected",
