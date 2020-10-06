@@ -459,7 +459,7 @@ class ManagedServiceInstance:
         "failed",
     ]
 
-    DELETE_FLOW_BAD_STATES = ["rejected", "failed"]
+    DELETE_FLOW_BAD_STATES = []
 
     ALL_BAD_STATES = list(set(CREATE_FLOW_BAD_STATES + UPDATE_FLOW_BAD_STATES + DELETE_FLOW_BAD_STATES))
 
