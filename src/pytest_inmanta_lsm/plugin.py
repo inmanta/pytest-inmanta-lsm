@@ -451,11 +451,13 @@ class ManagedServiceInstance:
     CREATE_FLOW_BAD_STATES = [ "rejected", "failed" ]
 
     UPDATE_FLOW_BAD_STATES = [
-        "update_rejected",
-        "update_warning",
-        "update_failed",
-        "rollback_failed",
-        "warning",
+        "update_start_failed", 
+        "update_acknowledged_failed", 
+        "update_designed_failed", 
+        "update_rejected", 
+        "update_rejected_failed", 
+        "update_failed", 
+        "failed",
     ]
 
     DELETE_FLOW_BAD_STATES = ["delete_failed", "deallocate_failed"]
