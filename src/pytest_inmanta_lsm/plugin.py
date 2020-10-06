@@ -492,9 +492,18 @@ class ManagedServiceInstance:
         if "message" in response.result:
             LOGGER.info(response.result["message"])
 
-        assert response.code == 200
+        assert response.code == 200, f"LSM service create failed: {response.result}"
         assert response.result["data"]["version"] == 1
+
         self._instance_id = response.result["data"]["id"]
+        LOGGER.info(f"Created instance has ID: {self._instance_id}")
+
+        instance_state = response.result["data"]["state"]
+        assert instance_state == "ordered"
+
+        if wait_for_state == "ordered":
+            # Nothing more to be done
+            pass
 
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
