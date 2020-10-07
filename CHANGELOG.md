@@ -1,5 +1,6 @@
 # v 0.1.0 (?)
 Changes in this release:
+- Added logging of deployment failure when awaited service instance reaches bad state (#49).
 
 - Add support to override the environment settings that are set after a clean
 - Expose the noclean boolean in the object returned by remote_orchestator fixtures for other fixtures to hook into
