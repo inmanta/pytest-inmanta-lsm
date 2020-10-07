@@ -15,7 +15,6 @@ mypy-extensions==0.4.3
 pathspec==0.8.0
 pycodestyle==2.6.0
 pyflakes==2.2.0
-pytest-inmanta-yang>=0.5.7
 regex==2020.9.27
 testfixtures==6.14.2
 toml==0.10.1
