@@ -423,9 +423,7 @@ class RemoteOrchestrator:
         env_id: str = self.environment
 
         # Get latest version service instance
-        result = client.lsm_services_get(
-            tid=env_id, service_entity=service_entity_name, service_id=instance_id
-        )
+        result = client.lsm_services_get(tid=env_id, service_entity=service_entity_name, service_id=instance_id)
         assert result.code == 200
         current_version = result.result["data"]["version"]
 
@@ -438,21 +436,15 @@ class RemoteOrchestrator:
         )
         assert result.code == 200
         resource_ids_failed_resources = [
-            r["resource_id"]
-            for r in result.result["data"]
-            if r["resource_state"] == ResourceState.failed.value
+            r["resource_id"] for r in result.result["data"] if r["resource_state"] == ResourceState.failed.value
         ]
 
         # Find the latest log message with the ERROR log level
         for rid in resource_ids_failed_resources:
-            result = client.get_resource(
-                tid=env_id, id=rid, logs=True, log_action=ResourceAction.deploy
-            )
+            result = client.get_resource(tid=env_id, id=rid, logs=True, log_action=ResourceAction.deploy)
             assert result.code == 200
             for resource_action in result.result["logs"]:
-                error_logs = [
-                    msg for msg in resource_action["messages"] if msg["level"] == "ERROR"
-                ]
+                error_logs = [msg for msg in resource_action["messages"] if msg["level"] == "ERROR"]
                 if error_logs:
                     return error_logs[0], result.result["resource"]
 
