@@ -19,7 +19,6 @@ import yaml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.endpoints import SyncClient
 from pytest_inmanta.plugin import Project
-from pytest_inmanta_yang import RemoteLogBasedPerformanceMeasurement
 
 from pytest_inmanta_lsm import retry_limited
 
@@ -444,6 +443,10 @@ class ManagedServiceInstance:
         self._instance_id = response.result["data"]["id"]
         LOGGER.info(f"Created instance has ID: {self._instance_id}")
 
+        if wait_for_state == "ordered":
+            # Nothing more to be done
+            pass
+
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
     def update(
@@ -726,20 +729,15 @@ class WaitForState(object):
         return current_state
 
 
-class FailedResourcesLogs(RemoteLogBasedPerformanceMeasurement):
+class FailedResourcesLogs:
     """
     Class to retrieve all logs from failed resources.
     No environment version needs to be specified, the latest (highest number) version will be used
     """
 
     def __init__(self, client, environment_id):
-        super().__init__(
-            client=client,
-            influxdb_publisher=None,
-            test_name=None,
-            test_action=None,
-            environment_id=environment_id,
-        )
+        self._client = client
+        self._environment_id = environment_id
 
     def _extract_logs(self, get_version_result):
         """
@@ -761,6 +759,19 @@ class FailedResourcesLogs(RemoteLogBasedPerformanceMeasurement):
                 logs.extend([(message, resource_id) for message in action["messages"]])
 
         return logs
+
+    def _retrieve_logs(self):
+        get_version_result = self._client.get_version(
+            tid=self._environment_id, id=self._find_version(), include_logs=True
+        ).get_result()
+
+        return self._extract_logs(get_version_result)
+
+    def _find_version(self):
+        versions = self._client.list_versions(tid=self._environment_id).result["versions"]
+
+        # assumption - version with highest number will be the latest one
+        return max(version_item["version"] for version_item in versions)
 
     def get(self):
         """Get the failed resources logs"""
