@@ -120,7 +120,9 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
 
 
 class RemoteOrchestrator:
-    def __init__(self, host: str, ssh_user: str, environment: str, project: Project, settings: Dict[str, str], noclean: bool) -> None:
+    def __init__(
+        self, host: str, ssh_user: str, environment: str, project: Project, settings: Dict[str, str], noclean: bool
+    ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
 
@@ -129,7 +131,8 @@ class RemoteOrchestrator:
         :param environment: uuid of the environment to use, is created if it doesn't exists
         :param project: project fixture of pytest-inmanta
         :param settings: The inmanta environment settings that should be set on the remote orchestrator
-        :param noclean: Option to indicate that after the run clean should not run. This exposes the attribute to other fixtures.
+        :param noclean: Option to indicate that after the run clean should not run. This exposes the attribute to other
+                        fixtures.
         """
         self._env = environment
         self._host = host
