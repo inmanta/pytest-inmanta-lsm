@@ -390,7 +390,7 @@ class RemoteOrchestrator:
                 if result is not None:
                     msg, resource = result
                     full_msg: str = f"Deployment Failure due to: {msg}.\n\nFailed resource: {resource}"
-                    LOGGER.warning(full_msgf)
+                    LOGGER.warning(full_msg)
                     assert False, full_msg
 
                 assert False, f"Returned state {instance_state} in {bad_states}"
@@ -491,7 +491,7 @@ class RemoteOrchestrator:
         reports = result.result["report"]["reports"]
         for report in reversed(reports):
             # get latest failed step
-            if report["returncode"] != 0:
+            if "returncode" in report and report["returncode"] != 0:
                 return report["errstream"]
 
         LOGGER.info("No failure found in the failed validation! %s", reports)
