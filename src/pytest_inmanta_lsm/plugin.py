@@ -12,7 +12,7 @@ import os.path
 import subprocess
 import time
 from pprint import pformat
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 import pytest
 import yaml
@@ -84,7 +84,7 @@ def get_opt_or_env_or(config, key: str, default: str) -> str:
 
 
 @pytest.fixture
-def remote_orchestrator_settings():
+def remote_orchestrator_settings() -> Dict[str, Union[str, int, bool]]:
     return {}
 
 
@@ -97,6 +97,7 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
     noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
 
+    # set the defaults here and lets the fixture override specific values
     settings = {
         "auto_deploy": True,
         "server_compile": True,
