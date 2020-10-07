@@ -12,7 +12,7 @@ import os.path
 import subprocess
 import time
 from pprint import pformat
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import pytest
 import yaml
@@ -85,7 +85,18 @@ def get_opt_or_env_or(config, key: str, default: str) -> str:
 
 
 @pytest.fixture
-def remote_orchestrator(project: Project, request) -> "Iterator[RemoteOrchestrator]":
+def remote_orchestrator_settings() -> Dict[str, Union[str, int, bool]]:
+    """Override this fixture in your tests or conf test to set custom environment settings after cleanup. The supported
+    settings are documented in https://docs.inmanta.com/inmanta-service-orchestrator/3/reference/environmentsettings.html
+
+    The remote_orchestrator fixture already sets a number of non-default values to make the fixture work as it should.
+    However, overriding for example the deploy interval so speed up skip resources can be useful.
+    """
+    return {}
+
+
+@pytest.fixture
+def remote_orchestrator(project: Project, request, remote_orchestrator_settings) -> "Iterator[RemoteOrchestrator]":
     LOGGER.info("Setting up remote orchestrator")
 
     env = get_opt_or_env_or(request.config, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
@@ -93,7 +104,20 @@ def remote_orchestrator(project: Project, request) -> "Iterator[RemoteOrchestrat
     user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
     noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
 
-    remote_orchestrator = RemoteOrchestrator(host, user, env, project)
+    # set the defaults here and lets the fixture override specific values
+    settings = {
+        "auto_deploy": True,
+        "server_compile": True,
+        "agent_trigger_method_on_auto_deploy": "push_incremental_deploy",
+        "push_on_auto_deploy": True,
+        "autostart_agent_deploy_splay_time": 0,
+        "autostart_agent_deploy_interval": 600,
+        "autostart_agent_repair_splay_time": 600,
+        "autostart_agent_repair_interval": 0,
+    }
+    settings.update(remote_orchestrator_settings)
+
+    remote_orchestrator = RemoteOrchestrator(host, user, env, project, settings, noclean)
     remote_orchestrator.clean()
 
     yield remote_orchestrator
@@ -104,7 +128,9 @@ def remote_orchestrator(project: Project, request) -> "Iterator[RemoteOrchestrat
 
 
 class RemoteOrchestrator:
-    def __init__(self, host: str, ssh_user: str, environment: str, project: Project) -> None:
+    def __init__(
+        self, host: str, ssh_user: str, environment: str, project: Project, settings: Dict[str, str], noclean: bool
+    ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
 
@@ -112,10 +138,15 @@ class RemoteOrchestrator:
         :param ssh_user: the username to log on to the machine, should have sudo rights
         :param environment: uuid of the environment to use, is created if it doesn't exists
         :param project: project fixture of pytest-inmanta
+        :param settings: The inmanta environment settings that should be set on the remote orchestrator
+        :param noclean: Option to indicate that after the run clean should not run. This exposes the attribute to other
+                        fixtures.
         """
         self._env = environment
         self._host = host
         self._ssh_user = ssh_user
+        self._settings = settings
+        self.noclean = noclean
 
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", self._env)
@@ -282,14 +313,8 @@ class RemoteOrchestrator:
         LOGGER.debug("Cleared environment")
 
         LOGGER.info("Resetting orchestrator")
-        self.client.set_setting(self._env, "auto_deploy", True)
-        self.client.set_setting(self._env, "server_compile", True)
-        self.client.set_setting(self._env, "agent_trigger_method_on_auto_deploy", "push_incremental_deploy")
-        self.client.set_setting(self._env, "push_on_auto_deploy", True)
-        self.client.set_setting(self._env, "autostart_agent_deploy_splay_time", 0)
-        self.client.set_setting(self._env, "autostart_agent_deploy_interval", 600)
-        self.client.set_setting(self._env, "autostart_agent_repair_splay_time", 600)
-        self.client.set_setting(self._env, "autostart_agent_repair_interval", 0)
+        for key, value in self._settings.items():
+            self.client.set_setting(self._env, key, value)
 
     def cache_project(self) -> None:
         """Cache the project on the server so that a sync can be faster."""
