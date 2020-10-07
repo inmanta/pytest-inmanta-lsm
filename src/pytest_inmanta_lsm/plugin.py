@@ -85,6 +85,12 @@ def get_opt_or_env_or(config, key: str, default: str) -> str:
 
 @pytest.fixture
 def remote_orchestrator_settings() -> Dict[str, Union[str, int, bool]]:
+    """Override this fixture in your tests or conf test to set custom environment settings after cleanup. The supported
+    settings are documented in https://docs.inmanta.com/inmanta-service-orchestrator/3/reference/environmentsettings.html
+
+    The remote_orchestrator fixture already sets a number of non-default values to make the fixture work as it should.
+    However, overriding for example the deploy interval so speed up skip resources can be useful.
+    """
     return {}
 
 
