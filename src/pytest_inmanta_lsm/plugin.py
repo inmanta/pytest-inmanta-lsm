@@ -18,8 +18,8 @@ import pytest
 import yaml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.endpoints import SyncClient
-from pytest_inmanta_yang import RemoteLogBasedPerformanceMeasurement
 from pytest_inmanta.plugin import Project
+from pytest_inmanta_yang import RemoteLogBasedPerformanceMeasurement
 
 from pytest_inmanta_lsm import retry_limited
 
@@ -613,7 +613,6 @@ class ManagedServiceInstance:
 
         return {"state": instance_state, "version": instance_version}
 
-
     def wait_for_state(
         self,
         state: str,
@@ -631,7 +630,7 @@ class ManagedServiceInstance:
            waiting is aborted (if the target state is in bad_states, it considered to be good.)
         :param start_version: Provide a start_version when the wait for state is the same as the starting state
         """
-        
+
         def compare_states(current_state, wait_for_state):
             if current_state["state"] == wait_for_state["state"]:
                 if not version:
@@ -662,11 +661,10 @@ class ManagedServiceInstance:
 
             # No validation failure message, so getting failed resource logs
             failed_resource_logs = FailedResourcesLogs(
-                self.remote_orchestrator.client, 
+                self.remote_orchestrator.client,
                 self.remote_orchestrator.environment,
             )
             return failed_resource_logs.get()
-
 
         wait_for_obj = WaitForState(
             "Connection",
@@ -677,9 +675,7 @@ class ManagedServiceInstance:
             get_bad_state_error_method=get_bad_state_error,
         )
 
-        wait_for_obj.wait_for_state(
-            {"state": state, "version": version}, bad_states=bad_states, timeout=timeout
-        )
+        wait_for_obj.wait_for_state({"state": state, "version": version}, bad_states=bad_states, timeout=timeout)
 
     def get_validation_failure_message(self) -> Optional[str]:
         assert self._instance_id is not None
@@ -773,17 +769,13 @@ class WaitForState(object):
             current_state = self.__get_state()
 
             if previous_state != current_state:
-                LOGGER.info(
-                    f"{self.name} went to state ({current_state}), waiting for state ({state})"
-                )
+                LOGGER.info(f"{self.name} went to state ({current_state}), waiting for state ({state})")
 
                 previous_state = current_state
 
             if self.__check_start_state(current_state):
                 if not start_state_logged:
-                    LOGGER.info(
-                        f"{self.name} is still in starting state ({current_state}), waiting for next state"
-                    )
+                    LOGGER.info(f"{self.name} is still in starting state ({current_state}), waiting for next state")
                     start_state_logged = True
 
             else:
@@ -850,6 +842,5 @@ class FailedResourcesLogs(RemoteLogBasedPerformanceMeasurement):
         return logs
 
     def get(self):
-        """ Get the failed resources logs
-        """
+        """Get the failed resources logs"""
         return self._retrieve_logs()
