@@ -1,5 +1,6 @@
 # v 0.1.0 (?)
 Changes in this release:
+- Added logging of deployment failure when awaited service instance reaches bad state (#49).
 
 # V 0.0.2 (20-09-18)
 Changes in this release:
