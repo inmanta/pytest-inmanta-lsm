@@ -444,10 +444,6 @@ class ManagedServiceInstance:
         self._instance_id = response.result["data"]["id"]
         LOGGER.info(f"Created instance has ID: {self._instance_id}")
 
-        if wait_for_state == "ordered":
-            # Nothing more to be done
-            pass
-
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
     def update(
