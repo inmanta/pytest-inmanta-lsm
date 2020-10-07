@@ -18,6 +18,7 @@ import pytest
 import yaml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.endpoints import SyncClient
+from pytest_inmanta_yang import RemoteLogBasedPerformanceMeasurement
 from pytest_inmanta.plugin import Project
 
 from pytest_inmanta_lsm import retry_limited
@@ -484,10 +485,10 @@ class ManagedServiceInstance:
     def create(
         self,
         attributes: Dict[str, Any],
-        wait_for_state: str = "start",
+        wait_for_state: str = "up",
         version: Optional[int] = None,
         bad_states: List[str] = CREATE_FLOW_BAD_STATES,
-    ) -> Tuple[str, int]:
+    ) -> None:
         """Create the service instance and wait for it to go into {wait_for_state} and
         have version {version}
 
@@ -522,16 +523,16 @@ class ManagedServiceInstance:
             # Nothing more to be done
             pass
 
-        return self.wait_for_state(wait_for_state, version, bad_states=bad_states)
+        self.wait_for_state(wait_for_state, version, bad_states=bad_states)
 
     def update(
         self,
-        wait_for_state: str = "update_start",
+        wait_for_state: str = "up",
         current_version: Optional[int] = None,
         new_version: int = None,
         attribute_updates: Dict[str, Union[str, int]] = {},
         bad_states: List[str] = UPDATE_FLOW_BAD_STATES,
-    ) -> Tuple[str, int]:
+    ) -> None:
         """
         Update Connection with given parameters 'attribute_update'
         This method will wait for the provided state to verify the update
@@ -543,13 +544,7 @@ class ManagedServiceInstance:
         :param bad_states: see Connection.wait_for_state parameter 'bad_states'
         """
         if current_version is None:
-            response = self.remote_orchestrator.client.lsm_services_get(
-                tid=self.remote_orchestrator.environment,
-                service_entity=self.service_entity_name,
-                service_id=self._instance_id,
-            )
-            assert response.code == 200
-            current_version = response.result["data"]["version"]
+            current_version = self.get_state()["version"]
 
         LOGGER.info("Updating service instance %s", self._instance_id)
         client = self.remote_orchestrator.client
@@ -564,10 +559,11 @@ class ManagedServiceInstance:
             response.code == 200
         ), f"Failed to update for ID: {self._instance_id}, response code: {response.code}\n{response.result}"
 
-        return self.wait_for_state(
+        self.wait_for_state(
             wait_for_state,
             version=new_version,
             bad_states=bad_states,
+            start_version=current_version,
         )
 
     def delete(
@@ -576,7 +572,7 @@ class ManagedServiceInstance:
         wait_for_state: str = "terminated",
         version: Optional[int] = None,
         bad_states: List[str] = DELETE_FLOW_BAD_STATES,
-    ) -> Tuple[str, int]:
+    ) -> None:
         """
         :param current_version: the version the service is in now
         :param wait_for_state: wait for this state to be reached
@@ -584,13 +580,7 @@ class ManagedServiceInstance:
         :param version: the target state should have this version number
         """
         if current_version is None:
-            response = self.remote_orchestrator.client.lsm_services_get(
-                tid=self.remote_orchestrator.environment,
-                service_entity=self.service_entity_name,
-                service_id=self._instance_id,
-            )
-            assert response.code == 200
-            current_version = response.result["data"]["version"]
+            current_version = self.get_state()["version"]
 
         LOGGER.info("Deleting service instance %s", self._instance_id)
         response = self.remote_orchestrator.client.lsm_services_delete(
@@ -603,11 +593,26 @@ class ManagedServiceInstance:
             response.code == 200
         ), f"Failed to delete for ID: {self._instance_id}, response code: {response.code}\n{response.result}"
 
-        return self.wait_for_state(
+        self.wait_for_state(
             wait_for_state,
             version=version,
             bad_states=bad_states,
         )
+
+    def get_state(
+        self,
+    ) -> Dict[str, Union[str, int]]:
+        response = self.remote_orchestrator.client.lsm_services_get(
+            tid=self.remote_orchestrator.environment,
+            service_entity=self.service_entity_name,
+            service_id=self._instance_id,
+        )
+        assert response.code == 200
+        instance_state = response.result["data"]["state"]
+        instance_version = response.result["data"]["version"]
+
+        return {"state": instance_state, "version": instance_version}
+
 
     def wait_for_state(
         self,
@@ -615,6 +620,7 @@ class ManagedServiceInstance:
         version: Optional[int] = None,
         timeout: int = 600,
         bad_states: List[str] = ALL_BAD_STATES,
+        start_version: int = None,
     ) -> Tuple[str, int]:
         """Wait for the service instance  to reach the given state
 
@@ -623,15 +629,56 @@ class ManagedServiceInstance:
         :param timeout: How long can we wait for service to achieve given state (in seconds)
         :param bad_states: States that should not be reached, if these are reached,
            waiting is aborted (if the target state is in bad_states, it considered to be good.)
+        :param start_version: Provide a start_version when the wait for state is the same as the starting state
         """
-        assert self._instance_id is not None
-        return self.remote_orchestrator.wait_for_state(
-            service_entity_name=self.service_entity_name,
-            service_instance_id=self._instance_id,
-            state=state,
-            version=version,
-            timeout=timeout,
-            bad_states=bad_states,
+        
+        def compare_states(current_state, wait_for_state):
+            if current_state["state"] == wait_for_state["state"]:
+                if not version:
+                    # Version is not given, so version does not need to be verified
+                    return True
+
+                else:
+                    assert (
+                        current_state["version"] == wait_for_state["version"]
+                    ), f"Connection reached state ({current_state}), but has a version mismatch: ({wait_for_state})"
+                    return True
+            else:
+                return False
+
+        def check_start_state(current_state):
+            return current_state["version"] == start_version
+
+        def check_bad_state(current_state, bad_states):
+            return current_state["state"] in bad_states
+
+        def get_bad_state_error(current_state):
+            validation_failure_msg = self.remote_orchestrator.get_validation_failure_message(
+                service_entity_name=self.service_entity_name,
+                service_instance_id=self._instance_id,
+            )
+            if validation_failure_msg:
+                return validation_failure_msg
+
+            # No validation failure message, so getting failed resource logs
+            failed_resource_logs = FailedResourcesLogs(
+                self.remote_orchestrator.client, 
+                self.remote_orchestrator.environment,
+            )
+            return failed_resource_logs.get()
+
+
+        wait_for_obj = WaitForState(
+            "Connection",
+            get_state_method=self.get_state,
+            compare_states_method=compare_states,
+            check_start_state_method=check_start_state,
+            check_bad_state_method=check_bad_state,
+            get_bad_state_error_method=get_bad_state_error,
+        )
+
+        wait_for_obj.wait_for_state(
+            {"state": state, "version": version}, bad_states=bad_states, timeout=timeout
         )
 
     def get_validation_failure_message(self) -> Optional[str]:
@@ -640,3 +687,169 @@ class ManagedServiceInstance:
             service_entity_name=self.service_entity_name,
             service_instance_id=self._instance_id,
         )
+
+
+class WaitForState(object):
+    """
+    Wait for state helper class
+    """
+
+    @staticmethod
+    def default_get_state():
+        return None
+
+    @staticmethod
+    def default_compare_states(current_state, wait_for_state):
+        return current_state == wait_for_state
+
+    @staticmethod
+    def default_check_start_state(current_state):
+        return False
+
+    @staticmethod
+    def default_check_bad_state(current_state, bad_states):
+        return current_state in bad_states
+
+    @staticmethod
+    def default_get_bad_state_error(current_state):
+        return None
+
+    def __init__(
+        self,
+        name,
+        get_state_method=default_get_state.__func__,
+        compare_states_method=default_compare_states.__func__,
+        check_start_state_method=default_check_start_state.__func__,
+        check_bad_state_method=default_check_bad_state.__func__,
+        get_bad_state_error_method=default_get_bad_state_error.__func__,
+    ):
+        """
+        :param name: to clarify the logging,
+            preferably set to name of class where the wait for state functionality is needed
+        :param get_state_method: method to obtain the instance state
+        :param compare_states_method: method to compare the current state with the wait_for_state
+            method should return True in case both states are equal
+            method should return False in case states are different
+            method should have two parameters: current_state, wait_for_state
+        :param check_start_state_method: method to take the start state into account
+            method should return True in case the given state is the start state
+            method should return False in case the given state is not the start state
+            method should have one parameter: current_state
+        :param get_bad_state_error_method: use this method if more details about the bad_state can be obtained,
+            method should have current_state as parameter
+            just return None is no details are available
+        """
+        self.name = name
+        self.__get_state = get_state_method
+        self.__compare_states = compare_states_method
+        self.__check_start_state = check_start_state_method
+        self.__check_bad_state = check_bad_state_method
+        self.__get_bad_state_error = get_bad_state_error_method
+
+    def __compose_error_msg_with_bad_state_error(self, error_msg, current_state):
+        bad_state_error = self.__get_bad_state_error(current_state)
+        if bad_state_error:
+            error_msg += f", error: {pformat(bad_state_error)}"
+
+        return error_msg
+
+    def wait_for_state(self, state, bad_states=[], timeout=600, interval=1):
+        """
+        Wait for instance to go to given state
+
+        :param state: state the instance needs to go to
+        :param bad_states: in case the instance can go into an unwanted state, leave empty if not applicable
+        :param timeout: timeout value of this method (in seconds)
+        :param interval: wait time between retries (in seconds)
+        :returns: current state, can raise RuntimeError when state has not been reached within timeout
+        """
+        LOGGER.info(f"Waiting for {self.name} to go to state ({state})")
+        start_time = time.time()
+
+        previous_state = None
+        start_state_logged = False
+
+        while True:
+            current_state = self.__get_state()
+
+            if previous_state != current_state:
+                LOGGER.info(
+                    f"{self.name} went to state ({current_state}), waiting for state ({state})"
+                )
+
+                previous_state = current_state
+
+            if self.__check_start_state(current_state):
+                if not start_state_logged:
+                    LOGGER.info(
+                        f"{self.name} is still in starting state ({current_state}), waiting for next state"
+                    )
+                    start_state_logged = True
+
+            else:
+                if self.__compare_states(current_state, state):
+                    LOGGER.info(f"{self.name} reached state ({state})")
+                    break
+
+                if self.__check_bad_state(current_state, bad_states):
+                    error_msg = self.__compose_error_msg_with_bad_state_error(
+                        f"{self.name} got into bad state ({current_state})",
+                        current_state,
+                    )
+                    raise RuntimeError(error_msg)
+
+            if time.time() - start_time > timeout:
+                error_msg = self.__compose_error_msg_with_bad_state_error(
+                    (
+                        f"{self.name} exceeded timeout {timeout}s while waiting for state ({state}). "
+                        f"Stuck in current state ({current_state})"
+                    ),
+                    current_state,
+                )
+                raise RuntimeError(error_msg)
+
+            time.sleep(interval)
+
+        return current_state
+
+
+class FailedResourcesLogs(RemoteLogBasedPerformanceMeasurement):
+    """
+    Class to retrieve all logs from failed resources.
+    No environment version needs to be specified, the latest (highest number) version will be used
+    """
+
+    def __init__(self, client, environment_id):
+        super().__init__(
+            client=client,
+            influxdb_publisher=None,
+            test_name=None,
+            test_action=None,
+            environment_id=environment_id,
+        )
+
+    def _extract_logs(self, get_version_result):
+        """
+        Extract the relevant logs
+        """
+        logs = []
+
+        for resource in get_version_result["resources"]:
+            resource_id = resource["resource_id"]
+
+            # Only interested in failed resources
+            if resource["status"] != "failed":
+                continue
+
+            for action in resource["actions"]:
+                if "messages" not in action:
+                    continue
+
+                logs.extend([(message, resource_id) for message in action["messages"]])
+
+        return logs
+
+    def get(self):
+        """ Get the failed resources logs
+        """
+        return self._retrieve_logs()
