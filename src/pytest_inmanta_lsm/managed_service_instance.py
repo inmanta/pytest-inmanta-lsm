@@ -2,7 +2,7 @@ import logging
 from pprint import pformat
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from pytest_inmanta_lsm import remote_orchestrator
+from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
 from pytest_inmanta_lsm.failed_resources_logs import FailedResourcesLogs
 from pytest_inmanta_lsm.wait_for_state import WaitForState
 
@@ -32,7 +32,7 @@ class ManagedServiceInstance:
 
     def __init__(
         self,
-        remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+        remote_orchestrator: "r_orchestrator.RemoteOrchestrator",
         service_entity_name: str,
         service_id: Optional[str] = None,
     ) -> None:
