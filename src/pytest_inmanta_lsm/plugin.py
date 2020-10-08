@@ -166,13 +166,17 @@ class RemoteOrchestrator:
 
         def ensure_project(project_name: str) -> str:
             result = client.project_list()
-            assert result.code == 200
+            assert (
+                result.code == 200
+            ), f"Wrong reponse code while verifying project, got {result.code} (expected 200): \n{result}"
             for project in result.result["data"]:
                 if project["name"] == project_name:
                     return project["id"]
 
             result = client.project_create(name=project_name)
-            assert result.code == 200
+            assert (
+                result.code == 200
+            ), f"Wrong reponse code while creating project, got {result.code} (expected 200): \n{result}"
             return result.result["data"]["id"]
 
         result = client.create_environment(
@@ -326,7 +330,9 @@ class RemoteOrchestrator:
         result = client.get_version(environment, version)
         for resource in result.result["resources"]:
             LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
-            assert resource["status"] == desired_state
+            assert (
+                resource["status"] == desired_state
+            ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
 
     def get_validation_failure_message(
         self,
@@ -345,7 +351,9 @@ class RemoteOrchestrator:
             service_entity=service_entity_name,
             service_id=service_instance_id,
         )
-        assert result.code == 200
+        assert (
+            result.code == 200
+        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{result}"
         # get events that led to final state
         events = result.result["data"][0]["events"]
         try:
@@ -356,7 +364,9 @@ class RemoteOrchestrator:
             return None
         # get the report
         result = client.get_report(compile_id)
-        assert result.code == 200
+        assert (
+            result.code == 200
+        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{result}"
         # get stage reports
         reports = result.result["report"]["reports"]
         for report in reversed(reports):
@@ -438,7 +448,9 @@ class ManagedServiceInstance:
             LOGGER.info(response.result["message"])
 
         assert response.code == 200, f"LSM service create failed: {response.result}"
-        assert response.result["data"]["version"] == 1
+        assert (
+            response.result["data"]["version"] == 1
+        ), f"Error while creating instance: wrong version, got {response.result['data']['version']} (expected 1)"
 
         self._instance_id = response.result["data"]["id"]
         LOGGER.info(f"Created instance has ID: {self._instance_id}")
@@ -531,7 +543,9 @@ class ManagedServiceInstance:
             service_entity=self.service_entity_name,
             service_id=self._instance_id,
         )
-        assert response.code == 200
+        assert (
+            response.code == 200
+        ), f"Wrong reponse code while trying to get state, got {response.code} (expected 200): \n{response}"
         instance_state = response.result["data"]["state"]
         instance_version = response.result["data"]["version"]
 
@@ -602,7 +616,7 @@ class ManagedServiceInstance:
         wait_for_obj.wait_for_state({"state": state, "version": version}, bad_states=bad_states, timeout=timeout)
 
     def get_validation_failure_message(self) -> Optional[str]:
-        assert self._instance_id is not None
+        assert self._instance_id is not None, "ManagedServiceInstance._instance_id can not be None"
         return self.remote_orchestrator.get_validation_failure_message(
             service_entity_name=self.service_entity_name,
             service_instance_id=self._instance_id,
