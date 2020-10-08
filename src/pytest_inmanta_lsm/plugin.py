@@ -17,7 +17,6 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import pytest
 import yaml
 from inmanta.agent import config as inmanta_config
-from inmanta.const import ResourceAction, ResourceState
 from inmanta.protocol.endpoints import SyncClient
 from pytest_inmanta.plugin import Project
 
