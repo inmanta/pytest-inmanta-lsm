@@ -2,7 +2,7 @@ import logging
 import os
 import subprocess
 from pprint import pformat
-from typing import Optional
+from typing import Dict, Optional
 
 import yaml
 from inmanta.agent import config as inmanta_config
@@ -24,7 +24,9 @@ SSH_CMD = [
 
 
 class RemoteOrchestrator:
-    def __init__(self, host: str, ssh_user: str, environment: str, project: Project) -> None:
+    def __init__(
+        self, host: str, ssh_user: str, environment: str, project: Project, settings: Dict[str, str], noclean: bool
+    ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
 
@@ -32,10 +34,15 @@ class RemoteOrchestrator:
         :param ssh_user: the username to log on to the machine, should have sudo rights
         :param environment: uuid of the environment to use, is created if it doesn't exists
         :param project: project fixture of pytest-inmanta
+        :param settings: The inmanta environment settings that should be set on the remote orchestrator
+        :param noclean: Option to indicate that after the run clean should not run. This exposes the attribute to other
+                        fixtures.
         """
         self._env = environment
         self._host = host
         self._ssh_user = ssh_user
+        self._settings = settings
+        self.noclean = noclean
 
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", self._env)
@@ -206,14 +213,8 @@ class RemoteOrchestrator:
         LOGGER.debug("Cleared environment")
 
         LOGGER.info("Resetting orchestrator")
-        self.client.set_setting(self._env, "auto_deploy", True)
-        self.client.set_setting(self._env, "server_compile", True)
-        self.client.set_setting(self._env, "agent_trigger_method_on_auto_deploy", "push_incremental_deploy")
-        self.client.set_setting(self._env, "push_on_auto_deploy", True)
-        self.client.set_setting(self._env, "autostart_agent_deploy_splay_time", 0)
-        self.client.set_setting(self._env, "autostart_agent_deploy_interval", 600)
-        self.client.set_setting(self._env, "autostart_agent_repair_splay_time", 600)
-        self.client.set_setting(self._env, "autostart_agent_repair_interval", 0)
+        for key, value in self._settings.items():
+            self.client.set_setting(self._env, key, value)
 
     def cache_project(self) -> None:
         """Cache the project on the server so that a sync can be faster."""
