@@ -1,3 +1,12 @@
+"""
+    Pytest Inmanta LSM
+
+    :copyright: 2020 Inmanta
+    :contact: code@inmanta.com
+    :license: Inmanta EULA
+"""
+
+
 class FailedResourcesLogs:
     """
     Class to retrieve all logs from failed resources.
