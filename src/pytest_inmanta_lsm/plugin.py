@@ -83,7 +83,7 @@ def remote_orchestrator_settings() -> Dict[str, Union[str, int, bool]]:
 @pytest.fixture
 def remote_orchestrator(
     project: Project, request, remote_orchestrator_settings
-) -> "Iterator[r_orchestrator.RemoteOrchestrator]":
+) -> Iterator["r_orchestrator.RemoteOrchestrator"]:
     LOGGER.info("Setting up remote orchestrator")
 
     env = get_opt_or_env_or(request.config, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
