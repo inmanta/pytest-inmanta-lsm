@@ -14,7 +14,7 @@ from typing import Dict, Iterator, Union
 import pytest
 from pytest_inmanta.plugin import Project
 
-from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
+from pytest_inmanta_lsm.remote_orchestrator import RemoteOrchestrator
 
 try:
     # make sure that lsm methods are loaded
@@ -81,9 +81,7 @@ def remote_orchestrator_settings() -> Dict[str, Union[str, int, bool]]:
 
 
 @pytest.fixture
-def remote_orchestrator(
-    project: Project, request, remote_orchestrator_settings
-) -> Iterator["r_orchestrator.RemoteOrchestrator"]:
+def remote_orchestrator(project: Project, request, remote_orchestrator_settings) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
     env = get_opt_or_env_or(request.config, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
@@ -104,7 +102,7 @@ def remote_orchestrator(
     }
     settings.update(remote_orchestrator_settings)
 
-    remote_orchestrator = r_orchestrator.RemoteOrchestrator(host, user, env, project, settings, noclean)
+    remote_orchestrator = RemoteOrchestrator(host, user, env, project, settings, noclean)
     remote_orchestrator.clean()
 
     yield remote_orchestrator
