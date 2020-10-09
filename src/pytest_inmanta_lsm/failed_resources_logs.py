@@ -6,6 +6,12 @@
     :license: Inmanta EULA
 """
 
+import logging
+
+from inmanta.protocol.endpoints import SyncClient
+
+LOGGER = logging.getLogger(__name__)
+
 
 class FailedResourcesLogs:
     """
@@ -13,7 +19,7 @@ class FailedResourcesLogs:
     No environment version needs to be specified, the latest (highest number) version will be used
     """
 
-    def __init__(self, client, environment_id):
+    def __init__(self, client: SyncClient, environment_id: str):
         self._client = client
         self._environment_id = environment_id
 
@@ -49,6 +55,10 @@ class FailedResourcesLogs:
         versions = self._client.list_versions(tid=self._environment_id).result["versions"]
 
         # assumption - version with highest number will be the latest one
+        if len(versions) == 0:
+            LOGGER.warn(f"No versions provided for environment {self._environment_id}, picking version 0")
+            return 0
+
         return max(version_item["version"] for version_item in versions)
 
     def get(self):
