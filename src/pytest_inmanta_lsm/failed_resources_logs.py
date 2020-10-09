@@ -7,6 +7,8 @@
 """
 
 import logging
+import uuid
+from typing import Dict, List, Tuple
 
 from inmanta.protocol.endpoints import SyncClient
 
@@ -19,11 +21,11 @@ class FailedResourcesLogs:
     No environment version needs to be specified, the latest (highest number) version will be used
     """
 
-    def __init__(self, client: SyncClient, environment_id: str):
+    def __init__(self, client: SyncClient, environment_id: uuid.UUID):
         self._client = client
         self._environment_id = environment_id
 
-    def _extract_logs(self, get_version_result):
+    def _extract_logs(self, get_version_result: Dict[str, any]) -> List[Tuple[str, str]]:
         """
         Extract the relevant logs
         """
@@ -44,14 +46,14 @@ class FailedResourcesLogs:
 
         return logs
 
-    def _retrieve_logs(self):
+    def _retrieve_logs(self) -> List[Tuple[str, str]]:
         get_version_result = self._client.get_version(
             tid=self._environment_id, id=self._find_version(), include_logs=True
         ).get_result()
 
         return self._extract_logs(get_version_result)
 
-    def _find_version(self):
+    def _find_version(self) -> int:
         versions = self._client.list_versions(tid=self._environment_id).result["versions"]
 
         # assumption - version with highest number will be the latest one
@@ -61,6 +63,6 @@ class FailedResourcesLogs:
 
         return max(version_item["version"] for version_item in versions)
 
-    def get(self):
+    def get(self) -> List[Tuple[str, str]]:
         """Get the failed resources logs"""
         return self._retrieve_logs()
