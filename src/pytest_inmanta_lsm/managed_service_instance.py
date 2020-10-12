@@ -177,7 +177,7 @@ class ManagedServiceInstance:
         )
         assert (
             response.code == 200
-        ), f"Wrong reponse code while trying to get state, got {response.code} (expected 200): \n{response}"
+        ), f"Wrong response code while trying to get state, got {response.code} (expected 200): \n{response}"
         instance_state = response.result["data"]["state"]
         instance_version = response.result["data"]["version"]
 
