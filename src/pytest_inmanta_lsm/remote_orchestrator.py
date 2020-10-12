@@ -10,7 +10,7 @@ import logging
 import os
 import subprocess
 from pprint import pformat
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import yaml
 from inmanta.agent import config as inmanta_config
@@ -33,7 +33,13 @@ SSH_CMD = [
 
 class RemoteOrchestrator:
     def __init__(
-        self, host: str, ssh_user: str, environment: str, project: Project, settings: Dict[str, str], noclean: bool
+        self,
+        host: str,
+        ssh_user: str,
+        environment: str,
+        project: Project,
+        settings: Dict[str, Union[bool, str, int]],
+        noclean: bool,
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta

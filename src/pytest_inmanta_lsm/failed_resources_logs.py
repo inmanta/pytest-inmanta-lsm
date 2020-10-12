@@ -8,7 +8,7 @@
 
 import logging
 import uuid
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from inmanta.protocol.endpoints import SyncClient
 
@@ -25,7 +25,7 @@ class FailedResourcesLogs:
         self._client = client
         self._environment_id = environment_id
 
-    def _extract_logs(self, get_version_result: Dict[str, any]) -> List[Tuple[str, str]]:
+    def _extract_logs(self, get_version_result: Dict[str, Any]) -> List[Tuple[str, str]]:
         """
         Extract the relevant logs
         """

@@ -90,7 +90,7 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
 
     # set the defaults here and lets the fixture override specific values
-    settings = {
+    settings: Dict[str, Union[bool, str, int]] = {
         "auto_deploy": True,
         "server_compile": True,
         "agent_trigger_method_on_auto_deploy": "push_incremental_deploy",

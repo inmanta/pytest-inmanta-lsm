@@ -8,7 +8,7 @@
 
 import logging
 from pprint import pformat
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
 from pytest_inmanta_lsm.failed_resources_logs import FailedResourcesLogs
@@ -190,7 +190,7 @@ class ManagedServiceInstance:
         timeout: int = 600,
         bad_states: List[str] = ALL_BAD_STATES,
         start_version: int = None,
-    ) -> Tuple[str, int]:
+    ) -> None:
         """Wait for the service instance  to reach the given state
 
         :param state: Poll until the service instance  reaches this state
