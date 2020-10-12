@@ -8,6 +8,8 @@
 
 import logging
 import time
+
+from typing import Dict, List, Union
 from pprint import pformat
 
 LOGGER = logging.getLogger(__name__)
@@ -23,25 +25,25 @@ class WaitForState(object):
         return None
 
     @staticmethod
-    def default_compare_states(current_state, wait_for_state):
+    def default_compare_states(current_state: any, wait_for_state: any):
         return current_state == wait_for_state
 
     @staticmethod
-    def default_check_start_state(current_state):
+    def default_check_start_state(current_state: any):
         return False
 
     @staticmethod
-    def default_check_bad_state(current_state, bad_states):
+    def default_check_bad_state(current_state: any, bad_states: List[any]):
         return current_state in bad_states
 
     @staticmethod
-    def default_get_bad_state_error(current_state):
+    def default_get_bad_state_error(current_state: any):
         return None
 
     def __init__(
         self,
         name,
-        get_state_method=default_get_state.__func__,
+        get_state_method,
         compare_states_method=default_compare_states.__func__,
         check_start_state_method=default_check_start_state.__func__,
         check_bad_state_method=default_check_bad_state.__func__,
@@ -70,14 +72,14 @@ class WaitForState(object):
         self.__check_bad_state = check_bad_state_method
         self.__get_bad_state_error = get_bad_state_error_method
 
-    def __compose_error_msg_with_bad_state_error(self, error_msg, current_state):
+    def __compose_error_msg_with_bad_state_error(self, error_msg: str, current_state: any):
         bad_state_error = self.__get_bad_state_error(current_state)
         if bad_state_error:
             error_msg += f", error: {pformat(bad_state_error)}"
 
         return error_msg
 
-    def wait_for_state(self, state, bad_states=[], timeout=600, interval=1):
+    def wait_for_state(self, state: any, bad_states: List[any]=[], timeout: int=600, interval: int=1):
         """
         Wait for instance to go to given state
 
