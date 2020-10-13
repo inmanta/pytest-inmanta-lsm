@@ -126,6 +126,9 @@ class RemoteOrchestrator:
             name="pytest-inmanta-lsm",
             environment_id=self._env,
         )
+        assert (
+            result.code == 200
+        ), f"Wrong response code while creating environment, got {result.code} (expected 200): \n{result}"
 
     def sync_project(self) -> None:
         """Synchronize the project to the lab orchestrator"""
