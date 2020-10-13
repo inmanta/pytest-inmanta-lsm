@@ -56,7 +56,7 @@ class WaitForState(object):
         return current_state.name in bad_states
 
     @staticmethod
-    def default_get_bad_state_error(current_state: str):
+    def default_get_bad_state_error(current_state: str) -> Any:
         return None
 
     def __init__(
@@ -91,18 +91,18 @@ class WaitForState(object):
         self.__check_bad_state = check_bad_state_method
         self.__get_bad_state_error = get_bad_state_error_method
 
-    def __compose_error_msg_with_bad_state_error(self, error_msg: str, current_state: Any):
+    def __compose_error_msg_with_bad_state_error(self, error_msg: str, current_state: Any) -> str:
         bad_state_error = self.__get_bad_state_error(current_state)
         if bad_state_error:
             error_msg += f", error: {pformat(bad_state_error)}"
 
         return error_msg
 
-    def wait_for_state(self, desired_state: State, bad_states: List[str] = [], timeout: int = 600, interval: int = 1):
+    def wait_for_state(self, desired_state: State, bad_states: List[str] = [], timeout: int = 600, interval: int = 1) -> State:
         """
         Wait for instance to go to given state
 
-        :param state: state the instance needs to go to
+        :param desired_state: state the instance needs to go to
         :param bad_states: in case the instance can go into an unwanted state, leave empty if not applicable
         :param timeout: timeout value of this method (in seconds)
         :param interval: wait time between retries (in seconds)

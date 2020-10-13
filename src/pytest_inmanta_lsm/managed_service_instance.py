@@ -106,7 +106,7 @@ class ManagedServiceInstance:
         This method will wait for the provided state to verify the update
 
         :param wait_for_state: which state to wait for when update is finished
-        :param version: current version
+        :param current_version: current version
         :param new_version: version when update has finished
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates
         :param bad_states: see Connection.wait_for_state parameter 'bad_states'
@@ -215,10 +215,10 @@ class ManagedServiceInstance:
             else:
                 return False
 
-        def check_start_state(current_state: State):
+        def check_start_state(current_state: State) -> bool:
             return current_state.version == start_version
 
-        def get_bad_state_error(current_state):
+        def get_bad_state_error(current_state) -> Any:
             validation_failure_msg = self.remote_orchestrator.get_validation_failure_message(
                 service_entity_name=self.service_entity_name,
                 service_instance_id=self._instance_id,
