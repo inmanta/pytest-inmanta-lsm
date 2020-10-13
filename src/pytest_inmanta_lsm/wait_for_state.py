@@ -9,9 +9,30 @@
 import logging
 import time
 from pprint import pformat
-from typing import Any, List
+from typing import Any, List, Optional
 
 LOGGER = logging.getLogger(__name__)
+
+
+class State:
+
+    def __init__(self, name: str, version: Optional[int] = None):
+        self.name = name
+        self.version = version
+
+    def __str__(self):
+        return f"{self.name} (version: {self.version})"
+
+    def __eq__(self, other) -> bool:
+        if other is None:
+            return False
+        if self.name != other.name:
+            return False
+        if self.version is None and other.version is None:
+            return True
+        if self.version is None or other.version is None:
+            return False
+        return self.version == other.version
 
 
 class WaitForState(object):
@@ -20,23 +41,23 @@ class WaitForState(object):
     """
 
     @staticmethod
-    def default_get_state():
+    def default_get_state() -> State:
         return None
 
     @staticmethod
-    def default_compare_states(current_state: Any, wait_for_state: Any):
+    def default_compare_states(current_state: State, wait_for_state: State) -> bool:
         return current_state == wait_for_state
 
     @staticmethod
-    def default_check_start_state(current_state: Any):
+    def default_check_start_state(current_state: State) -> bool:
         return False
 
     @staticmethod
-    def default_check_bad_state(current_state: Any, bad_states: List[Any]):
-        return current_state in bad_states
+    def default_check_bad_state(current_state: State, bad_states: List[str]) -> bool:
+        return current_state.name in bad_states
 
     @staticmethod
-    def default_get_bad_state_error(current_state: Any):
+    def default_get_bad_state_error(current_state: str):
         return None
 
     def __init__(
@@ -78,7 +99,7 @@ class WaitForState(object):
 
         return error_msg
 
-    def wait_for_state(self, state: Any, bad_states: List[Any] = [], timeout: int = 600, interval: int = 1):
+    def wait_for_state(self, desired_state: State, bad_states: List[str] = [], timeout: int = 600, interval: int = 1):
         """
         Wait for instance to go to given state
 
@@ -88,17 +109,17 @@ class WaitForState(object):
         :param interval: wait time between retries (in seconds)
         :returns: current state, can raise RuntimeError when state has not been reached within timeout
         """
-        LOGGER.info(f"Waiting for {self.name} to go to state ({state})")
+        LOGGER.info(f"Waiting for {self.name} to go to state ({desired_state})")
         start_time = time.time()
 
-        previous_state = None
+        previous_state: State = None
         start_state_logged = False
 
         while True:
             current_state = self.__get_state()
 
             if previous_state != current_state:
-                LOGGER.info(f"{self.name} went to state ({current_state}), waiting for state ({state})")
+                LOGGER.info(f"{self.name} went to state ({current_state}), waiting for state ({desired_state})")
 
                 previous_state = current_state
 
@@ -108,8 +129,8 @@ class WaitForState(object):
                     start_state_logged = True
 
             else:
-                if self.__compare_states(current_state, state):
-                    LOGGER.info(f"{self.name} reached state ({state})")
+                if self.__compare_states(current_state, desired_state):
+                    LOGGER.info(f"{self.name} reached state ({desired_state})")
                     break
 
                 if self.__check_bad_state(current_state, bad_states):
@@ -122,7 +143,7 @@ class WaitForState(object):
             if time.time() - start_time > timeout:
                 error_msg = self.__compose_error_msg_with_bad_state_error(
                     (
-                        f"{self.name} exceeded timeout {timeout}s while waiting for state ({state}). "
+                        f"{self.name} exceeded timeout {timeout}s while waiting for state ({desired_state}). "
                         f"Stuck in current state ({current_state})"
                     ),
                     current_state,

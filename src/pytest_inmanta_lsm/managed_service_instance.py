@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
 from pytest_inmanta_lsm.failed_resources_logs import FailedResourcesLogs
-from pytest_inmanta_lsm.wait_for_state import WaitForState
+from pytest_inmanta_lsm.wait_for_state import State, WaitForState
 
 LOGGER = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ class ManagedServiceInstance:
         :param bad_states: see Connection.wait_for_state parameter 'bad_states'
         """
         if current_version is None:
-            current_version = self.get_state()["version"]
+            current_version = self.get_state().version
 
         LOGGER.info("Updating service instance %s", self._instance_id)
         client = self.remote_orchestrator.client
@@ -148,7 +148,7 @@ class ManagedServiceInstance:
         :param version: the target state should have this version number
         """
         if current_version is None:
-            current_version = self.get_state()["version"]
+            current_version = self.get_state().version
 
         LOGGER.info("Deleting service instance %s", self._instance_id)
         response = self.remote_orchestrator.client.lsm_services_delete(
@@ -169,7 +169,7 @@ class ManagedServiceInstance:
 
     def get_state(
         self,
-    ) -> Dict[str, Union[str, int]]:
+    ) -> State:
         response = self.remote_orchestrator.client.lsm_services_get(
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
@@ -181,7 +181,7 @@ class ManagedServiceInstance:
         instance_state = response.result["data"]["state"]
         instance_version = response.result["data"]["version"]
 
-        return {"state": instance_state, "version": instance_version}
+        return State(name=instance_state, version=instance_version)
 
     def wait_for_state(
         self,
@@ -201,25 +201,22 @@ class ManagedServiceInstance:
         :param start_version: Provide a start_version when the wait for state is the same as the starting state
         """
 
-        def compare_states(current_state, wait_for_state):
-            if current_state["state"] == wait_for_state["state"]:
+        def compare_states(current_state: State, wait_for_state: State) -> bool:
+            if current_state.name == wait_for_state.name:
                 if not version:
                     # Version is not given, so version does not need to be verified
                     return True
 
                 else:
                     assert (
-                        current_state["version"] == wait_for_state["version"]
+                        current_state.version == wait_for_state.version
                     ), f"Connection reached state ({current_state}), but has a version mismatch: ({wait_for_state})"
                     return True
             else:
                 return False
 
-        def check_start_state(current_state):
-            return current_state["version"] == start_version
-
-        def check_bad_state(current_state, bad_states):
-            return current_state["state"] in bad_states
+        def check_start_state(current_state: State):
+            return current_state.version == start_version
 
         def get_bad_state_error(current_state):
             validation_failure_msg = self.remote_orchestrator.get_validation_failure_message(
@@ -241,11 +238,10 @@ class ManagedServiceInstance:
             get_state_method=self.get_state,
             compare_states_method=compare_states,
             check_start_state_method=check_start_state,
-            check_bad_state_method=check_bad_state,
             get_bad_state_error_method=get_bad_state_error,
         )
 
-        wait_for_obj.wait_for_state({"state": state, "version": version}, bad_states=bad_states, timeout=timeout)
+        wait_for_obj.wait_for_state(State(name=state, version=version), bad_states=bad_states, timeout=timeout)
 
     def get_validation_failure_message(self) -> Optional[str]:
         assert self._instance_id is not None, "ManagedServiceInstance._instance_id can not be None"
