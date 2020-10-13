@@ -31,18 +31,23 @@ class FailedResourcesLogs:
         """
         logs = []
 
-        for resource in get_version_result["resources"]:
-            resource_id = resource["resource_id"]
+        if get_version_result.code == 200:
+            for resource in get_version_result["resources"]:
+                resource_id = resource["resource_id"]
 
-            # Only interested in failed resources
-            if resource["status"] != "failed":
-                continue
-
-            for action in resource["actions"]:
-                if "messages" not in action:
+                # Only interested in failed resources
+                if resource["status"] != "failed":
                     continue
 
-                logs.extend([(message, resource_id) for message in action["messages"]])
+                for action in resource["actions"]:
+                    if "messages" not in action:
+                        continue
+
+                    logs.extend([(message, resource_id) for message in action["messages"]])
+        else:
+            LOGGER.warn(
+                f"Couldn't get error logs, got response code {get_version_result.code} (expected 200): \n{get_version_result}"
+            )
 
         return logs
 
