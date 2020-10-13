@@ -15,7 +15,6 @@ LOGGER = logging.getLogger(__name__)
 
 
 class State:
-
     def __init__(self, name: str, version: Optional[int] = None):
         self.name = name
         self.version = version
