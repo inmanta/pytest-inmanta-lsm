@@ -1,0 +1,47 @@
+"""
+    Pytest Inmanta LSM
+
+    :copyright: 2020 Inmanta
+    :contact: code@inmanta.com
+    :license: Inmanta EULA
+"""
+
+import lsm
+import lsm::fsm
+
+entity TestService extends lsm::ServiceEntity:
+    """
+        :attr service_id: A free form unique service id determined by the customer.
+    """
+    string service_id
+end
+
+index TestService(service_id)
+
+binding = lsm::ServiceEntityBinding(
+    service_entity="__config__::TestService",
+    lifecycle=lsm::fsm::simple,
+    service_entity_name="test-service",
+)
+
+for instance in lsm::all(binding):
+    TestService(
+        instance_id=instance["id"],
+        entity_binding=binding,
+        service_id=instance["attributes"]["service_id"],
+    )
+end
+
+implementation testService for TestService:
+    r = unittest::Resource(
+        name=self.instance_id,
+        desired_value="{{self.service_id}}",
+        fail=true,
+        skip=false,
+        send_event=true,
+    )
+    self.resources = [r]
+end
+
+implement TestService using parents
+implement TestService using testService
