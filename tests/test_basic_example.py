@@ -15,3 +15,11 @@ def test_basic_example(testdir):
 
     result = testdir.runpytest("tests/test_quickstart.py")
     result.assert_outcomes(passed=1)
+
+def test_basic_failed_example(testdir):
+    """ Testing that a failed test doesn't make the plugin fail """
+
+    testdir.copy_example("quickstart")
+
+    result = testdir.runpytest("tests/test_quickstart_failed.py")
+    result.assert_outcomes(failed=1)
