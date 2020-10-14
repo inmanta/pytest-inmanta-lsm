@@ -14,8 +14,38 @@ def test_full_cycle(project, remote_orchestrator):
     client = remote_orchestrator.client
 
     project.compile(
-        """
+        f"""
         import test_service
+        import lsm
+        import lsm::fsm
+        import unittest
+
+        binding = lsm::ServiceEntityBinding(
+            service_entity="test_service::TestService",
+            lifecycle=lsm::fsm::simple,
+            service_entity_name="{SERVICE_NAME}",
+        )
+
+        for instance in lsm::all(binding):
+            test_service::TestService(
+                instance_id=instance["id"],
+                entity_binding=binding,
+                service_id=instance["attributes"]["service_id"],
+            )
+        end
+
+        implementation testService for test_service::TestService:
+            r = unittest::Resource(
+                name=self.instance_id,
+                desired_value="{{self.service_id}}",
+                fail=true,
+                skip=false,
+                send_event=true,
+            )
+            self.resources = [r]
+        end
+
+        implement test_service::TestService using testService
         """
     )
 
