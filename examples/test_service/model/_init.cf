@@ -7,6 +7,7 @@
 """
 
 import lsm
+import lsm::fsm
 
 entity TestService extends lsm::ServiceEntity:
     """
@@ -17,4 +18,49 @@ end
 
 index TestService(service_id)
 
+binding = lsm::ServiceEntityBinding(
+    service_entity="test_service::TestService",
+    lifecycle=lsm::fsm::simple,
+    service_entity_name="test-service",
+)
+
+for instance in lsm::all(binding):
+    TestService(
+        instance_id=instance["id"],
+        entity_binding=binding,
+        service_id=instance["attributes"]["service_id"],
+    )
+end
+
+implementation testService for TestService:
+    r = NullResource(
+        name=self.instance_id,
+        desired_value="{{self.service_id}}",
+        fail=true,
+        skip=false,
+        send_event=true,
+    )
+    self.resources = [r]
+end
+
+implement test_service::TestService using testService
 implement TestService using parents
+
+entity NullResource extends std::PurgeableResource:
+    """
+        A test resource for unit and integration testing purposes.
+
+        :param skip: When set to true the handler will raise a skipresource
+        :param fail: When set to true the handler will raise an exception to mark a failure
+    """
+    string name
+    string desired_value
+    bool skip=false
+    bool fail=false
+    string agent="internal"
+    bool send_event=true
+end
+
+index NullResource(name)
+
+implement NullResource using std::none

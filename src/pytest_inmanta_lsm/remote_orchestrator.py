@@ -292,20 +292,24 @@ class RemoteOrchestrator:
         )
         assert (
             result.code == 200
-        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{result}"
+        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{pformat(result.get_result(), width=140)}"
+
         # get events that led to final state
         events = result.result["data"][0]["events"]
+
         try:
             # find any compile report id (all the same anyways)
             compile_id = next((event["id_compile_report"] for event in events if event["id_compile_report"] is not None))
         except StopIteration:
             LOGGER.info("No validation failure report found")
             return None
+
         # get the report
         result = client.get_report(compile_id)
         assert (
             result.code == 200
-        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{result}"
+        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{pformat(result.get_result(), width=140)}"
+        
         # get stage reports
         reports = result.result["report"]["reports"]
         for report in reversed(reports):
@@ -313,7 +317,7 @@ class RemoteOrchestrator:
             if "returncode" in report and report["returncode"] != 0:
                 return report["errstream"]
 
-        LOGGER.info("No failure found in the failed validation! %s", reports)
+        LOGGER.info("No failure found in the failed validation! \n%s", pformat(reports, width=140))
         return None
 
     def get_managed_instance(

@@ -57,7 +57,7 @@ class FailedResourcesLogs:
             return self._extract_logs(get_version_result.get_result())
         else:
             LOGGER.warn(
-                f"Couldn't get error logs, got response code {get_version_result.code} (expected 200): \n{get_version_result}"
+                f"Couldn't get error logs, got response code {get_version_result.code} (expected 200): \n{get_version_result.get_result()}"
             )
             return []
 
