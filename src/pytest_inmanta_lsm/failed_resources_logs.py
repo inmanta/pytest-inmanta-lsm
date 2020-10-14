@@ -66,7 +66,7 @@ class FailedResourcesLogs:
 
         # assumption - version with highest number will be the latest one
         if len(versions) == 0:
-            LOGGER.warn(f"No versions provided for environment {self._environment_id}, picking version 0")
+            LOGGER.warn(f"No versions provided for environment {self._environment_id}")
             return None
 
         return max(version_item["version"] for version_item in versions)
