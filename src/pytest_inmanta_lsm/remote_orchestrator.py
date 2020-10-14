@@ -290,9 +290,8 @@ class RemoteOrchestrator:
             service_entity=service_entity_name,
             service_id=service_instance_id,
         )
-        assert (
-            result.code == 200
-        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{pformat(result.get_result(), width=140)}"
+        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
+        f"{pformat(result.get_result(), width=140)}"
 
         # get events that led to final state
         events = result.result["data"][0]["events"]
@@ -306,10 +305,9 @@ class RemoteOrchestrator:
 
         # get the report
         result = client.get_report(compile_id)
-        assert (
-            result.code == 200
-        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{pformat(result.get_result(), width=140)}"
-        
+        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
+        f"{pformat(result.get_result(), width=140)}"
+
         # get stage reports
         reports = result.result["report"]["reports"]
         for report in reversed(reports):

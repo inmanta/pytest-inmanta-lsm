@@ -8,7 +8,6 @@
 
 import pytest
 
-
 SERVICE_NAME = "test-service"
 
 
@@ -17,7 +16,7 @@ def test_full_cycle(project, remote_orchestrator):
     client = remote_orchestrator.client
 
     project.compile(
-        f"""
+        """
         import test_service
         """
     )

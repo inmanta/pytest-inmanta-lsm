@@ -15,7 +15,6 @@ LOGGER = logging.getLogger(__name__)
 
 
 class BadStateError(RuntimeError):
-
     def __init__(self, bad_state: str, message: str):
         super().__init__(f"Instance got into a bad state: {bad_state}\n{message}")
 
