@@ -51,10 +51,10 @@ class FailedResourcesLogs:
         if version is None:
             return []
 
-        get_version_result = self._client.get_version(tid=self._environment_id, id=version, include_logs=True).get_result()
+        get_version_result = self._client.get_version(tid=self._environment_id, id=version, include_logs=True)
 
         if get_version_result.code == 200:
-            return self._extract_logs(get_version_result)
+            return self._extract_logs(get_version_result.get_result())
         else:
             LOGGER.warn(
                 f"Couldn't get error logs, got response code {get_version_result.code} (expected 200): \n{get_version_result}"
