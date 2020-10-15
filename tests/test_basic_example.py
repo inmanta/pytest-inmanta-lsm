@@ -8,8 +8,7 @@
 
 
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
-# def test_deployment_failure(testdir):
-def a():
+def test_deployment_failure(testdir):
     """ Testing that a failed test doesn't make the plugin fail """
 
     testdir.copy_example("test_service")
@@ -18,8 +17,7 @@ def a():
     result.assert_outcomes(passed=1)
 
 
-# def test_basic_example(testdir):
-def b():
+def test_basic_example(testdir):
     """Make sure that our plugin works."""
 
     testdir.copy_example("quickstart")
@@ -34,4 +32,4 @@ def test_client_guard(testdir):
     testdir.copy_example("quickstart")
 
     result = testdir.runpytest("tests/test_client_guard.py")
-    result.assert_outcomes(passed=1)
+    result.assert_outcomes(passed=4)

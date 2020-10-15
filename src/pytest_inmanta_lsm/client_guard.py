@@ -12,6 +12,11 @@ class BadResponseError(RuntimeError):
         super().__init__(self, f"Got a bad response code: {message}")
 
 
+class InvalidRequestError(BadResponseError):
+    def __init__(self, message: str):
+        BadResponseError.__init__(self, f"400 Invalid request: {message}")
+
+
 class NotFoundError(BadResponseError):
     def __init__(self, message: str):
         BadResponseError.__init__(self, f"403 Forbidden: {message}")
@@ -29,6 +34,8 @@ class ClientGuard:
     def _check_result(self, result: Result):
         if result.code == 200:
             return
+        if result.code == 400:
+            raise InvalidRequestError(result.result)
         if result.code == 403:
             raise ForbiddenError(result.result)
         if result.code == 404:
@@ -60,6 +67,16 @@ class ClientGuard:
         result: Result = self._client.environment_clear(id=environment_id)
         self._check_result(result)
         return result.result
+
+    def environment_delete(self, environment_id: UUID) -> None:
+        result: Result = self._client.environment_delete(id=environment_id)
+        self._check_result(result)
+        return result.result
+
+    def environment_list(self) -> List[Environment]:
+        result: Result = self._client.environment_list()
+        self._check_result(result)
+        return [Environment(**e) for e in result.result["data"]]
 
     def environment_get(self, environment_id: UUID) -> Environment:
         result: Result = self._client.environment_get(id=environment_id)
