@@ -43,7 +43,7 @@ pipeline {
     }
     stage("tests"){
       steps{
-        lock(label: "iso3-test", variable: "LOCK"){
+        lock(label: 'iso3-test', variable: 'LOCK'){
           sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
             withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
               script{
