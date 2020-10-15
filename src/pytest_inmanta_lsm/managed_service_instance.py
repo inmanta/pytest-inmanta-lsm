@@ -9,6 +9,7 @@
 import logging
 from pprint import pformat
 from typing import Any, Dict, List, Optional, Union
+from uuid import UUID
 
 from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
 from pytest_inmanta_lsm.failed_resources_logs import FailedResourcesLogs
@@ -42,7 +43,7 @@ class ManagedServiceInstance:
         self,
         remote_orchestrator: "r_orchestrator.RemoteOrchestrator",
         service_entity_name: str,
-        service_id: Optional[str] = None,
+        service_id: Optional[UUID] = None,
     ) -> None:
         """
         :param remote_orchestrator: remote_orchestrator to create the service instance  on
@@ -68,7 +69,7 @@ class ManagedServiceInstance:
         :param version: the target state should have this version number
         """
         LOGGER.info(f"LSM {self.service_entity_name} creation parameters:\n{pformat(attributes)}")
-        result = self.remote_orchestrator.client_guard.lsm_services_create(
+        service_instance = self.remote_orchestrator.client_guard.lsm_services_create(
             environment_id=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             attributes=attributes,
@@ -77,16 +78,14 @@ class ManagedServiceInstance:
 
         LOGGER.info(
             "Created instance, got response %s",
-            pformat(result),
+            pformat(service_instance),
         )
-        if "message" in result:
-            LOGGER.info(result["message"])
 
         assert (
-            result["data"]["version"] == 1
-        ), f"Error while creating instance: wrong version, got {result['data']['version']} (expected 1)"
+            service_instance.version == 1
+        ), f"Error while creating instance: wrong version, got {service_instance.version} (expected 1)"
 
-        self._instance_id = result["data"]["id"]
+        self._instance_id = service_instance.id
         LOGGER.info(f"Created instance has ID: {self._instance_id}")
 
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
@@ -159,14 +158,14 @@ class ManagedServiceInstance:
         )
 
     def get_state(self) -> State:
-        result = self.remote_orchestrator.client_guard.lsm_services_get(
+        service_instance = self.remote_orchestrator.client_guard.lsm_services_get(
             environment_id=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             service_id=self._instance_id,
         )
 
-        instance_state = result["data"]["state"]
-        instance_version = result["data"]["version"]
+        instance_state = service_instance.state
+        instance_version = service_instance.version
 
         return State(name=instance_state, version=instance_version)
 

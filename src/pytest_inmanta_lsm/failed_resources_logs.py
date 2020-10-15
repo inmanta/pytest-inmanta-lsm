@@ -46,13 +46,13 @@ class FailedResourcesLogs:
 
         return logs
 
-    def _retrieve_logs(self) -> dict:
+    def _retrieve_logs(self) -> List[Tuple[str, str]]:
         version = self._find_version()
         if version is None:
             return []
 
         try:
-            return self._client.get_version(environment_id=self._environment_id, version=version, include_logs=True)
+            return self._extract_logs(self._client.get_version(environment_id=self._environment_id, version=version, include_logs=True))
         except BadResponseError as e:
             LOGGER.warn(f"Couldn't get error logs: {e}")
             return []

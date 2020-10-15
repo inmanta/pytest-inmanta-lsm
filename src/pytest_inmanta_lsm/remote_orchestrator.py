@@ -11,6 +11,7 @@ import os
 import subprocess
 from pprint import pformat
 from typing import Dict, Optional, Union
+from uuid import UUID
 
 import yaml
 from inmanta.agent import config as inmanta_config
@@ -37,7 +38,7 @@ class RemoteOrchestrator:
         self,
         host: str,
         ssh_user: str,
-        environment: str,
+        environment: UUID,
         project: Project,
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
@@ -60,7 +61,7 @@ class RemoteOrchestrator:
         self.noclean = noclean
 
         inmanta_config.Config.load_config()
-        inmanta_config.Config.set("config", "environment", self._env)
+        inmanta_config.Config.set("config", "environment", str(self._env))
         inmanta_config.Config.set("compiler_rest_transport", "host", host)
         inmanta_config.Config.set("compiler_rest_transport", "port", "8888")
         inmanta_config.Config.set("client_rest_transport", "host", host)
@@ -78,7 +79,7 @@ class RemoteOrchestrator:
         self._ensure_environment()
 
     @property
-    def environment(self) -> str:
+    def environment(self) -> UUID:
         return self._env
 
     @property
@@ -108,14 +109,14 @@ class RemoteOrchestrator:
         client = self.client_guard
 
         # environment does not exists, find project
-        def ensure_project(project_name: str) -> str:
-            result = client.project_list()
-            for project in result["data"]:
-                if project["name"] == project_name:
-                    return project["id"]
+        def ensure_project(project_name: str) -> UUID:
+            projects = client.project_list()
+            for project in projects:
+                if project.name == project_name:
+                    return project.id
 
-            result = client.project_create(name=project_name)
-            return result["data"]["id"]
+            project = client.project_create(name=project_name)
+            return project.id
 
         try:
             client.environment_get(self._env)
@@ -274,7 +275,7 @@ class RemoteOrchestrator:
     def get_validation_failure_message(
         self,
         service_entity_name: str,
-        service_instance_id: str,
+        service_instance_id: UUID,
     ) -> Optional[str]:
         """
         Get the compiler error for a validation failure for a specific service entity
@@ -283,18 +284,22 @@ class RemoteOrchestrator:
         environment = self.environment
 
         # get service log
-        result = client.lsm_service_log_list(
+        logs = client.lsm_service_log_list(
             environment_id=environment,
             service_entity=service_entity_name,
             service_id=service_instance_id,
         )
 
         # get events that led to final state
-        events = result["data"][0]["events"]
+        if len(logs) == 0:
+            LOGGER.info("No validation failure logs retrieved")
+            return None
+
+        events = logs[0].events
 
         try:
             # find any compile report id (all the same anyways)
-            compile_id = next((event["id_compile_report"] for event in events if event["id_compile_report"] is not None))
+            compile_id = next((event.id_compile_report for event in events if event.id_compile_report is not None))
         except StopIteration:
             LOGGER.info("No validation failure report found")
             return None
