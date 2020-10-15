@@ -54,7 +54,7 @@ class ClientGuard:
             environment_id=environment_id,
         )
         self._check_result(result)
-        return result.result
+        return Environment(**result.result["data"])
 
     def environment_clear(self, environment_id: UUID) -> None:
         result: Result = self._client.environment_clear(id=environment_id)
@@ -64,7 +64,7 @@ class ClientGuard:
     def environment_get(self, environment_id: UUID) -> Environment:
         result: Result = self._client.environment_get(id=environment_id)
         self._check_result(result)
-        return result.result
+        return Environment(**result.result["data"])
 
     def environment_setting_set(self, environment_id: UUID, id: str, value: EnvSettingType) -> ReturnValue[None]:
         result: Result = self._client.environment_settings_set(
@@ -104,12 +104,12 @@ class ClientGuard:
     def project_create(self, name: str, project_id: UUID = None) -> Project:
         result: Result = self._client.project_create(name=name, project_id=project_id)
         self._check_result(result)
-        return result.result
+        return Project(**result.result["data"])
 
     def project_list(self) -> List[Project]:
         result: Result = self._client.project_list()
         self._check_result(result)
-        return result.result
+        return [Project(**p) for p in result.result["data"]]
 
     # Compile reports
 
@@ -130,7 +130,7 @@ class ClientGuard:
             service_instance_id=service_instance_id,
         )
         self._check_result(result)
-        return result.result
+        return ServiceInstance(**result.result["data"])
 
     def lsm_services_delete(self, environment_id: UUID, service_entity: str, service_id: UUID, current_version: int) -> None:
         result: Result = self._client.lsm_services_delete(
@@ -140,7 +140,6 @@ class ClientGuard:
             current_version=current_version,
         )
         self._check_result(result)
-        return
 
     def lsm_services_get(
         self, environment_id: UUID, service_entity: str, service_id: UUID, current_version: Optional[int] = None
@@ -152,7 +151,7 @@ class ClientGuard:
             current_version=current_version,
         )
         self._check_result(result)
-        return result.result
+        return ServiceInstance(**result.result["data"])
 
     def lsm_services_update(
         self, environment_id: UUID, service_entity: str, service_id: UUID, attributes: Dict[str, Any], current_version: int
@@ -165,12 +164,11 @@ class ClientGuard:
             current_version=current_version,
         )
         self._check_result(result)
-        return
 
     def lsm_service_catalog_get_entity(self, environment_id: UUID, service_entity: str) -> ServiceEntity:
         result: Result = self._client.lsm_service_catalog_get_entity(environment_id, service_entity)
         self._check_result(result)
-        return result.result
+        return ServiceEntity(**result.result["data"])
 
     def lsm_service_log_list(self, environment_id: UUID, service_entity: str, service_id: UUID) -> List[ServiceInstanceLog]:
         result: Result = self._client.lsm_service_log_list(
@@ -179,4 +177,4 @@ class ClientGuard:
             service_id=service_id,
         )
         self._check_result(result)
-        return result.result
+        return [ServiceInstanceLog(**l) for l in result.result["data"]]
