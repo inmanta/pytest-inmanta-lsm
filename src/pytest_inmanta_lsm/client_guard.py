@@ -111,6 +111,10 @@ class ClientGuard:
         self._check_result(result)
         return [Project(**p) for p in result.result["data"]]
 
+    def project_delete(self, project_id: UUID = None) -> None:
+        result: Result = self._client.project_delete(id=project_id)
+        self._check_result(result)
+
     # Compile reports
 
     def get_report(self, compile_id: UUID) -> dict:
