@@ -11,6 +11,7 @@ import os
 import subprocess
 from pprint import pformat
 from typing import Dict, Optional, Union
+from uuid import UUID
 
 import yaml
 from inmanta.agent import config as inmanta_config
@@ -36,7 +37,7 @@ class RemoteOrchestrator:
         self,
         host: str,
         ssh_user: str,
-        environment: str,
+        environment: UUID,
         project: Project,
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
@@ -59,7 +60,7 @@ class RemoteOrchestrator:
         self.noclean = noclean
 
         inmanta_config.Config.load_config()
-        inmanta_config.Config.set("config", "environment", self._env)
+        inmanta_config.Config.set("config", "environment", str(self._env))
         inmanta_config.Config.set("compiler_rest_transport", "host", host)
         inmanta_config.Config.set("compiler_rest_transport", "port", "8888")
         inmanta_config.Config.set("client_rest_transport", "host", host)
@@ -76,7 +77,7 @@ class RemoteOrchestrator:
         self._ensure_environment()
 
     @property
-    def environment(self) -> str:
+    def environment(self) -> UUID:
         return self._env
 
     @property

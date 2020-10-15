@@ -10,6 +10,7 @@ import logging
 import os
 import os.path
 from typing import Dict, Iterator, Union
+from uuid import UUID
 
 import pytest
 from pytest_inmanta.plugin import Project
@@ -102,7 +103,7 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     }
     settings.update(remote_orchestrator_settings)
 
-    remote_orchestrator = RemoteOrchestrator(host, user, env, project, settings, noclean)
+    remote_orchestrator = RemoteOrchestrator(host, user, UUID(env), project, settings, noclean)
     remote_orchestrator.clean()
 
     yield remote_orchestrator
