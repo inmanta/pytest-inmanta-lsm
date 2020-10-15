@@ -18,6 +18,7 @@ from inmanta.protocol.endpoints import SyncClient
 from pytest_inmanta.plugin import Project
 
 from pytest_inmanta_lsm import managed_service_instance, retry_limited
+from pytest_inmanta_lsm.client_guard import BadResponseError, ClientGuard
 
 LOGGER = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ class RemoteOrchestrator:
         self._project = project
 
         self._client: SyncClient = None
+        self._client_guard: ClientGuard = None
 
         # cache the environment before a cleanup is done. This allows the sync to go faster.
         self._server_path: str = None
@@ -87,6 +89,12 @@ class RemoteOrchestrator:
         return self._client
 
     @property
+    def client_guard(self) -> ClientGuard:
+        if self._client_guard is None:
+            self._client_guard = ClientGuard(self.client)
+        return self._client_guard
+
+    @property
     def host(self) -> str:
         return self._host
 
@@ -97,38 +105,26 @@ class RemoteOrchestrator:
 
     def _ensure_environment(self) -> None:
         """Make sure the environment exists"""
-        client = self.client
-
-        result = client.get_environment(self._env)
-        if result.code == 200:
-            # environment exists
-            return
+        client = self.client_guard
 
         # environment does not exists, find project
-
         def ensure_project(project_name: str) -> str:
             result = client.project_list()
-            assert (
-                result.code == 200
-            ), f"Wrong reponse code while verifying project, got {result.code} (expected 200): \n{result}"
-            for project in result.result["data"]:
+            for project in result["data"]:
                 if project["name"] == project_name:
                     return project["id"]
 
             result = client.project_create(name=project_name)
-            assert (
-                result.code == 200
-            ), f"Wrong reponse code while creating project, got {result.code} (expected 200): \n{result}"
-            return result.result["data"]["id"]
+            return result["data"]["id"]
 
-        result = client.create_environment(
-            project_id=ensure_project("pytest-inmanta-lsm"),
-            name="pytest-inmanta-lsm",
-            environment_id=self._env,
-        )
-        assert (
-            result.code == 200
-        ), f"Wrong response code while creating environment, got {result.code} (expected 200): \n{result}"
+        try:
+            client.get_environment(self._env)
+        except BadResponseError:
+            client.create_environment(
+                project_id=ensure_project("pytest-inmanta-lsm"),
+                name="pytest-inmanta-lsm",
+                environment_id=self._env,
+            )
 
     def sync_project(self) -> None:
         """Synchronize the project to the lab orchestrator"""
@@ -226,12 +222,12 @@ class RemoteOrchestrator:
 
     def clean(self) -> None:
         LOGGER.info("Clear environment: stopping agents, delete_cascade contents and remove project_dir")
-        self.client.clear_environment(self._env)
+        self.client_guard.clear_environment(self._env)
         LOGGER.debug("Cleared environment")
 
         LOGGER.info("Resetting orchestrator")
         for key, value in self._settings.items():
-            self.client.set_setting(self._env, key, value)
+            self.client_guard.set_setting(self._env, key, value)
 
     def cache_project(self) -> None:
         """Cache the project on the server so that a sync can be faster."""
@@ -253,21 +249,23 @@ class RemoteOrchestrator:
         :param desired_state: Expected state of each resource when the deployment is ready
         :raise AssertionError: In case of wrong state or timeout expiration
         """
-        client = self.client
+        client = self.client_guard
         environment = self.environment
 
         def is_deployment_finished() -> bool:
-            response = client.get_version(environment, version)
+            result = client.get_version(environment, version)
+
             LOGGER.info(
                 "Deployed %s of %s resources",
-                response.result["model"]["done"],
-                response.result["model"]["total"],
+                result["model"]["done"],
+                result["model"]["total"],
             )
-            return response.result["model"]["total"] - response.result["model"]["done"] <= 0
+            return result["model"]["total"] - result["model"]["done"] <= 0
 
         retry_limited(is_deployment_finished, timeout)
         result = client.get_version(environment, version)
-        for resource in result.result["resources"]:
+
+        for resource in result["resources"]:
             LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
             assert (
                 resource["status"] == desired_state
@@ -281,20 +279,18 @@ class RemoteOrchestrator:
         """
         Get the compiler error for a validation failure for a specific service entity
         """
-        client = self.client
+        client = self.client_guard
         environment = self.environment
 
         # get service log
         result = client.lsm_service_log_list(
-            tid=environment,
+            environment_id=environment,
             service_entity=service_entity_name,
             service_id=service_instance_id,
         )
-        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
-        f"{pformat(result.get_result(), width=140)}"
 
         # get events that led to final state
-        events = result.result["data"][0]["events"]
+        events = result["data"][0]["events"]
 
         try:
             # find any compile report id (all the same anyways)
@@ -305,11 +301,9 @@ class RemoteOrchestrator:
 
         # get the report
         result = client.get_report(compile_id)
-        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
-        f"{pformat(result.get_result(), width=140)}"
 
         # get stage reports
-        reports = result.result["report"]["reports"]
+        reports = result["report"]["reports"]
         for report in reversed(reports):
             # get latest failed step
             if "returncode" in report and report["returncode"] != 0:

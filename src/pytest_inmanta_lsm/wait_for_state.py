@@ -19,6 +19,11 @@ class BadStateError(RuntimeError):
         super().__init__(f"Instance got into a bad state: {bad_state}\n{message}")
 
 
+class TimeoutError(RuntimeError):
+    def __init__(self, timeout: int, message: str):
+        super().__init__(f"Timeout ({timeout}s) reached: \n{message}")
+
+
 class State:
     def __init__(self, name: str, version: Optional[int] = None):
         self.name = name
@@ -142,7 +147,7 @@ class WaitForState(object):
                         f"{self.name} got into bad state ({current_state})",
                         current_state,
                     )
-                    raise BadStateError(current_state, error_msg)
+                    raise BadStateError(current_state.name, error_msg)
 
             if time.time() - start_time > timeout:
                 error_msg = self.__compose_error_msg_with_bad_state_error(
@@ -152,7 +157,7 @@ class WaitForState(object):
                     ),
                     current_state,
                 )
-                raise RuntimeError(error_msg)
+                raise TimeoutError(timeout, error_msg)
 
             time.sleep(interval)
 

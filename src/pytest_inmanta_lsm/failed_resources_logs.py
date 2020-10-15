@@ -7,10 +7,12 @@
 """
 
 import logging
-import uuid
 from typing import Any, Dict, List, Tuple
+from uuid import UUID
 
 from inmanta.protocol.endpoints import SyncClient
+
+from pytest_inmanta_lsm.client_guard import BadResponseError, ClientGuard
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,8 +23,8 @@ class FailedResourcesLogs:
     No environment version needs to be specified, the latest (highest number) version will be used
     """
 
-    def __init__(self, client: SyncClient, environment_id: uuid.UUID):
-        self._client = client
+    def __init__(self, client: SyncClient, environment_id: UUID):
+        self._client: ClientGuard = ClientGuard(client)
         self._environment_id = environment_id
 
     def _extract_logs(self, get_version_result: Dict[str, Any]) -> List[Tuple[str, str]]:
@@ -46,24 +48,19 @@ class FailedResourcesLogs:
 
         return logs
 
-    def _retrieve_logs(self) -> List[Tuple[str, str]]:
+    def _retrieve_logs(self) -> dict:
         version = self._find_version()
         if version is None:
             return []
 
-        get_version_result = self._client.get_version(tid=self._environment_id, id=version, include_logs=True)
-
-        if get_version_result.code == 200:
-            return self._extract_logs(get_version_result.get_result())
-        else:
-            LOGGER.warn(
-                f"Couldn't get error logs, got response code {get_version_result.code} (expected 200): \n"
-                f"{get_version_result.get_result()}"
-            )
+        try:
+            return self._client.get_version(environment_id=self._environment_id, version=version, include_logs=True)
+        except BadResponseError as e:
+            LOGGER.warn(f"Couldn't get error logs: {e}")
             return []
 
     def _find_version(self) -> int:
-        versions = self._client.list_versions(tid=self._environment_id).result["versions"]
+        versions = self._client.list_versions(environment_id=self._environment_id)["versions"]
 
         # assumption - version with highest number will be the latest one
         if len(versions) == 0:

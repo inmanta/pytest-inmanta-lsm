@@ -67,28 +67,26 @@ class ManagedServiceInstance:
         :param bad_states: stop waiting and fail if any of these states are reached
         :param version: the target state should have this version number
         """
-        client = self.remote_orchestrator.client
         LOGGER.info(f"LSM {self.service_entity_name} creation parameters:\n{pformat(attributes)}")
-        response = client.lsm_services_create(
-            tid=self.remote_orchestrator.environment,
+        result = self.remote_orchestrator.client_guard.lsm_services_create(
+            environment_id=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             attributes=attributes,
             service_instance_id=self._instance_id,
         )
+
         LOGGER.info(
-            "Created instance with status code %d, got response %s",
-            response.code,
-            pformat(response.result),
+            "Created instance, got response %s",
+            pformat(result),
         )
-        if "message" in response.result:
-            LOGGER.info(response.result["message"])
+        if "message" in result:
+            LOGGER.info(result["message"])
 
-        assert response.code == 200, f"LSM service create failed: {response.result}"
         assert (
-            response.result["data"]["version"] == 1
-        ), f"Error while creating instance: wrong version, got {response.result['data']['version']} (expected 1)"
+            result["data"]["version"] == 1
+        ), f"Error while creating instance: wrong version, got {result['data']['version']} (expected 1)"
 
-        self._instance_id = response.result["data"]["id"]
+        self._instance_id = result["data"]["id"]
         LOGGER.info(f"Created instance has ID: {self._instance_id}")
 
         self.wait_for_state(wait_for_state, version, bad_states=bad_states)
@@ -115,17 +113,13 @@ class ManagedServiceInstance:
             current_version = self.get_state().version
 
         LOGGER.info("Updating service instance %s", self._instance_id)
-        client = self.remote_orchestrator.client
-        response = client.lsm_services_update(
-            tid=self.remote_orchestrator.environment,
+        self.remote_orchestrator.client_guard.lsm_services_update(
+            environment_id=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             service_id=self._instance_id,
             attributes=attribute_updates,
             current_version=current_version,
         )
-        assert (
-            response.code == 200
-        ), f"Failed to update for ID: {self._instance_id}, response code: {response.code}\n{response.result}"
 
         self.wait_for_state(
             wait_for_state,
@@ -151,15 +145,12 @@ class ManagedServiceInstance:
             current_version = self.get_state().version
 
         LOGGER.info("Deleting service instance %s", self._instance_id)
-        response = self.remote_orchestrator.client.lsm_services_delete(
-            tid=self.remote_orchestrator.environment,
+        self.remote_orchestrator.client_guard.lsm_services_delete(
+            environment_id=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             service_id=self._instance_id,
             current_version=current_version,
         )
-        assert (
-            response.code == 200
-        ), f"Failed to delete for ID: {self._instance_id}, response code: {response.code}\n{response.result}"
 
         self.wait_for_state(
             wait_for_state,
@@ -167,19 +158,15 @@ class ManagedServiceInstance:
             bad_states=bad_states,
         )
 
-    def get_state(
-        self,
-    ) -> State:
-        response = self.remote_orchestrator.client.lsm_services_get(
-            tid=self.remote_orchestrator.environment,
+    def get_state(self) -> State:
+        result = self.remote_orchestrator.client_guard.lsm_services_get(
+            environment_id=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             service_id=self._instance_id,
         )
-        assert (
-            response.code == 200
-        ), f"Wrong response code while trying to get state, got {response.code} (expected 200): \n{response}"
-        instance_state = response.result["data"]["state"]
-        instance_version = response.result["data"]["version"]
+
+        instance_state = result["data"]["state"]
+        instance_version = result["data"]["version"]
 
         return State(name=instance_state, version=instance_version)
 
