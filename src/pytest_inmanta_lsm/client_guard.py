@@ -177,4 +177,4 @@ class ClientGuard:
             service_id=service_id,
         )
         self._check_result(result)
-        return [ServiceInstanceLog(**l) for l in result.result["data"]]
+        return [ServiceInstanceLog(**log) for log in result.result["data"]]

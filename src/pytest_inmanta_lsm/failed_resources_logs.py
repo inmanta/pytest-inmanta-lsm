@@ -52,7 +52,9 @@ class FailedResourcesLogs:
             return []
 
         try:
-            return self._extract_logs(self._client.get_version(environment_id=self._environment_id, version=version, include_logs=True))
+            return self._extract_logs(
+                self._client.get_version(environment_id=self._environment_id, version=version, include_logs=True)
+            )
         except BadResponseError as e:
             LOGGER.warn(f"Couldn't get error logs: {e}")
             return []
