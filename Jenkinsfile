@@ -17,6 +17,7 @@ pipeline {
     booleanParam(name:"pytest_inmanta_dev", defaultValue: true, description: 'Changes the index used to install pytest-inmanta to the inmanta dev index')
   }
   environment{
+     INMANTA_LSM_HOST="iso3-test.ci.inmanta.com"
      PIP_INDEX_URL="https://artifacts.internal.inmanta.com/inmanta/dev"
   }
   stages {
@@ -43,14 +44,16 @@ pipeline {
     }
     stage("tests"){
       steps{
+<<<<<<< HEAD
         lock(label: 'iso3-test', variable: 'LOCK'){
+=======
+        lock("iso3-test-1"){
+>>>>>>> parent of 40ec180... New Jenkinsfile
           sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
             withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
               script{
                 sh"""
-                export INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" 
-                export INMANTA_LSM_HOST="${env.LOCK}.ci.inmanta.com" 
-                ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
+                INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
                 """
                 junit 'junit.xml'
               }
