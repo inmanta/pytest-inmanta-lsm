@@ -44,11 +44,7 @@ pipeline {
     }
     stage("tests"){
       steps{
-<<<<<<< HEAD
-        lock(label: 'iso3-test', variable: 'LOCK'){
-=======
         lock("iso3-test-1"){
->>>>>>> parent of 40ec180... New Jenkinsfile
           sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
             withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
               script{
