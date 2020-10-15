@@ -14,6 +14,11 @@ from typing import Any, List, Optional
 LOGGER = logging.getLogger(__name__)
 
 
+class BadStateError(RuntimeError):
+    def __init__(self, bad_state: str, message: str):
+        super().__init__(f"Instance got into a bad state: {bad_state}\n{message}")
+
+
 class State:
     def __init__(self, name: str, version: Optional[int] = None):
         self.name = name
@@ -137,7 +142,7 @@ class WaitForState(object):
                         f"{self.name} got into bad state ({current_state})",
                         current_state,
                     )
-                    raise RuntimeError(error_msg)
+                    raise BadStateError(current_state, error_msg)
 
             if time.time() - start_time > timeout:
                 error_msg = self.__compose_error_msg_with_bad_state_error(

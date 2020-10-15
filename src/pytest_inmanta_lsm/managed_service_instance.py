@@ -78,7 +78,7 @@ class ManagedServiceInstance:
         LOGGER.info(
             "Created instance with status code %d, got response %s",
             response.code,
-            response.result,
+            pformat(response.result),
         )
         if "message" in response.result:
             LOGGER.info(response.result["message"])
@@ -225,6 +225,8 @@ class ManagedServiceInstance:
             )
             if validation_failure_msg:
                 return validation_failure_msg
+
+            LOGGER.info("No validation failure message, getting failed resource logs")
 
             # No validation failure message, so getting failed resource logs
             failed_resource_logs = FailedResourcesLogs(

@@ -11,6 +11,7 @@ import os
 import subprocess
 from pprint import pformat
 from typing import Dict, Optional, Union
+from uuid import UUID
 
 import yaml
 from inmanta.agent import config as inmanta_config
@@ -36,7 +37,7 @@ class RemoteOrchestrator:
         self,
         host: str,
         ssh_user: str,
-        environment: str,
+        environment: UUID,
         project: Project,
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
@@ -59,7 +60,7 @@ class RemoteOrchestrator:
         self.noclean = noclean
 
         inmanta_config.Config.load_config()
-        inmanta_config.Config.set("config", "environment", self._env)
+        inmanta_config.Config.set("config", "environment", str(self._env))
         inmanta_config.Config.set("compiler_rest_transport", "host", host)
         inmanta_config.Config.set("compiler_rest_transport", "port", "8888")
         inmanta_config.Config.set("client_rest_transport", "host", host)
@@ -76,7 +77,7 @@ class RemoteOrchestrator:
         self._ensure_environment()
 
     @property
-    def environment(self) -> str:
+    def environment(self) -> UUID:
         return self._env
 
     @property
@@ -290,22 +291,24 @@ class RemoteOrchestrator:
             service_entity=service_entity_name,
             service_id=service_instance_id,
         )
-        assert (
-            result.code == 200
-        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{result}"
+        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
+        f"{pformat(result.get_result(), width=140)}"
+
         # get events that led to final state
         events = result.result["data"][0]["events"]
+
         try:
             # find any compile report id (all the same anyways)
             compile_id = next((event["id_compile_report"] for event in events if event["id_compile_report"] is not None))
         except StopIteration:
             LOGGER.info("No validation failure report found")
             return None
+
         # get the report
         result = client.get_report(compile_id)
-        assert (
-            result.code == 200
-        ), f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n{result}"
+        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
+        f"{pformat(result.get_result(), width=140)}"
+
         # get stage reports
         reports = result.result["report"]["reports"]
         for report in reversed(reports):
@@ -313,7 +316,7 @@ class RemoteOrchestrator:
             if "returncode" in report and report["returncode"] != 0:
                 return report["errstream"]
 
-        LOGGER.info("No failure found in the failed validation! %s", reports)
+        LOGGER.info("No failure found in the failed validation! \n%s", pformat(reports, width=140))
         return None
 
     def get_managed_instance(
