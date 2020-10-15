@@ -118,9 +118,9 @@ class RemoteOrchestrator:
             return result["data"]["id"]
 
         try:
-            client.get_environment(self._env)
+            client.environment_get(self._env)
         except BadResponseError:
-            client.create_environment(
+            client.environment_create(
                 project_id=ensure_project("pytest-inmanta-lsm"),
                 name="pytest-inmanta-lsm",
                 environment_id=self._env,
@@ -222,12 +222,12 @@ class RemoteOrchestrator:
 
     def clean(self) -> None:
         LOGGER.info("Clear environment: stopping agents, delete_cascade contents and remove project_dir")
-        self.client_guard.clear_environment(self._env)
+        self.client_guard.environment_clear(self._env)
         LOGGER.debug("Cleared environment")
 
         LOGGER.info("Resetting orchestrator")
         for key, value in self._settings.items():
-            self.client_guard.set_setting(self._env, key, value)
+            self.client_guard.environment_setting_set(self._env, key, value)
 
     def cache_project(self) -> None:
         """Cache the project on the server so that a sync can be faster."""
