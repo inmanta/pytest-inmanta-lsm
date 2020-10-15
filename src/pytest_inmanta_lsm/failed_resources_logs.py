@@ -10,8 +10,6 @@ import logging
 from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
-from inmanta.protocol.endpoints import SyncClient
-
 from pytest_inmanta_lsm.client_guard import BadResponseError, ClientGuard
 
 LOGGER = logging.getLogger(__name__)
@@ -23,8 +21,8 @@ class FailedResourcesLogs:
     No environment version needs to be specified, the latest (highest number) version will be used
     """
 
-    def __init__(self, client: SyncClient, environment_id: UUID):
-        self._client: ClientGuard = ClientGuard(client)
+    def __init__(self, client: ClientGuard, environment_id: UUID):
+        self._client = client
         self._environment_id = environment_id
 
     def _extract_logs(self, get_version_result: Dict[str, Any]) -> List[Tuple[str, str]]:

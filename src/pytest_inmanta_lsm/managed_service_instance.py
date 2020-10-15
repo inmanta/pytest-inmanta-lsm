@@ -217,7 +217,7 @@ class ManagedServiceInstance:
 
             # No validation failure message, so getting failed resource logs
             failed_resource_logs = FailedResourcesLogs(
-                self.remote_orchestrator.client,
+                self.remote_orchestrator.client_guard,
                 self.remote_orchestrator.environment,
             )
             return failed_resource_logs.get()
