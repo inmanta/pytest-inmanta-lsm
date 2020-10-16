@@ -47,18 +47,21 @@ pipeline {
           resourcesVariable('LOCKED_RESOURCE')
           resourceNumber(1)
         }
-        sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
-          withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
-            script{
-              sh"""
-              export INMANTA_LSM_HOST="$LOCKED_RESOURCE"
-              export INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" 
-              ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
-              """
-              junit 'junit.xml'
+        steps {
+          sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
+            withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
+              script{
+                sh"""
+                export INMANTA_LSM_HOST="$LOCKED_RESOURCE"
+                export INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" 
+                ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
+                """
+                junit 'junit.xml'
+              }
             }
           }
         }
+        
       }
     }
     stage("release") {
