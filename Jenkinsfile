@@ -42,18 +42,20 @@ pipeline {
       }
     }
     stage("tests"){
+      lockableResources('iso3-test-2.ii.inmanta.com iso3-test-3.ii.inmanta.com') {
+        resourcesVariable('LOCKED_RESOURCE')
+        resourceNumber(1)
+      }
       steps{
-        lock("iso3-test-1"){
-          sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
-            withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
-              script{
-                sh"""
-                export INMANTA_LSM_HOST="iso3-test.ci.inmanta.com"
-                export INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" 
-                ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
-                """
-                junit 'junit.xml'
-              }
+        sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
+          withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
+            script{
+              sh"""
+              export INMANTA_LSM_HOST="$LOCKED_RESOURCE"
+              export INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" 
+              ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
+              """
+              junit 'junit.xml'
             }
           }
         }
