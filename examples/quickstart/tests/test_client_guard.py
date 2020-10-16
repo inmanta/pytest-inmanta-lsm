@@ -6,7 +6,6 @@
     :license: Inmanta EULA
 """
 import time
-from uuid import UUID
 
 from inmanta.data.model import Environment, Project
 from inmanta_lsm.model import ServiceEntity, ServiceInstance, ServiceInstanceLog
@@ -149,6 +148,7 @@ def test_lsm(project, remote_orchestrator):
     )
     assert isinstance(service_instance, ServiceInstance)
 
+    # wait for instance to be up
     while service_instance.state != "up":
         time.sleep(1)
         service_instance = client_guard.lsm_services_get(
@@ -157,6 +157,9 @@ def test_lsm(project, remote_orchestrator):
             service_id=service_instance.id,
         )
 
+    last_up_version = service_instance.version
+
+    # update the instance
     client_guard.lsm_services_update(
         environment_id=environment_id,
         service_entity=SERVICE_NAME,
@@ -165,7 +168,8 @@ def test_lsm(project, remote_orchestrator):
         current_version=service_instance.version,
     )
 
-    while service_instance.state != "up":
+    # wait for the instance to be up
+    while service_instance.state != "up" or service_instance.version == last_up_version:
         time.sleep(1)
         service_instance = client_guard.lsm_services_get(
             environment_id=environment_id,
@@ -187,7 +191,7 @@ def test_lsm(project, remote_orchestrator):
         # find any compile report id (all the same anyways)
         compile_id = next((event.id_compile_report for event in events if event.id_compile_report is not None))
         report = client_guard.get_report(compile_id=compile_id)
-        assert UUID(report["report"]["id"]) == compile_id
+        assert "report" in report
     except StopIteration:
         assert False
 

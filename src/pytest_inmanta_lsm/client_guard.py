@@ -42,7 +42,7 @@ class ClientGuard:
         if result.code == 404:
             raise NotFoundError(message)
         else:
-            raise BadResponseError(f"Got {result.code} (expected 200): \n{message}")
+            raise BadResponseError(f"Got {result.code} (expected 200): {message}")
 
     # Environment
 
