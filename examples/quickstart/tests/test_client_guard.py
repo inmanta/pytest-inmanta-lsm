@@ -5,6 +5,8 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+import time 
+from uuid import UUID
 from inmanta.data.model import Environment, Project
 from inmanta_lsm.model import ServiceEntity, ServiceInstance, ServiceInstanceLog
 
@@ -146,6 +148,30 @@ def test_lsm(project, remote_orchestrator):
     )
     assert isinstance(service_instance, ServiceInstance)
 
+    while service_instance.state != "up":
+        time.sleep(1)
+        service_instance = client_guard.lsm_services_get(
+            environment_id=environment_id,
+            service_entity=SERVICE_NAME,
+            service_id=service_instance.id,
+        )
+
+    client_guard.lsm_services_update(
+        environment_id=environment_id,
+        service_entity=SERVICE_NAME,
+        service_id=service_instance.id,
+        attributes={"vlan_id": 42},
+        current_version=service_instance.version,
+    )
+
+    while service_instance.state != "up":
+        time.sleep(1)
+        service_instance = client_guard.lsm_services_get(
+            environment_id=environment_id,
+            service_entity=SERVICE_NAME,
+            service_id=service_instance.id,
+        )
+
     # get service log
     logs = client_guard.lsm_service_log_list(
         environment_id=environment_id,
@@ -160,6 +186,13 @@ def test_lsm(project, remote_orchestrator):
         # find any compile report id (all the same anyways)
         compile_id = next((event.id_compile_report for event in events if event.id_compile_report is not None))
         report = client_guard.get_report(compile_id=compile_id)
-        raise RuntimeError(report)
+        assert UUID(report["report"]["id"]) == compile_id
     except StopIteration:
-        pass
+        assert False
+
+    client_guard.lsm_services_delete(
+        environment_id=environment_id,
+        service_entity=SERVICE_NAME,
+        service_id=service_instance.id,
+        current_version=service_instance.version,
+    )
