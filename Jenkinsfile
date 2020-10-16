@@ -42,11 +42,11 @@ pipeline {
       }
     }
     stage("tests"){
-      lockableResources('iso3-test-2.ii.inmanta.com iso3-test-3.ii.inmanta.com') {
-        resourcesVariable('LOCKED_RESOURCE')
-        resourceNumber(1)
-      }
       steps{
+        lockableResources('iso3-test-2.ii.inmanta.com iso3-test-3.ii.inmanta.com') {
+          resourcesVariable('LOCKED_RESOURCE')
+          resourceNumber(1)
+        }
         sshagent(credentials : ['96f313c8-b5db-4978-ac85-d314ac372b8f']) {
           withCredentials([string(credentialsId: 'fff7ef7e-cb20-4fb2-a93b-c5139463c6bf', variable: 'GITHUB_TOKEN')]) {
             script{
