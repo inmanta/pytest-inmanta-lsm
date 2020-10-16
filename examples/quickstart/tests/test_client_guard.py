@@ -11,8 +11,8 @@ from inmanta.data.model import Environment, Project
 from inmanta_lsm.model import ServiceEntity, ServiceInstance, ServiceInstanceLog
 
 SERVICE_NAME = "vlan-assignment"
-project_name = "test-client-guard"
-environment_name = "test-client-guard"
+PROJECT_NAME = "test-client-guard"
+ENVIRONMENT_NAME = "test-client-guard"
 
 
 def test_project(project, remote_orchestrator):
@@ -22,15 +22,15 @@ def test_project(project, remote_orchestrator):
     # preparing a clean start
     projects = client_guard.project_list()
     for p in projects:
-        if p.name == project_name:
+        if p.name == PROJECT_NAME:
             client_guard.project_delete(project_id=p.id)
 
     initial_project_count = len(projects)
 
     # creating new project
-    new_project = client_guard.project_create(name=project_name)
+    new_project = client_guard.project_create(name=PROJECT_NAME)
     assert isinstance(new_project, Project)
-    assert new_project.name == project_name
+    assert new_project.name == PROJECT_NAME
     assert new_project.id is not None
 
     projects = client_guard.project_list()
@@ -57,16 +57,16 @@ def test_environment(project, remote_orchestrator):
     # ensure that our new environment doesn't exist
     environments = client_guard.environment_list()
     for e in environments:
-        if e.name == environment_name and e.project_id == project_id:
+        if e.name == ENVIRONMENT_NAME and e.project_id == project_id:
             client_guard.environment_delete(e.id)
 
     # create our new environment
     new_environment = client_guard.environment_create(
         project_id=project_id,
-        name=environment_name,
+        name=ENVIRONMENT_NAME,
     )
     assert isinstance(new_environment, Environment)
-    assert new_environment.name == environment_name
+    assert new_environment.name == ENVIRONMENT_NAME
 
     # testing setting set call
     client_guard.environment_setting_set(
@@ -111,7 +111,7 @@ def test_version(project, remote_orchestrator):
     )
 
     # get all versions
-    versions = client_guard.list_versions(environment_id=environment_id)
+    versions = client_guard.list_versions(environment_id=environment_id)["versions"]
     assert len(versions) >= 0
 
     latest_version_number = max(version_item["version"] for version_item in versions["versions"])
@@ -193,7 +193,7 @@ def test_lsm(project, remote_orchestrator):
         report = client_guard.get_report(compile_id=compile_id)
         assert "report" in report
     except StopIteration:
-        assert False
+        assert False, "No compile_id found"
 
     client_guard.lsm_services_delete(
         environment_id=environment_id,

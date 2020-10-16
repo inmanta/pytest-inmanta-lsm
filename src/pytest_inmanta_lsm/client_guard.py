@@ -1,3 +1,11 @@
+"""
+    Pytest Inmanta LSM
+
+    :copyright: 2020 Inmanta
+    :contact: code@inmanta.com
+    :license: Inmanta EULA
+"""
+
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -17,12 +25,12 @@ class InvalidRequestError(BadResponseError):
         BadResponseError.__init__(self, f"400 Invalid request: {message}")
 
 
-class NotFoundError(BadResponseError):
+class ForbiddenError(BadResponseError):
     def __init__(self, message: str):
         BadResponseError.__init__(self, f"403 Forbidden: {message}")
 
 
-class ForbiddenError(BadResponseError):
+class NotFoundError(BadResponseError):
     def __init__(self, message: str):
         BadResponseError.__init__(self, f"404 Not Found: {message}")
 
@@ -67,12 +75,12 @@ class ClientGuard:
     def environment_clear(self, environment_id: UUID) -> None:
         result: Result = self._client.environment_clear(id=environment_id)
         self._check_result(result)
-        return result.result
+        return
 
     def environment_delete(self, environment_id: UUID) -> None:
         result: Result = self._client.environment_delete(id=environment_id)
         self._check_result(result)
-        return result.result
+        return
 
     def environment_list(self) -> List[Environment]:
         result: Result = self._client.environment_list()

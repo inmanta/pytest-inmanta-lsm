@@ -19,7 +19,7 @@ from inmanta.protocol.endpoints import SyncClient
 from pytest_inmanta.plugin import Project
 
 from pytest_inmanta_lsm import managed_service_instance, retry_limited
-from pytest_inmanta_lsm.client_guard import BadResponseError, ClientGuard
+from pytest_inmanta_lsm.client_guard import NotFoundError, ClientGuard
 
 LOGGER = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ class RemoteOrchestrator:
 
         try:
             client.environment_get(self._env)
-        except BadResponseError:
+        except NotFoundError:
             client.environment_create(
                 project_id=ensure_project("pytest-inmanta-lsm"),
                 name="pytest-inmanta-lsm",
