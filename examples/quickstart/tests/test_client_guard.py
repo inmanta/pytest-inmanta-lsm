@@ -111,8 +111,8 @@ def test_version(project, remote_orchestrator):
     )
 
     # get all versions
-    versions = client_guard.list_versions(environment_id=environment_id)["versions"]
-    assert len(versions) >= 0
+    versions = client_guard.list_versions(environment_id=environment_id)
+    assert len(versions["versions"]) >= 0
 
     latest_version_number = max(version_item["version"] for version_item in versions["versions"])
     version = client_guard.get_version(environment_id=environment_id, version=latest_version_number)
