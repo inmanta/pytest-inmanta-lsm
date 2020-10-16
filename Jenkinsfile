@@ -50,7 +50,7 @@ pipeline {
                 sh"""
                 export INMANTA_LSM_HOST="$env.LOCKED_RESOURCE"
                 export INMANTA_MODULE_REPO="https://${GITHUB_TOKEN}@github.com/inmanta/{}.git" 
-                ${env.WORKSPACE}/env/bin/pytest tests -v -s --junitxml=junit.xml
+                ${env.WORKSPACE}/env/bin/pytest tests -v --log-cli-level DEBUG -s --junitxml=junit.xml
                 """
                 junit 'junit.xml'
               }
