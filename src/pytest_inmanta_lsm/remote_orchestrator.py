@@ -19,7 +19,7 @@ from inmanta.protocol.endpoints import SyncClient
 from pytest_inmanta.plugin import Project
 
 from pytest_inmanta_lsm import managed_service_instance, retry_limited
-from pytest_inmanta_lsm.client_guard import NotFoundError, ClientGuard
+from pytest_inmanta_lsm.client_guard import ClientGuard, NotFoundError
 
 LOGGER = logging.getLogger(__name__)
 
