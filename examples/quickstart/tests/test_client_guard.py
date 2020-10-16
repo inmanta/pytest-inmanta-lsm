@@ -5,8 +5,9 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
-import time 
+import time
 from uuid import UUID
+
 from inmanta.data.model import Environment, Project
 from inmanta_lsm.model import ServiceEntity, ServiceInstance, ServiceInstanceLog
 
