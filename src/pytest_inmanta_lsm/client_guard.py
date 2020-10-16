@@ -34,14 +34,15 @@ class ClientGuard:
     def _check_result(self, result: Result):
         if result.code == 200:
             return
+        message = result.result["message"] if "message" in result.result else str(result.result)
         if result.code == 400:
-            raise InvalidRequestError(result.result)
+            raise InvalidRequestError(message)
         if result.code == 403:
-            raise ForbiddenError(result.result)
+            raise ForbiddenError(message)
         if result.code == 404:
-            raise NotFoundError(result.result)
+            raise NotFoundError(message)
         else:
-            raise BadResponseError(f"Got {result.code} (expected 200): \n{result.result}")
+            raise BadResponseError(f"Got {result.code} (expected 200): \n{message}")
 
     # Environment
 
