@@ -42,7 +42,7 @@ pipeline {
       }
     }
     stage("tests"){
-      steps{
+      job("tests"){
         lockableResources('iso3-test-2.ii.inmanta.com iso3-test-3.ii.inmanta.com') {
           resourcesVariable('LOCKED_RESOURCE')
           resourceNumber(1)
