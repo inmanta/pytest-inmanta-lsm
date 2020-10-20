@@ -33,6 +33,11 @@ SSH_CMD = [
 
 
 class RemoteOrchestrator:
+
+    # cache the environment before a cleanup is done. This allows the sync to go faster.
+    _server_path: Optional[str]
+    _server_cache_path: Optional[str]
+
     def __init__(
         self,
         host: str,
@@ -68,11 +73,7 @@ class RemoteOrchestrator:
 
         self._project = project
 
-        self._client: SyncClient = None
-
-        # cache the environment before a cleanup is done. This allows the sync to go faster.
-        self._server_path: str = None
-        self._server_cache_path: str = None
+        self._client: Optional[SyncClient] = None
 
         self._ensure_environment()
 
@@ -277,7 +278,7 @@ class RemoteOrchestrator:
     def get_validation_failure_message(
         self,
         service_entity_name: str,
-        service_instance_id: str,
+        service_instance_id: UUID,
     ) -> Optional[str]:
         """
         Get the compiler error for a validation failure for a specific service entity
@@ -320,6 +321,6 @@ class RemoteOrchestrator:
         return None
 
     def get_managed_instance(
-        self, service_entity_name: str, service_id: Optional[str] = None
+        self, service_entity_name: str, service_id: Optional[UUID] = None
     ) -> "managed_service_instance.ManagedServiceInstance":
         return managed_service_instance.ManagedServiceInstance(self, service_entity_name, service_id)

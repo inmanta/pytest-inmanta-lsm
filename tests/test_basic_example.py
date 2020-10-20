@@ -23,4 +23,4 @@ def test_basic_example(testdir):
     testdir.copy_example("quickstart")
 
     result = testdir.runpytest("tests/test_quickstart.py")
-    result.assert_outcomes(passed=1)
+    result.assert_outcomes(passed=2)

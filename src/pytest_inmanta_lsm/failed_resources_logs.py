@@ -8,7 +8,7 @@
 
 import logging
 import uuid
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from inmanta.protocol.endpoints import SyncClient
 
@@ -62,7 +62,7 @@ class FailedResourcesLogs:
             )
             return []
 
-    def _find_version(self) -> int:
+    def _find_version(self) -> Optional[int]:
         versions = self._client.list_versions(tid=self._environment_id).result["versions"]
 
         # assumption - version with highest number will be the latest one
