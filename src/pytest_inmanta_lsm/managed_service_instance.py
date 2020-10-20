@@ -63,6 +63,7 @@ class ManagedServiceInstance:
         """
         :param remote_orchestrator: remote_orchestrator to create the service instance  on
         :param service_entity_name: name of the service entity
+        :param service_id: manually choose the id of the service instance
         """
         self.remote_orchestrator = remote_orchestrator
         self.service_entity_name = service_entity_name
@@ -89,8 +90,10 @@ class ManagedServiceInstance:
 
         :param attributes: service attributes to set
         :param wait_for_state: wait for this state to be reached
+        :param wait_for_state_extended: wait for one of those state to be reached
         :param bad_states: stop waiting and fail if any of these states are reached
         :param version: the target state should have this version number
+        :param version_extended: the target state should have this version number
         """
         client = self.remote_orchestrator.client
         LOGGER.info(f"LSM {self.service_entity_name} creation parameters:\n{pformat(attributes)}")
@@ -139,8 +142,10 @@ class ManagedServiceInstance:
         This method will wait for the provided state to verify the update
 
         :param wait_for_state: which state to wait for when update is finished
+        :param wait_for_state_extended: one of the state to wait for when update is finished
         :param current_version: current version
         :param new_version: version when update has finished
+        :param new_version_extended: version when update has finished
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates
         :param bad_states: see Connection.wait_for_state parameter 'bad_states'
         """
@@ -181,8 +186,10 @@ class ManagedServiceInstance:
         """
         :param current_version: the version the service is in now
         :param wait_for_state: wait for this state to be reached
+        :param wait_for_state_extended: wait for one of those states to be reached
         :param bad_states: stop waiting and fail if any of these states are reached
         :param version: the target state should have this version number
+        :param version_extended: the target state should have this version number
         """
         if current_version is None:
             current_version = self.get_state().version
@@ -234,8 +241,10 @@ class ManagedServiceInstance:
     ) -> None:
         """Wait for the service instance  to reach the given state
 
-        :param state: Poll until the service instance  reaches this state
-        :param version: In this state the service instance  should have this version
+        :param state: Poll until the service instance reaches this state
+        :param state_extended: Poll until the service instance reaches one of those states
+        :param version: In this state the service instance should have this version
+        :param version_extended: In this state the service instance should have this version
         :param timeout: How long can we wait for service to achieve given state (in seconds)
         :param bad_states: States that should not be reached, if these are reached,
            waiting is aborted (if the target state is in bad_states, it considered to be good.)
