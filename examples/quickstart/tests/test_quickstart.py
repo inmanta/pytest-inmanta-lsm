@@ -76,13 +76,10 @@ def test_transient_state(project, remote_orchestrator):
         wait_for_state="creating",
         wait_for_state_extended=["up"],
         version=None,
-        version_extended=[None]
+        version_extended=[None],
     )
 
-    service_instance.wait_for_state(
-        state="up",
-        version=None
-    )
+    service_instance.wait_for_state(state="up", version=None)
 
     # break it down
     service_instance.delete()

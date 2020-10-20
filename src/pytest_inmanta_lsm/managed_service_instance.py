@@ -28,9 +28,9 @@ class VersionExceededError(RuntimeError):
         RuntimeError.__init__(self, f"VersionExceededError: {message}")
 
 
-class BadInputParameterError(RuntimeError):
+class BadInputArgumentError(RuntimeError):
     def __init__(self, message: str):
-        RuntimeError.__init__(self, f"BadInputParameterError: {message}")
+        RuntimeError.__init__(self, f"BadInputArgumentError: {message}")
 
 
 class ManagedServiceInstance:
@@ -245,7 +245,7 @@ class ManagedServiceInstance:
         def get_desired_states():
             states = [State(name=state, version=version)]
             if len(state_extended) != len(version_extended):
-                raise BadInputParameterError(
+                raise BadInputArgumentError(
                     "Bad input parameters: you must provide as much versions as states, "
                     f"length is {len(version_extended)} (expected {len(state_extended)})"
                 )
