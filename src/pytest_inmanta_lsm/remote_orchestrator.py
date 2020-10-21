@@ -33,11 +33,6 @@ SSH_CMD = [
 
 
 class RemoteOrchestrator:
-
-    # cache the environment before a cleanup is done. This allows the sync to go faster.
-    _server_path: Optional[str]
-    _server_cache_path: Optional[str]
-
     def __init__(
         self,
         host: str,
@@ -74,6 +69,10 @@ class RemoteOrchestrator:
         self._project = project
 
         self._client: Optional[SyncClient] = None
+
+        # cache the environment before a cleanup is done. This allows the sync to go faster.
+        self._server_path: Optional[str] = None
+        self._server_cache_path: Optional[str] = None
 
         self._ensure_environment()
 

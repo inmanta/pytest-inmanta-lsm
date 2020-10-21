@@ -275,7 +275,11 @@ class ManagedServiceInstance:
                     )
                 else:
                     return True
-            elif len(desired_versions) > 0 and max(desired_versions) <= current_state.version:
+            elif (
+                len(desired_versions) > 0
+                and current_state.version is not None
+                and max(desired_versions) <= current_state.version
+            ):
                 raise VersionExceededError(
                     f"Instance's version ({current_state.version}) has exceeded all desired ones ({desired_versions})"
                 )
