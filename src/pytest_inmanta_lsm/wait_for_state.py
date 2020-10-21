@@ -19,6 +19,11 @@ class BadStateError(RuntimeError):
         super().__init__(f"Instance got into a bad state: {bad_state}\n{message}")
 
 
+class Timeout(RuntimeError):
+    def __init__(self, desired_states: List[str], message: str):
+        super().__init__(f"Timout reached when waiting for instance to go into one of: {desired_states}\n{message}")
+
+
 class State:
     def __init__(self, name: str, version: Optional[int] = None):
         self.name = name
@@ -49,8 +54,8 @@ class WaitForState(object):
         return State(name="default", version=0)
 
     @staticmethod
-    def default_compare_states(current_state: State, wait_for_states: List[State]) -> bool:
-        return current_state in wait_for_states
+    def default_compare_states(current_state: State, wait_for_states: List[str]) -> bool:
+        return current_state.name in wait_for_states
 
     @staticmethod
     def default_check_start_state(current_state: State) -> bool:
@@ -104,7 +109,7 @@ class WaitForState(object):
         return error_msg
 
     def wait_for_state(
-        self, desired_states: List[State], bad_states: List[str] = [], timeout: int = 600, interval: int = 1
+        self, desired_states: List[str], bad_states: List[str] = [], timeout: int = 600, interval: int = 1
     ) -> State:
         """
         Wait for instance to go to given state
@@ -116,10 +121,7 @@ class WaitForState(object):
         :returns: current state, can raise RuntimeError when state has not been reached within timeout
         """
 
-        def stringify(desired_states: List[State]) -> List[str]:
-            return [str(state) for state in desired_states]
-
-        LOGGER.info(f"Waiting for {self.name} to go to one of {stringify(desired_states)}")
+        LOGGER.info(f"Waiting for {self.name} to go to one of {desired_states}")
         start_time = time.time()
 
         previous_state: State = State(name="default", version=0)
@@ -129,7 +131,7 @@ class WaitForState(object):
             current_state = self.__get_state()
 
             if previous_state != current_state:
-                LOGGER.info(f"{self.name} went to state ({current_state}), waiting for one of ({stringify(desired_states)})")
+                LOGGER.info(f"{self.name} went to state ({current_state}), waiting for one of ({desired_states})")
 
                 previous_state = current_state
 
@@ -153,12 +155,12 @@ class WaitForState(object):
             if time.time() - start_time > timeout:
                 error_msg = self.__compose_error_msg_with_bad_state_error(
                     (
-                        f"{self.name} exceeded timeout {timeout}s while waiting for one of ({stringify(desired_states)}). "
+                        f"{self.name} exceeded timeout {timeout}s while waiting for one of ({desired_states}). "
                         f"Stuck in current state ({current_state})"
                     ),
                     current_state,
                 )
-                raise RuntimeError(error_msg)
+                raise TimeoutError(desired_states, error_msg)
 
             time.sleep(interval)
 

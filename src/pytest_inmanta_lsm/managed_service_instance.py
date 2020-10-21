@@ -28,11 +28,6 @@ class VersionExceededError(RuntimeError):
         RuntimeError.__init__(self, f"VersionExceededError: {message}")
 
 
-class BadInputArgumentError(RuntimeError):
-    def __init__(self, message: str):
-        RuntimeError.__init__(self, f"BadInputArgumentError: {message}")
-
-
 class ManagedServiceInstance:
     """Object that represents a service instance that contains the method to
     push it through its lifecycle and verify its status
@@ -79,21 +74,21 @@ class ManagedServiceInstance:
     def create(
         self,
         attributes: Dict[str, Any],
-        wait_for_state: str = "up",
-        wait_for_state_extended: List[str] = [],
+        wait_for_state: Optional[str] = "up",
+        wait_for_states: Optional[List[str]] = None,
         version: Optional[int] = None,
-        version_extended: List[Optional[int]] = [],
+        versions: Optional[List[int]] = None,
         bad_states: List[str] = CREATE_FLOW_BAD_STATES,
     ) -> None:
-        """Create the service instance and wait for it to go into {wait_for_state} and
-        have version {version}
+        """Create the service instance and wait for it to go into {wait_for_state} or one of {wait_for_states} and
+        have version {version} or one of versions {versions} if those are provided
 
         :param attributes: service attributes to set
         :param wait_for_state: wait for this state to be reached
-        :param wait_for_state_extended: wait for one of those state to be reached
-        :param bad_states: stop waiting and fail if any of these states are reached
+        :param wait_for_states: wait for one of those states to be reached
         :param version: the target state should have this version number
-        :param version_extended: the target state should have this version number
+        :param versions: the target state should have one of those version numbers
+        :param bad_states: stop waiting and fail if any of these states are reached
         """
         client = self.remote_orchestrator.client
         LOGGER.info(f"LSM {self.service_entity_name} creation parameters:\n{pformat(attributes)}")
@@ -121,31 +116,30 @@ class ManagedServiceInstance:
 
         self.wait_for_state(
             state=wait_for_state,
-            state_extended=wait_for_state_extended,
+            states=wait_for_states,
             version=version,
-            version_extended=version_extended,
+            versions=versions,
             bad_states=bad_states,
         )
 
     def update(
         self,
-        wait_for_state: str = "up",
-        wait_for_state_extended: List[str] = [],
+        wait_for_state: Optional[str] = "up",
+        wait_for_states: Optional[List[str]] = None,
+        new_version: Optional[int] = None,
+        new_versions: Optional[List[int]] = None,
         current_version: Optional[int] = None,
-        new_version: int = None,
-        new_version_extended: List[Optional[int]] = [],
         attribute_updates: Dict[str, Union[str, int]] = {},
         bad_states: List[str] = UPDATE_FLOW_BAD_STATES,
     ) -> None:
-        """
-        Update Connection with given parameters 'attribute_update'
-        This method will wait for the provided state to verify the update
+        """Update the service instance with the given {attributes_updates} and wait for it to go into {wait_for_state} or one
+        of {wait_for_states} and have version {version} or one of versions {versions} if those are provided
 
-        :param wait_for_state: which state to wait for when update is finished
-        :param wait_for_state_extended: one of the state to wait for when update is finished
+        :param wait_for_state: wait for this state to be reached
+        :param wait_for_states: wait for one of those states to be reached
+        :param new_version: the target state should have this version number
+        :param new_versions: the target state should have one of those version numbers
         :param current_version: current version
-        :param new_version: version when update has finished
-        :param new_version_extended: version when update has finished
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates
         :param bad_states: see Connection.wait_for_state parameter 'bad_states'
         """
@@ -167,9 +161,9 @@ class ManagedServiceInstance:
 
         self.wait_for_state(
             state=wait_for_state,
-            state_extended=wait_for_state_extended,
+            states=wait_for_states,
             version=new_version,
-            version_extended=new_version_extended,
+            versions=new_versions,
             bad_states=bad_states,
             start_version=current_version,
         )
@@ -177,19 +171,21 @@ class ManagedServiceInstance:
     def delete(
         self,
         current_version: Optional[int] = None,
-        wait_for_state: str = "terminated",
-        wait_for_state_extended: List[str] = [],
+        wait_for_state: Optional[str] = "terminated",
+        wait_for_states: Optional[List[str]] = None,
         version: Optional[int] = None,
-        version_extended: List[Optional[int]] = [],
+        versions: Optional[List[int]] = None,
         bad_states: List[str] = DELETE_FLOW_BAD_STATES,
     ) -> None:
-        """
+        """Delete the service instance and wait for it to go into {wait_for_state} or one of {wait_for_states} and
+        have version {version} or one of versions {versions} if those are provided
+
         :param current_version: the version the service is in now
         :param wait_for_state: wait for this state to be reached
-        :param wait_for_state_extended: wait for one of those states to be reached
-        :param bad_states: stop waiting and fail if any of these states are reached
+        :param wait_for_states: wait for one of those states to be reached
         :param version: the target state should have this version number
-        :param version_extended: the target state should have this version number
+        :param versions: the target state should have one of those version numbers
+        :param bad_states: stop waiting and fail if any of these states are reached
         """
         if current_version is None:
             current_version = self.get_state().version
@@ -207,15 +203,16 @@ class ManagedServiceInstance:
 
         self.wait_for_state(
             state=wait_for_state,
-            state_extended=wait_for_state_extended,
+            states=wait_for_states,
             version=version,
-            version_extended=version_extended,
+            versions=versions,
             bad_states=bad_states,
         )
 
     def get_state(
         self,
     ) -> State:
+        """Get the current state of the service instance"""
         response = self.remote_orchestrator.client.lsm_services_get(
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
@@ -231,55 +228,58 @@ class ManagedServiceInstance:
 
     def wait_for_state(
         self,
-        state: str,
-        state_extended: List[str] = [],
+        state: Optional[str] = None,
+        states: Optional[List[str]] = None,
         version: Optional[int] = None,
-        version_extended: List[Optional[int]] = [],
+        versions: Optional[List[int]] = None,
         timeout: int = 600,
         bad_states: List[str] = ALL_BAD_STATES,
         start_version: Optional[int] = None,
     ) -> None:
-        """Wait for the service instance  to reach the given state
+        """Wait for the service instance to go into {state} or one of {states} and
+        have version {version} or one of versions {versions} if those are provided
 
         :param state: Poll until the service instance reaches this state
-        :param state_extended: Poll until the service instance reaches one of those states
+        :param states: Poll until the service instance reaches one of those states
         :param version: In this state the service instance should have this version
-        :param version_extended: In this state the service instance should have this version
+        :param versions: In this state the service instance should have one of those versions
         :param timeout: How long can we wait for service to achieve given state (in seconds)
         :param bad_states: States that should not be reached, if these are reached,
            waiting is aborted (if the target state is in bad_states, it considered to be good.)
         :param start_version: Provide a start_version when the wait for state is the same as the starting state
         """
+        desired_states: List[str] = []
+        if state is None and states is not None:
+            desired_states.extend(states)
+        elif state is not None and states is None:
+            desired_states.append(state)
+        else:
+            raise ValueError("Exactly one of 'state' and 'states' arguments has to be set")
 
-        def get_desired_states():
-            states = [State(name=state, version=version)]
-            if len(state_extended) != len(version_extended):
-                raise BadInputArgumentError(
-                    "Bad input parameters: you must provide as much versions as states, "
-                    f"length is {len(version_extended)} (expected {len(state_extended)})"
-                )
-            for i in range(len(state_extended)):
-                states.append(State(name=state_extended[i], version=version_extended[i]))
-            return states
+        desired_versions: List[int] = []
+        if version is None and versions is not None:
+            desired_versions.extend(versions)
+        elif version is not None and versions is None:
+            desired_versions.append(version)
+        elif version is not None and versions is not None:
+            raise ValueError("Both 'version' and 'versions' arguments can not be set")
 
-        def compare_states(current_state: State, wait_for_states: List[State]) -> bool:
-            def _compare_states(current_state: State, wait_for_state: State) -> bool:
-                if current_state.name == wait_for_state.name:
-                    if wait_for_state.version is None or current_state.version is None:
-                        # Version is not given, so version does not need to be verified
-                        return True
-                    elif current_state.version != wait_for_state.version:
-                        raise VersionMismatchError(
-                            f"Connection reached state ({current_state}), but has a version mismatch: ({wait_for_state})"
-                        )
-                    else:
-                        return True
-                else:
-                    return False
-
-            for state in wait_for_states:
-                if _compare_states(current_state, state):
+        def compare_states(current_state: State, wait_for_states: List[str]) -> bool:
+            if current_state.name in wait_for_states:
+                if len(desired_versions) == 0:
+                    # Version is not given, so version does not need to be verified
                     return True
+                elif current_state.version not in desired_versions:
+                    raise VersionMismatchError(
+                        f"Instance reached state ({current_state}), but its version is not in {desired_versions}"
+                    )
+                else:
+                    return True
+            elif len(desired_versions) > 0 and max(desired_versions) <= current_state.version:
+                raise VersionExceededError(
+                    f"Instance's version ({current_state.version}) has exceeded all desired ones ({desired_versions})"
+                )
+
             return False
 
         def check_start_state(current_state: State) -> bool:
@@ -312,7 +312,7 @@ class ManagedServiceInstance:
             get_bad_state_error_method=get_bad_state_error,
         )
 
-        wait_for_obj.wait_for_state(get_desired_states(), bad_states=bad_states, timeout=timeout)
+        wait_for_obj.wait_for_state(desired_states=desired_states, bad_states=bad_states, timeout=timeout)
 
     def get_validation_failure_message(self) -> Optional[str]:
         return self.remote_orchestrator.get_validation_failure_message(
