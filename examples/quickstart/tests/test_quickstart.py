@@ -73,13 +73,11 @@ def test_transient_state(project, remote_orchestrator):
     # create an instance and wait for it to be up
     service_instance.create(
         attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-        wait_for_state="creating",
-        wait_for_state_extended=["up"],
-        version=None,
-        version_extended=[None],
+        wait_for_state=None,
+        wait_for_states=["creating", "up"],
     )
 
-    service_instance.wait_for_state(state="up", version=None)
+    service_instance.wait_for_state(state="up")
 
     # break it down
     service_instance.delete()
