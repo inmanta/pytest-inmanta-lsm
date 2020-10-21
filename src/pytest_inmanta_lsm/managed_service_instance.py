@@ -72,7 +72,7 @@ class ManagedServiceInstance:
     @property
     def instance_id(self) -> UUID:
         if self._instance_id is None:
-            raise RuntimeError("Instance id is unknown")
+            raise RuntimeError("Instance id is unknown, did you call create already?")
         else:
             return self._instance_id
 
