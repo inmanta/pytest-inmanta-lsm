@@ -8,7 +8,7 @@
 
 import logging
 from pprint import pformat
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
 from uuid import UUID
 
 from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
@@ -75,9 +75,9 @@ class ManagedServiceInstance:
         self,
         attributes: Dict[str, Any],
         wait_for_state: Optional[str] = None,
-        wait_for_states: Optional[List[str]] = None,
+        wait_for_states: Optional[Set[str]] = None,
         version: Optional[int] = None,
-        versions: Optional[List[int]] = None,
+        versions: Optional[Set[int]] = None,
         bad_states: List[str] = CREATE_FLOW_BAD_STATES,
     ) -> None:
         """
@@ -90,11 +90,11 @@ class ManagedServiceInstance:
             None, None otherwise
         :type wait_for_state: Optional[str], optional
         :param wait_for_states: wait for one of those states to be reached, defaults to None
-        :type wait_for_states: Optional[List[str]], optional
+        :type wait_for_states: Optional[Set[str]], optional
         :param version: the target state should have this version number, defaults to None
         :type version: Optional[int], optional
         :param versions: the target state should have one of those version numbers, defaults to None
-        :type versions: Optional[List[int]], optional
+        :type versions: Optional[Set[int]], optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to CREATE_FLOW_BAD_STATES
         :type bad_states: List[str], optional
         :raises BadStateError: If the instance went into a bad state
@@ -142,9 +142,9 @@ class ManagedServiceInstance:
     def update(
         self,
         wait_for_state: Optional[str] = None,
-        wait_for_states: Optional[List[str]] = None,
+        wait_for_states: Optional[Set[str]] = None,
         new_version: Optional[int] = None,
-        new_versions: Optional[List[int]] = None,
+        new_versions: Optional[Set[int]] = None,
         current_version: Optional[int] = None,
         attribute_updates: Dict[str, Union[str, int]] = {},
         bad_states: List[str] = UPDATE_FLOW_BAD_STATES,
@@ -157,11 +157,11 @@ class ManagedServiceInstance:
             None, None otherwise
         :type wait_for_state: Optional[str], optional
         :param wait_for_states: wait for one of those states to be reached, defaults to None
-        :type wait_for_states: Optional[List[str]], optional
+        :type wait_for_states: Optional[Set[str]], optional
         :param new_version: the target state should have this version number, defaults to None
         :type new_version: Optional[int], optional
         :param new_versions: the target state should have one of those version numbers, defaults to None
-        :type new_versions: Optional[List[int]], optional
+        :type new_versions: Optional[Set[int]], optional
         :param current_version: current version, defaults to None
         :type current_version: Optional[int], optional
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates, defaults to {}
@@ -206,9 +206,9 @@ class ManagedServiceInstance:
     def delete(
         self,
         wait_for_state: Optional[str] = None,
-        wait_for_states: Optional[List[str]] = None,
+        wait_for_states: Optional[Set[str]] = None,
         version: Optional[int] = None,
-        versions: Optional[List[int]] = None,
+        versions: Optional[Set[int]] = None,
         current_version: Optional[int] = None,
         bad_states: List[str] = DELETE_FLOW_BAD_STATES,
     ) -> None:
@@ -220,11 +220,11 @@ class ManagedServiceInstance:
             default None, None otherwise
         :type wait_for_state: Optional[str], optional
         :param wait_for_states: wait for one of those states to be reached, defaults to None
-        :type wait_for_states: Optional[List[str]], optional
+        :type wait_for_states: Optional[Set[str]], optional
         :param new_version: the target state should have this version number, defaults to None
         :type new_version: Optional[int], optional
         :param new_versions: the target state should have one of those version numbers, defaults to None
-        :type new_versions: Optional[List[int]], optional
+        :type new_versions: Optional[Set[int]], optional
         :param current_version: current version, defaults to None
         :type current_version: Optional[int], optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to UPDATE_FLOW_BAD_STATES
@@ -281,9 +281,9 @@ class ManagedServiceInstance:
     def wait_for_state(
         self,
         state: Optional[str] = None,
-        states: Optional[List[str]] = None,
+        states: Optional[Set[str]] = None,
         version: Optional[int] = None,
-        versions: Optional[List[int]] = None,
+        versions: Optional[Set[int]] = None,
         timeout: int = 600,
         bad_states: List[str] = ALL_BAD_STATES,
         start_version: Optional[int] = None,
@@ -295,11 +295,11 @@ class ManagedServiceInstance:
         :param state: Poll until the service instance reaches this state, defaults to None
         :type state: Optional[str], optional
         :param states: Poll until the service instance reaches one of those states, defaults to None
-        :type states: Optional[List[str]], optional
+        :type states: Optional[Set[str]], optional
         :param version: In this state the service instance should have this version, defaults to None
         :type version: Optional[int], optional
         :param versions: In this state the service instance should have one of those versions, defaults to None
-        :type versions: Optional[List[int]], optional
+        :type versions: Optional[Set[int]], optional
         :param timeout: How long can we wait for service to achieve given state (in seconds), defaults to 600
         :type timeout: int, optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to ALL_BAD_STATES
