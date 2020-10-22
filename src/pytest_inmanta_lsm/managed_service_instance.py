@@ -231,6 +231,7 @@ class ManagedServiceInstance:
             version=version,
             versions=versions,
             bad_states=bad_states,
+            start_version=current_version
         )
 
     def get_state(
