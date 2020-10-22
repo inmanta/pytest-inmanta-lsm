@@ -76,18 +76,12 @@ class ManagedServiceInstance:
         have version `version` or one of versions `versions` if those are provided
 
         :param attributes: service attributes to set
-        :type attributes: Dict[str, Any]
         :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is not set, otherwise
             None
-        :type wait_for_state: Optional[str], optional
         :param wait_for_states: wait for one of those states to be reached, defaults to None
-        :type wait_for_states: Optional[Collection[str]], optional
         :param version: the target state should have this version number, defaults to None
-        :type version: Optional[int], optional
         :param versions: the target state should have one of those version numbers, defaults to None
-        :type versions: Optional[Collection[int]], optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to CREATE_FLOW_BAD_STATES
-        :type bad_states: Collection[str], optional
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If both of state and states are set
@@ -146,19 +140,12 @@ class ManagedServiceInstance:
 
         :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is not set, otherwise
             None
-        :type wait_for_state: Optional[str], optional
         :param wait_for_states: wait for one of those states to be reached, defaults to None
-        :type wait_for_states: Optional[Collection[str]], optional
         :param new_version: the target state should have this version number, defaults to None
-        :type new_version: Optional[int], optional
         :param new_versions: the target state should have one of those version numbers, defaults to None
-        :type new_versions: Optional[Collection[int]], optional
         :param current_version: current version, defaults to None
-        :type current_version: Optional[int], optional
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates, defaults to {}
-        :type attribute_updates: Dict[str, Union[str, int]], optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to UPDATE_FLOW_BAD_STATES
-        :type bad_states: Collection[str], optional
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If both of state and states are set
@@ -209,17 +196,11 @@ class ManagedServiceInstance:
 
         :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is not set, otherwise
             None
-        :type wait_for_state: Optional[str], optional
         :param wait_for_states: wait for one of those states to be reached, defaults to None
-        :type wait_for_states: Optional[Collection[str]], optional
         :param new_version: the target state should have this version number, defaults to None
-        :type new_version: Optional[int], optional
         :param new_versions: the target state should have one of those version numbers, defaults to None
-        :type new_versions: Optional[Collection[int]], optional
         :param current_version: current version, defaults to None
-        :type current_version: Optional[int], optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to UPDATE_FLOW_BAD_STATES
-        :type bad_states: Collection[str], optional
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If both of state and states are set
@@ -284,20 +265,13 @@ class ManagedServiceInstance:
         have version `version` or one of versions `versions` if those are provided
 
         :param state: Poll until the service instance reaches this state, defaults to None
-        :type state: Optional[str], optional
         :param states: Poll until the service instance reaches one of those states, defaults to None
-        :type states: Optional[Collection[str]], optional
         :param version: In this state the service instance should have this version, defaults to None
-        :type version: Optional[int], optional
         :param versions: In this state the service instance should have one of those versions, defaults to None
-        :type versions: Optional[Collection[int]], optional
         :param timeout: How long can we wait for service to achieve given state (in seconds), defaults to 600
-        :type timeout: int, optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to ALL_BAD_STATES
-        :type bad_states: Collection[str], optional
         :param start_version: Provide a start_version when the wait for state is the same as the starting state, defaults to
             None
-        :type start_version: Optional[int], optional
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If none of both of state and states are set
