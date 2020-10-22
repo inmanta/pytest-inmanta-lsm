@@ -78,7 +78,7 @@ class ManagedServiceInstance:
         wait_for_states: Optional[Collection[str]] = None,
         version: Optional[int] = None,
         versions: Optional[Collection[int]] = None,
-        bad_states: List[str] = CREATE_FLOW_BAD_STATES,
+        bad_states: Collection[str] = CREATE_FLOW_BAD_STATES,
     ) -> None:
         """
         Create the service instance and wait for it to go into `wait_for_state` or one of `wait_for_states` and
@@ -96,7 +96,7 @@ class ManagedServiceInstance:
         :param versions: the target state should have one of those version numbers, defaults to None
         :type versions: Optional[Collection[int]], optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to CREATE_FLOW_BAD_STATES
-        :type bad_states: List[str], optional
+        :type bad_states: Collection[str], optional
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If both of state and states are set
@@ -147,7 +147,7 @@ class ManagedServiceInstance:
         new_versions: Optional[Collection[int]] = None,
         current_version: Optional[int] = None,
         attribute_updates: Dict[str, Union[str, int]] = {},
-        bad_states: List[str] = UPDATE_FLOW_BAD_STATES,
+        bad_states: Collection[str] = UPDATE_FLOW_BAD_STATES,
     ) -> None:
         """
         Update the service instance with the given `attributes_updates` and wait for it to go into `wait_for_state` or one
@@ -167,7 +167,7 @@ class ManagedServiceInstance:
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates, defaults to {}
         :type attribute_updates: Dict[str, Union[str, int]], optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to UPDATE_FLOW_BAD_STATES
-        :type bad_states: List[str], optional
+        :type bad_states: Collection[str], optional
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If both of state and states are set
@@ -210,7 +210,7 @@ class ManagedServiceInstance:
         version: Optional[int] = None,
         versions: Optional[Collection[int]] = None,
         current_version: Optional[int] = None,
-        bad_states: List[str] = DELETE_FLOW_BAD_STATES,
+        bad_states: Collection[str] = DELETE_FLOW_BAD_STATES,
     ) -> None:
         """
         Delete the service instance and wait for it to go into `wait_for_state` or one of `wait_for_states` and
@@ -228,7 +228,7 @@ class ManagedServiceInstance:
         :param current_version: current version, defaults to None
         :type current_version: Optional[int], optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to UPDATE_FLOW_BAD_STATES
-        :type bad_states: List[str], optional
+        :type bad_states: Collection[str], optional
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If both of state and states are set
@@ -285,7 +285,7 @@ class ManagedServiceInstance:
         version: Optional[int] = None,
         versions: Optional[Collection[int]] = None,
         timeout: int = 600,
-        bad_states: List[str] = ALL_BAD_STATES,
+        bad_states: Collection[str] = ALL_BAD_STATES,
         start_version: Optional[int] = None,
     ) -> None:
         """
@@ -303,7 +303,7 @@ class ManagedServiceInstance:
         :param timeout: How long can we wait for service to achieve given state (in seconds), defaults to 600
         :type timeout: int, optional
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to ALL_BAD_STATES
-        :type bad_states: List[str], optional
+        :type bad_states: Collection[str], optional
         :param start_version: Provide a start_version when the wait for state is the same as the starting state, defaults to
             None
         :type start_version: Optional[int], optional
