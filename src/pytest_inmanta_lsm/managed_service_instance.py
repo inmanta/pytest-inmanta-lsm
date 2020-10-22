@@ -12,20 +12,11 @@ from typing import Any, Collection, Dict, List, Optional, Union
 from uuid import UUID
 
 from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
+from pytest_inmanta_lsm.exceptions import VersionExceededError, VersionMismatchError
 from pytest_inmanta_lsm.failed_resources_logs import FailedResourcesLogs
 from pytest_inmanta_lsm.wait_for_state import State, WaitForState
 
 LOGGER = logging.getLogger(__name__)
-
-
-class VersionMismatchError(RuntimeError):
-    def __init__(self, message: str):
-        RuntimeError.__init__(self, f"VersionMismatchError: {message}")
-
-
-class VersionExceededError(RuntimeError):
-    def __init__(self, message: str):
-        RuntimeError.__init__(self, f"VersionExceededError: {message}")
 
 
 class ManagedServiceInstance:
@@ -86,8 +77,8 @@ class ManagedServiceInstance:
 
         :param attributes: service attributes to set
         :type attributes: Dict[str, Any]
-        :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is left to default
-            None, None otherwise
+        :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is not set, otherwise
+            None
         :type wait_for_state: Optional[str], optional
         :param wait_for_states: wait for one of those states to be reached, defaults to None
         :type wait_for_states: Optional[Collection[str]], optional
@@ -153,8 +144,8 @@ class ManagedServiceInstance:
         Update the service instance with the given `attributes_updates` and wait for it to go into `wait_for_state` or one
         of `wait_for_states` and have version `version` or one of versions `versions` if those are provided
 
-        :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is left to default
-            None, None otherwise
+        :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is not set, otherwise
+            None
         :type wait_for_state: Optional[str], optional
         :param wait_for_states: wait for one of those states to be reached, defaults to None
         :type wait_for_states: Optional[Collection[str]], optional
@@ -216,8 +207,8 @@ class ManagedServiceInstance:
         Delete the service instance and wait for it to go into `wait_for_state` or one of `wait_for_states` and
         have version `version` or one of versions `versions` if those are provided
 
-        :param wait_for_state: wait for this state to be reached, defaults to `"terminated"` if wait_for_states is left to
-            default None, None otherwise
+        :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is not set, otherwise
+            None
         :type wait_for_state: Optional[str], optional
         :param wait_for_states: wait for one of those states to be reached, defaults to None
         :type wait_for_states: Optional[Collection[str]], optional
@@ -336,9 +327,7 @@ class ManagedServiceInstance:
                     # Version is not given, so version does not need to be verified
                     return True
                 elif current_state.version not in desired_versions:
-                    raise VersionMismatchError(
-                        f"Instance reached state ({current_state}), but its version is not in {desired_versions}"
-                    )
+                    raise VersionMismatchError(self, desired_versions, current_state.version)
                 else:
                     return True
             elif (
@@ -346,9 +335,7 @@ class ManagedServiceInstance:
                 and current_state.version is not None
                 and max(desired_versions) <= current_state.version
             ):
-                raise VersionExceededError(
-                    f"Instance's version ({current_state.version}) has exceeded all desired ones ({desired_versions})"
-                )
+                raise VersionExceededError(self, desired_versions, current_state.version)
 
             return False
 
@@ -382,7 +369,7 @@ class ManagedServiceInstance:
             get_bad_state_error_method=get_bad_state_error,
         )
 
-        wait_for_obj.wait_for_state(desired_states=desired_states, bad_states=bad_states, timeout=timeout)
+        wait_for_obj.wait_for_state(instance=self, desired_states=desired_states, bad_states=bad_states, timeout=timeout)
 
     def get_validation_failure_message(self) -> Optional[str]:
         return self.remote_orchestrator.get_validation_failure_message(

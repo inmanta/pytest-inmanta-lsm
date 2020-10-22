@@ -11,17 +11,10 @@ import time
 from pprint import pformat
 from typing import Any, Collection, List, Optional
 
+from pytest_inmanta_lsm import managed_service_instance as msi
+from pytest_inmanta_lsm.exceptions import BadStateError, TimeoutError
+
 LOGGER = logging.getLogger(__name__)
-
-
-class BadStateError(RuntimeError):
-    def __init__(self, bad_state: str, message: str):
-        super().__init__(f"Instance got into a bad state: {bad_state}\n{message}")
-
-
-class Timeout(RuntimeError):
-    def __init__(self, desired_states: List[str], message: str):
-        super().__init__(f"Timout reached when waiting for instance to go into one of: {desired_states}\n{message}")
 
 
 class State:
@@ -109,7 +102,12 @@ class WaitForState(object):
         return error_msg
 
     def wait_for_state(
-        self, desired_states: List[str], bad_states: Collection[str] = [], timeout: int = 600, interval: int = 1
+        self,
+        instance: "msi.ManagedServiceInstance",
+        desired_states: List[str],
+        bad_states: Collection[str] = [],
+        timeout: int = 600,
+        interval: int = 1,
     ) -> State:
         """
         Wait for instance to go to given state
@@ -146,21 +144,25 @@ class WaitForState(object):
                     break
 
                 if self.__check_bad_state(current_state, bad_states):
-                    error_msg = self.__compose_error_msg_with_bad_state_error(
-                        f"{self.name} got into bad state ({current_state})",
-                        current_state,
+                    LOGGER.info(
+                        self.__compose_error_msg_with_bad_state_error(
+                            f"{self.name} got into bad state ({current_state})",
+                            current_state,
+                        )
                     )
-                    raise BadStateError(current_state, error_msg)
+                    raise BadStateError(instance, bad_states, current_state)
 
             if time.time() - start_time > timeout:
-                error_msg = self.__compose_error_msg_with_bad_state_error(
-                    (
-                        f"{self.name} exceeded timeout {timeout}s while waiting for one of ({desired_states}). "
-                        f"Stuck in current state ({current_state})"
-                    ),
-                    current_state,
+                LOGGER.info(
+                    self.__compose_error_msg_with_bad_state_error(
+                        (
+                            f"{self.name} exceeded timeout {timeout}s while waiting for one of ({desired_states}). "
+                            f"Stuck in current state ({current_state})"
+                        ),
+                        current_state,
+                    )
                 )
-                raise TimeoutError(desired_states, error_msg)
+                raise TimeoutError(instance, timeout)
 
             time.sleep(interval)
 
