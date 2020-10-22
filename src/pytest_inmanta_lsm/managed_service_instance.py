@@ -74,7 +74,7 @@ class ManagedServiceInstance:
     def create(
         self,
         attributes: Dict[str, Any],
-        wait_for_state: Optional[str] = "up",
+        wait_for_state: Optional[str] = None,
         wait_for_states: Optional[List[str]] = None,
         version: Optional[int] = None,
         versions: Optional[List[int]] = None,
@@ -90,6 +90,9 @@ class ManagedServiceInstance:
         :param versions: the target state should have one of those version numbers
         :param bad_states: stop waiting and fail if any of these states are reached
         """
+        if wait_for_state is None and wait_for_states is None:
+            wait_for_state = "up"
+
         client = self.remote_orchestrator.client
         LOGGER.info(f"LSM {self.service_entity_name} creation parameters:\n{pformat(attributes)}")
         response = client.lsm_services_create(
@@ -124,7 +127,7 @@ class ManagedServiceInstance:
 
     def update(
         self,
-        wait_for_state: Optional[str] = "up",
+        wait_for_state: Optional[str] = None,
         wait_for_states: Optional[List[str]] = None,
         new_version: Optional[int] = None,
         new_versions: Optional[List[int]] = None,
@@ -143,6 +146,9 @@ class ManagedServiceInstance:
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates
         :param bad_states: see Connection.wait_for_state parameter 'bad_states'
         """
+        if wait_for_state is None and wait_for_states is None:
+            wait_for_state = "up"
+
         if current_version is None:
             current_version = self.get_state().version
 
@@ -171,7 +177,7 @@ class ManagedServiceInstance:
     def delete(
         self,
         current_version: Optional[int] = None,
-        wait_for_state: Optional[str] = "terminated",
+        wait_for_state: Optional[str] = None,
         wait_for_states: Optional[List[str]] = None,
         version: Optional[int] = None,
         versions: Optional[List[int]] = None,
@@ -187,6 +193,9 @@ class ManagedServiceInstance:
         :param versions: the target state should have one of those version numbers
         :param bad_states: stop waiting and fail if any of these states are reached
         """
+        if wait_for_state is None and wait_for_states is None:
+            wait_for_state = "terminated"
+
         if current_version is None:
             current_version = self.get_state().version
 
