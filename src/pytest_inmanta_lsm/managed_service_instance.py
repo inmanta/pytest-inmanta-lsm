@@ -80,15 +80,29 @@ class ManagedServiceInstance:
         versions: Optional[List[int]] = None,
         bad_states: List[str] = CREATE_FLOW_BAD_STATES,
     ) -> None:
-        """Create the service instance and wait for it to go into {wait_for_state} or one of {wait_for_states} and
-        have version {version} or one of versions {versions} if those are provided
+        """
+        Create the service instance and wait for it to go into `wait_for_state` or one of `wait_for_states` and
+        have version `version` or one of versions `versions` if those are provided
 
         :param attributes: service attributes to set
-        :param wait_for_state: wait for this state to be reached
-        :param wait_for_states: wait for one of those states to be reached
-        :param version: the target state should have this version number
-        :param versions: the target state should have one of those version numbers
-        :param bad_states: stop waiting and fail if any of these states are reached
+        :type attributes: Dict[str, Any]
+        :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is left to default
+            None, None otherwise
+        :type wait_for_state: Optional[str], optional
+        :param wait_for_states: wait for one of those states to be reached, defaults to None
+        :type wait_for_states: Optional[List[str]], optional
+        :param version: the target state should have this version number, defaults to None
+        :type version: Optional[int], optional
+        :param versions: the target state should have one of those version numbers, defaults to None
+        :type versions: Optional[List[int]], optional
+        :param bad_states: stop waiting and fail if any of these states are reached, defaults to CREATE_FLOW_BAD_STATES
+        :type bad_states: List[str], optional
+        :raises BadStateError: If the instance went into a bad state
+        :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
+        :raises ValueError: If both of state and states are set
+        :raises ValueError: If both of version and versions are set
+        :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
+        :raises VersionExceededError: If version(s) is(are) provided and the current state goes passed it(them)
         """
         if wait_for_state is None and wait_for_states is None:
             wait_for_state = "up"
@@ -135,16 +149,31 @@ class ManagedServiceInstance:
         attribute_updates: Dict[str, Union[str, int]] = {},
         bad_states: List[str] = UPDATE_FLOW_BAD_STATES,
     ) -> None:
-        """Update the service instance with the given {attributes_updates} and wait for it to go into {wait_for_state} or one
-        of {wait_for_states} and have version {version} or one of versions {versions} if those are provided
+        """
+        Update the service instance with the given `attributes_updates` and wait for it to go into `wait_for_state` or one
+        of `wait_for_states` and have version `version` or one of versions `versions` if those are provided
 
-        :param wait_for_state: wait for this state to be reached
-        :param wait_for_states: wait for one of those states to be reached
-        :param new_version: the target state should have this version number
-        :param new_versions: the target state should have one of those version numbers
-        :param current_version: current version
-        :param attribute_updates: dictionary containing the key(s) and value(s) to be updates
-        :param bad_states: see Connection.wait_for_state parameter 'bad_states'
+        :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is left to default
+            None, None otherwise
+        :type wait_for_state: Optional[str], optional
+        :param wait_for_states: wait for one of those states to be reached, defaults to None
+        :type wait_for_states: Optional[List[str]], optional
+        :param new_version: the target state should have this version number, defaults to None
+        :type new_version: Optional[int], optional
+        :param new_versions: the target state should have one of those version numbers, defaults to None
+        :type new_versions: Optional[List[int]], optional
+        :param current_version: current version, defaults to None
+        :type current_version: Optional[int], optional
+        :param attribute_updates: dictionary containing the key(s) and value(s) to be updates, defaults to {}
+        :type attribute_updates: Dict[str, Union[str, int]], optional
+        :param bad_states: stop waiting and fail if any of these states are reached, defaults to UPDATE_FLOW_BAD_STATES
+        :type bad_states: List[str], optional
+        :raises BadStateError: If the instance went into a bad state
+        :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
+        :raises ValueError: If both of state and states are set
+        :raises ValueError: If both of version and versions are set
+        :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
+        :raises VersionExceededError: If version(s) is(are) provided and the current state goes passed it(them)
         """
         if wait_for_state is None and wait_for_states is None:
             wait_for_state = "up"
@@ -176,22 +205,36 @@ class ManagedServiceInstance:
 
     def delete(
         self,
-        current_version: Optional[int] = None,
         wait_for_state: Optional[str] = None,
         wait_for_states: Optional[List[str]] = None,
         version: Optional[int] = None,
         versions: Optional[List[int]] = None,
+        current_version: Optional[int] = None,
         bad_states: List[str] = DELETE_FLOW_BAD_STATES,
     ) -> None:
-        """Delete the service instance and wait for it to go into {wait_for_state} or one of {wait_for_states} and
-        have version {version} or one of versions {versions} if those are provided
+        """
+        Delete the service instance and wait for it to go into `wait_for_state` or one of `wait_for_states` and
+        have version `version` or one of versions `versions` if those are provided
 
-        :param current_version: the version the service is in now
-        :param wait_for_state: wait for this state to be reached
-        :param wait_for_states: wait for one of those states to be reached
-        :param version: the target state should have this version number
-        :param versions: the target state should have one of those version numbers
-        :param bad_states: stop waiting and fail if any of these states are reached
+        :param wait_for_state: wait for this state to be reached, defaults to `"terminated"` if wait_for_states is left to
+            default None, None otherwise
+        :type wait_for_state: Optional[str], optional
+        :param wait_for_states: wait for one of those states to be reached, defaults to None
+        :type wait_for_states: Optional[List[str]], optional
+        :param new_version: the target state should have this version number, defaults to None
+        :type new_version: Optional[int], optional
+        :param new_versions: the target state should have one of those version numbers, defaults to None
+        :type new_versions: Optional[List[int]], optional
+        :param current_version: current version, defaults to None
+        :type current_version: Optional[int], optional
+        :param bad_states: stop waiting and fail if any of these states are reached, defaults to UPDATE_FLOW_BAD_STATES
+        :type bad_states: List[str], optional
+        :raises BadStateError: If the instance went into a bad state
+        :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
+        :raises ValueError: If both of state and states are set
+        :raises ValueError: If both of version and versions are set
+        :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
+        :raises VersionExceededError: If version(s) is(are) provided and the current state goes passed it(them)
         """
         if wait_for_state is None and wait_for_states is None:
             wait_for_state = "terminated"
@@ -245,17 +288,31 @@ class ManagedServiceInstance:
         bad_states: List[str] = ALL_BAD_STATES,
         start_version: Optional[int] = None,
     ) -> None:
-        """Wait for the service instance to go into {state} or one of {states} and
-        have version {version} or one of versions {versions} if those are provided
+        """
+        Wait for the service instance to go into `state` or one of `states` and
+        have version `version` or one of versions `versions` if those are provided
 
-        :param state: Poll until the service instance reaches this state
-        :param states: Poll until the service instance reaches one of those states
-        :param version: In this state the service instance should have this version
-        :param versions: In this state the service instance should have one of those versions
-        :param timeout: How long can we wait for service to achieve given state (in seconds)
-        :param bad_states: States that should not be reached, if these are reached,
-           waiting is aborted (if the target state is in bad_states, it considered to be good.)
-        :param start_version: Provide a start_version when the wait for state is the same as the starting state
+        :param state: Poll until the service instance reaches this state, defaults to None
+        :type state: Optional[str], optional
+        :param states: Poll until the service instance reaches one of those states, defaults to None
+        :type states: Optional[List[str]], optional
+        :param version: In this state the service instance should have this version, defaults to None
+        :type version: Optional[int], optional
+        :param versions: In this state the service instance should have one of those versions, defaults to None
+        :type versions: Optional[List[int]], optional
+        :param timeout: How long can we wait for service to achieve given state (in seconds), defaults to 600
+        :type timeout: int, optional
+        :param bad_states: stop waiting and fail if any of these states are reached, defaults to ALL_BAD_STATES
+        :type bad_states: List[str], optional
+        :param start_version: Provide a start_version when the wait for state is the same as the starting state, defaults to
+            None
+        :type start_version: Optional[int], optional
+        :raises BadStateError: If the instance went into a bad state
+        :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
+        :raises ValueError: If none of both of state and states are set
+        :raises ValueError: If both of version and versions are set
+        :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
+        :raises VersionExceededError: If version(s) is(are) provided and the current state goes passed it(them)
         """
         desired_states: List[str] = []
         if state is None and states is not None:
@@ -318,7 +375,7 @@ class ManagedServiceInstance:
             return failed_resource_logs.get()
 
         wait_for_obj = WaitForState(
-            "Connection",
+            "Instance lifecycle",
             get_state_method=self.get_state,
             compare_states_method=compare_states,
             check_start_state_method=check_start_state,
