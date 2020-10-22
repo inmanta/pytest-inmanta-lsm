@@ -109,7 +109,7 @@ class WaitForState(object):
         return error_msg
 
     def wait_for_state(
-        self, desired_states: List[str], bad_states: List[str] = [], timeout: int = 600, interval: int = 1
+        self, desired_states: List[str], bad_states: Collection[str] = [], timeout: int = 600, interval: int = 1
     ) -> State:
         """
         Wait for instance to go to given state
