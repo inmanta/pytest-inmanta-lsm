@@ -87,7 +87,7 @@ class ManagedServiceInstance:
         :raises ValueError: If both of state and states are set
         :raises ValueError: If both of version and versions are set
         :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
-        :raises VersionExceededError: If version(s) is(are) provided and the current state goes passed it(them)
+        :raises VersionExceededError: If version(s) is(are) provided and the current state goes past it(them)
         """
         if wait_for_state is None and wait_for_states is None:
             wait_for_state = "up"
@@ -151,7 +151,7 @@ class ManagedServiceInstance:
         :raises ValueError: If both of state and states are set
         :raises ValueError: If both of version and versions are set
         :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
-        :raises VersionExceededError: If version(s) is(are) provided and the current state goes passed it(them)
+        :raises VersionExceededError: If version(s) is(are) provided and the current state goes past it(them)
         """
         if wait_for_state is None and wait_for_states is None:
             wait_for_state = "up"
@@ -206,7 +206,7 @@ class ManagedServiceInstance:
         :raises ValueError: If both of state and states are set
         :raises ValueError: If both of version and versions are set
         :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
-        :raises VersionExceededError: If version(s) is(are) provided and the current state goes passed it(them)
+        :raises VersionExceededError: If version(s) is(are) provided and the current state goes past it(them)
         """
         if wait_for_state is None and wait_for_states is None:
             wait_for_state = "terminated"
@@ -277,7 +277,7 @@ class ManagedServiceInstance:
         :raises ValueError: If none of both of state and states are set
         :raises ValueError: If both of version and versions are set
         :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
-        :raises VersionExceededError: If version(s) is(are) provided and the current state goes passed it(them)
+        :raises VersionExceededError: If version(s) is(are) provided and the current state goes past it(them)
         """
         desired_states: List[str] = []
         if state is None and states is not None:
