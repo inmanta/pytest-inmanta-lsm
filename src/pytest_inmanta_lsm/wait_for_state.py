@@ -9,7 +9,7 @@
 import logging
 import time
 from pprint import pformat
-from typing import Any, List, Optional
+from typing import Any, Collection, List, Optional
 
 LOGGER = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class WaitForState(object):
         return False
 
     @staticmethod
-    def default_check_bad_state(current_state: State, bad_states: List[str]) -> bool:
+    def default_check_bad_state(current_state: State, bad_states: Collection[str]) -> bool:
         return current_state.name in bad_states
 
     @staticmethod
