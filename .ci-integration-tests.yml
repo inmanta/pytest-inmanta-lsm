@@ -1,0 +1,7 @@
+pipeline_template: ci/inmanta-tools/Jenkinsfile-integration-tests
+repo_name: pytest-inmanta-lsm
+needs_lock: true
+directories_to_lint:
+    - examples
+    - src
+    - tests
