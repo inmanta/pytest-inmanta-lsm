@@ -1,3 +1,12 @@
+# v 0.1.0 (2020-11-10)
+Changes in this release:
+- Added update method to the remote orchestrator.
+- Added logging for deployment failure (#35) and more explanations on failures overall.
+- Add support to override the environment settings that are set after a clean
+- Expose the noclean boolean in the object returned by remote_orchestator fixtures for other fixtures to hook into
+- Fix issue #42 where the fixture fails if a compile is in progress
+- Added support for transient state (by actually waiting for multiple states) (#57)
+
 # V 0.0.2 (20-09-18)
 Changes in this release:
 - Fixed bug where `--lsm_noclean` defaults to True (#3)

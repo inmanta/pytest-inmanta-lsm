@@ -44,14 +44,19 @@ def test_full_cycle(project, remote_orchestrator):
 
     # create an instance and wait for it to be up
     service_instance.create(
-        attributes={"router_ip": "192.168.222.254", "interface_name": "eth1", "address": "10.10.14.254/24", "vlan_id": 14},
+        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
         wait_for_state="up",
     )
 
     # make validation fail by creating a duplicate
     remote_orchestrator.get_managed_instance(SERVICE_NAME).create(
-        attributes={"router_ip": "192.168.222.254", "interface_name": "eth1", "address": "10.10.14.254/24", "vlan_id": 14},
+        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
         wait_for_state="rejected",
+    )
+
+    service_instance.update(
+        attribute_updates={"vlan_id": 42},
+        wait_for_state="up",
     )
 
     # break it down
