@@ -3,6 +3,7 @@ Changes in this release:
 
 # v 1.0.0 (2020-11-18)
 Changes in this release:
+- Use inmanta-dev-dependencies package
 
 # v 0.1.0 (2020-11-10)
 Changes in this release:
