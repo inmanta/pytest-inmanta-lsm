@@ -251,6 +251,25 @@ class ManagedServiceInstance:
 
         return State(name=instance_state, version=instance_version)
 
+    def get_states(self, after_version: int = 0) -> List[State]:
+        """
+        Get all the states the managed instance went through after the given version
+
+        :param after_version: The version all returned states should be greater than
+        """
+        response = self.remote_orchestrator.client.lsm_services_log_list(
+            tid=self.remote_orchestrator.environment,
+            service_entity=self.service_entity_name,
+            service_id=self.instance_id,
+        )
+        assert (
+            response.code == 200
+        ), f"Wrong response code while trying to get state logs, got {response.code} (expected 200): \n{response}"
+
+        logs = response["data"]
+
+        return [State(name=log["state"], version=log["version"]) for log in logs if log["version"] > after_version]
+
     def wait_for_state(
         self,
         state: Optional[str] = None,
@@ -338,7 +357,7 @@ class ManagedServiceInstance:
 
         wait_for_obj = WaitForState(
             "Instance lifecycle",
-            get_state_method=self.get_state,
+            get_states_method=self.get_states,
             compare_states_method=compare_states,
             check_start_state_method=check_start_state,
             get_bad_state_error_method=get_bad_state_error,

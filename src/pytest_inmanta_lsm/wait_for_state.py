@@ -43,8 +43,8 @@ class WaitForState(object):
     """
 
     @staticmethod
-    def default_get_state() -> State:
-        return State(name="default", version=0)
+    def default_get_states() -> List[State]:
+        return [State(name="default", version=0)]
 
     @staticmethod
     def default_compare_states(current_state: State, wait_for_states: List[str]) -> bool:
@@ -65,7 +65,7 @@ class WaitForState(object):
     def __init__(
         self,
         name,
-        get_state_method,
+        get_states_method,
         compare_states_method=default_compare_states.__func__,
         check_start_state_method=default_check_start_state.__func__,
         check_bad_state_method=default_check_bad_state.__func__,
@@ -88,7 +88,7 @@ class WaitForState(object):
             just return None is no details are available
         """
         self.name = name
-        self.__get_state = get_state_method
+        self.__get_states = get_states_method
         self.__compare_states = compare_states_method
         self.__check_start_state = check_start_state_method
         self.__check_bad_state = check_bad_state_method
@@ -126,7 +126,11 @@ class WaitForState(object):
         start_state_logged = False
 
         while True:
-            current_state = self.__get_state()
+            # Getting all states we went through since last iteration
+            past_states = self.__get_states(previous_state.version)
+            past_states.sort(reverse=True, key=lambda state: state.version)
+
+            current_state = past_states[0]
 
             if previous_state != current_state:
                 LOGGER.info(f"{self.name} went to state ({current_state}), waiting for one of ({desired_states})")
@@ -139,18 +143,20 @@ class WaitForState(object):
                     start_state_logged = True
 
             else:
-                if self.__compare_states(current_state, desired_states):
-                    LOGGER.info(f"{self.name} reached state ({current_state})")
-                    break
-
-                if self.__check_bad_state(current_state, bad_states):
-                    LOGGER.info(
-                        self.__compose_error_msg_with_bad_state_error(
-                            f"{self.name} got into bad state ({current_state})",
-                            current_state,
+                for state in past_states:
+                    if self.__check_bad_state(state, bad_states):
+                        LOGGER.info(
+                            self.__compose_error_msg_with_bad_state_error(
+                                f"{self.name} got into bad state ({state})",
+                                state,
+                            )
                         )
-                    )
-                    raise BadStateError(instance, bad_states, current_state)
+                        raise BadStateError(instance, bad_states, state)
+
+                for state in past_states:
+                    if self.__compare_states(state, desired_states):
+                        LOGGER.info(f"{self.name} reached state ({state})")
+                        return current_state
 
             if time.time() - start_time > timeout:
                 LOGGER.info(
@@ -165,5 +171,3 @@ class WaitForState(object):
                 raise TimeoutError(instance, timeout)
 
             time.sleep(interval)
-
-        return current_state
