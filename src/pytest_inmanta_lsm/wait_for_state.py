@@ -129,6 +129,7 @@ class WaitForState(object):
             # Getting all states we went through since last iteration
             past_states = self.__get_states(previous_state.version)
             past_states.sort(reverse=True, key=lambda state: state.version)
+            past_states.append(previous_state)
 
             current_state = past_states[0]
 

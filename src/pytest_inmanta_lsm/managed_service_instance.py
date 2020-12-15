@@ -257,7 +257,7 @@ class ManagedServiceInstance:
 
         :param after_version: The version all returned states should be greater than
         """
-        response = self.remote_orchestrator.client.lsm_services_log_list(
+        response = self.remote_orchestrator.client.lsm_service_log_list(
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             service_id=self.instance_id,
@@ -266,7 +266,7 @@ class ManagedServiceInstance:
             response.code == 200
         ), f"Wrong response code while trying to get state logs, got {response.code} (expected 200): \n{response}"
 
-        logs = response["data"]
+        logs = response.result["data"]
 
         return [State(name=log["state"], version=log["version"]) for log in logs if log["version"] > after_version]
 
