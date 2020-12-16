@@ -155,6 +155,7 @@ class WaitForState(object):
                 if self.__compare_states(current_state, desired_states):
                     LOGGER.info(f"{self.name} reached state ({current_state})")
                     return current_state
+
                 if self.__check_bad_state(current_state, bad_states):
                     LOGGER.info(
                         self.__compose_error_msg_with_bad_state_error(
@@ -165,6 +166,11 @@ class WaitForState(object):
                     raise BadStateError(instance, bad_states, current_state)
             else:
                 for state in past_states:
+                    if self.__compare_states(state, desired_states):
+                        LOGGER.info(f"{self.name} reached state ({state})")
+                        return current_state
+
+                for state in past_states:
                     if self.__check_bad_state(state, bad_states):
                         LOGGER.info(
                             self.__compose_error_msg_with_bad_state_error(
@@ -173,11 +179,6 @@ class WaitForState(object):
                             )
                         )
                         raise BadStateError(instance, bad_states, state)
-
-                for state in past_states:
-                    if self.__compare_states(state, desired_states):
-                        LOGGER.info(f"{self.name} reached state ({state})")
-                        return current_state
 
             if time.time() - start_time > timeout:
                 LOGGER.info(
