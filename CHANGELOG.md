@@ -1,5 +1,10 @@
+# v 1.1.0 (2020-12-16)
+Changes in this release:
+- Ensure that wait_for_state always fails when a passing through a bad state, even if this is very short
+
 # v 1.0.0 (2020-11-18)
 Changes in this release:
+- Use inmanta-dev-dependencies package
 
 # v 0.1.0 (2020-11-10)
 Changes in this release:
