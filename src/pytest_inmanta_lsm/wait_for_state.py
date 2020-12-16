@@ -43,8 +43,8 @@ class WaitForState(object):
     """
 
     @staticmethod
-    def default_get_state() -> State:
-        return State(name="default", version=0)
+    def default_get_states() -> List[State]:
+        return [State(name="default", version=0)]
 
     @staticmethod
     def default_compare_states(current_state: State, wait_for_states: List[str]) -> bool:
@@ -65,7 +65,7 @@ class WaitForState(object):
     def __init__(
         self,
         name,
-        get_state_method,
+        get_states_method,
         compare_states_method=default_compare_states.__func__,
         check_start_state_method=default_check_start_state.__func__,
         check_bad_state_method=default_check_bad_state.__func__,
@@ -88,7 +88,7 @@ class WaitForState(object):
             just return None is no details are available
         """
         self.name = name
-        self.__get_state = get_state_method
+        self.__get_states = get_states_method
         self.__compare_states = compare_states_method
         self.__check_start_state = check_start_state_method
         self.__check_bad_state = check_bad_state_method
@@ -108,6 +108,7 @@ class WaitForState(object):
         bad_states: Collection[str] = [],
         timeout: int = 600,
         interval: int = 1,
+        start_version: Optional[int] = None,
     ) -> State:
         """
         Wait for instance to go to given state
@@ -116,17 +117,27 @@ class WaitForState(object):
         :param bad_states: in case the instance can go into an unwanted state, leave empty if not applicable
         :param timeout: timeout value of this method (in seconds)
         :param interval: wait time between retries (in seconds)
+        :param start_version: The version starting from which the update started, required if you want to ensure
+        no bad_state/desired_state has occurred between two checks
         :returns: current state, can raise RuntimeError when state has not been reached within timeout
         """
 
         LOGGER.info(f"Waiting for {self.name} to go to one of {desired_states}")
         start_time = time.time()
 
-        previous_state: State = State(name="default", version=0)
+        previous_state: State = State(
+            name="default",
+            version=start_version if start_version is not None else 0,
+        )
         start_state_logged = False
 
         while True:
-            current_state = self.__get_state()
+            # Getting all states we went through since last iteration
+            past_states = self.__get_states(previous_state.version)
+            past_states.append(previous_state)
+            past_states.sort(key=lambda state: state.version)
+
+            current_state = past_states[-1]
 
             if previous_state != current_state:
                 LOGGER.info(f"{self.name} went to state ({current_state}), waiting for one of ({desired_states})")
@@ -138,10 +149,12 @@ class WaitForState(object):
                     LOGGER.info(f"{self.name} is still in starting state ({current_state}), waiting for next state")
                     start_state_logged = True
 
-            else:
+            elif start_version is None:
+                # If start_version is None, we keep the previous behavior and only verify the
+                # current state
                 if self.__compare_states(current_state, desired_states):
                     LOGGER.info(f"{self.name} reached state ({current_state})")
-                    break
+                    return current_state
 
                 if self.__check_bad_state(current_state, bad_states):
                     LOGGER.info(
@@ -151,6 +164,20 @@ class WaitForState(object):
                         )
                     )
                     raise BadStateError(instance, bad_states, current_state)
+            else:
+                for state in past_states:
+                    if self.__compare_states(state, desired_states):
+                        LOGGER.info(f"{self.name} reached state ({state})")
+                        return current_state
+
+                    if self.__check_bad_state(state, bad_states):
+                        LOGGER.info(
+                            self.__compose_error_msg_with_bad_state_error(
+                                f"{self.name} got into bad state ({state})",
+                                state,
+                            )
+                        )
+                        raise BadStateError(instance, bad_states, state)
 
             if time.time() - start_time > timeout:
                 LOGGER.info(
@@ -165,5 +192,3 @@ class WaitForState(object):
                 raise TimeoutError(instance, timeout)
 
             time.sleep(interval)
-
-        return current_state
