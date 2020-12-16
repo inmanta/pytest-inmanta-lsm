@@ -1,5 +1,6 @@
 # v 1.1.0 (?)
 Changes in this release:
+- Added support for auto-repair transitions
 
 # v 1.0.0 (2020-11-18)
 Changes in this release:

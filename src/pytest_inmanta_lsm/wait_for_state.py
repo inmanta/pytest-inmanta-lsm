@@ -108,6 +108,7 @@ class WaitForState(object):
         bad_states: Collection[str] = [],
         timeout: int = 600,
         interval: int = 1,
+        start_version: int = 0,
     ) -> State:
         """
         Wait for instance to go to given state
@@ -122,7 +123,7 @@ class WaitForState(object):
         LOGGER.info(f"Waiting for {self.name} to go to one of {desired_states}")
         start_time = time.time()
 
-        previous_state: State = State(name="default", version=0)
+        previous_state: State = State(name="default", version=start_version)
         start_state_logged = False
 
         while True:
