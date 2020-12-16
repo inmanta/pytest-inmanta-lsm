@@ -1,3 +1,6 @@
+# v 1.2.0 (?)
+Changes in this release:
+
 # v 1.1.0 (2020-12-16)
 Changes in this release:
 - Ensure that wait_for_state always fails when a passing through a bad state, even if this is very short
