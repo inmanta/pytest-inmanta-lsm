@@ -134,10 +134,10 @@ class WaitForState(object):
         while True:
             # Getting all states we went through since last iteration
             past_states = self.__get_states(previous_state.version)
-            past_states.sort(reverse=True, key=lambda state: state.version)
             past_states.append(previous_state)
+            past_states.sort(key=lambda state: state.version)
 
-            current_state = past_states[0]
+            current_state = past_states[-1]
 
             if previous_state != current_state:
                 LOGGER.info(f"{self.name} went to state ({current_state}), waiting for one of ({desired_states})")
@@ -170,7 +170,6 @@ class WaitForState(object):
                         LOGGER.info(f"{self.name} reached state ({state})")
                         return current_state
 
-                for state in past_states:
                     if self.__check_bad_state(state, bad_states):
                         LOGGER.info(
                             self.__compose_error_msg_with_bad_state_error(
