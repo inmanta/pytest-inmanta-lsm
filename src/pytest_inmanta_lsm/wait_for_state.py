@@ -108,7 +108,7 @@ class WaitForState(object):
         bad_states: Collection[str] = [],
         timeout: int = 600,
         interval: int = 1,
-        start_version: int = 0,
+        start_version: Optional[int] = None,
     ) -> State:
         """
         Wait for instance to go to given state
@@ -117,13 +117,18 @@ class WaitForState(object):
         :param bad_states: in case the instance can go into an unwanted state, leave empty if not applicable
         :param timeout: timeout value of this method (in seconds)
         :param interval: wait time between retries (in seconds)
+        :param start_version: The version starting from which the update started, required if you want to ensure
+        no bad_state/desired_state has occurred between two checks
         :returns: current state, can raise RuntimeError when state has not been reached within timeout
         """
 
         LOGGER.info(f"Waiting for {self.name} to go to one of {desired_states}")
         start_time = time.time()
 
-        previous_state: State = State(name="default", version=start_version)
+        previous_state: State = State(
+            name="default",
+            version=start_version if start_version is not None else 0,
+        )
         start_state_logged = False
 
         while True:
@@ -144,6 +149,20 @@ class WaitForState(object):
                     LOGGER.info(f"{self.name} is still in starting state ({current_state}), waiting for next state")
                     start_state_logged = True
 
+            elif start_version is None:
+                # If start_version is None, we keep the previous behavior and only verify the
+                # current state
+                if self.__compare_states(current_state, desired_states):
+                    LOGGER.info(f"{self.name} reached state ({current_state})")
+                    return current_state
+                if self.__check_bad_state(current_state, bad_states):
+                    LOGGER.info(
+                        self.__compose_error_msg_with_bad_state_error(
+                            f"{self.name} got into bad state ({current_state})",
+                            current_state,
+                        )
+                    )
+                    raise BadStateError(instance, bad_states, current_state)
             else:
                 for state in past_states:
                     if self.__check_bad_state(state, bad_states):

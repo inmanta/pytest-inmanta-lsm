@@ -299,8 +299,6 @@ class ManagedServiceInstance:
         :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
         :raises VersionExceededError: If version(s) is(are) provided and the current state goes past it(them)
         """
-        current_state = self.get_state()
-
         desired_states: List[str] = []
         if state is None and states is not None:
             desired_states.extend(states)
@@ -370,7 +368,7 @@ class ManagedServiceInstance:
             desired_states=desired_states,
             bad_states=bad_states,
             timeout=timeout,
-            start_version=start_version if start_version is not None else current_state.version,
+            start_version=start_version,
         )
 
     def get_validation_failure_message(self) -> Optional[str]:
