@@ -1,1 +1,1 @@
-inmanta-dev-dependencies==1.4.0
+inmanta-dev-dependencies==1.5.0
