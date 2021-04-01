@@ -182,6 +182,7 @@ class RemoteOrchestrator:
         subprocess.check_output(
             [
                 "rsync",
+                "--delete",
                 "--exclude",
                 ".env",
                 "--exclude",
@@ -199,7 +200,7 @@ class RemoteOrchestrator:
         LOGGER.debug("Syncing module paths %s to orchestrator", modules_path)
         for path in modules_path:
             subprocess.check_output(
-                ["rsync", "--exclude", ".git", "-e", " ".join(SSH_CMD), "-rl", f"{path}/", f"{remote_path}libs/"],
+                ["rsync", "--delete", "--exclude", ".git", "-e", " ".join(SSH_CMD), "-rl", f"{path}/", f"{remote_path}libs/"],
                 stderr=subprocess.PIPE,
             )
 
