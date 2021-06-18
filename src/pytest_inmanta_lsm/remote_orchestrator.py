@@ -37,17 +37,18 @@ class RemoteOrchestrator:
         self,
         host: str,
         ssh_user: str,
+        ssh_port: str,
         environment: UUID,
         project: Project,
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
-        ssh_port: int,
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
 
         :param host: the host to connect to, the orchestrator should be on port 8888, ssh on port 22
         :param ssh_user: the username to log on to the machine, should have sudo rights
+        :param ssh_port: the port to use to log on to the machine
         :param environment: uuid of the environment to use, is created if it doesn't exists
         :param project: project fixture of pytest-inmanta
         :param settings: The inmanta environment settings that should be set on the remote orchestrator
