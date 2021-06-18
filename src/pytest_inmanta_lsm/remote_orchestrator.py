@@ -37,11 +37,11 @@ class RemoteOrchestrator:
         self,
         host: str,
         ssh_user: str,
-        ssh_port: str = 22,
         environment: UUID,
         project: Project,
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
+        ssh_port: str = "22",
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
