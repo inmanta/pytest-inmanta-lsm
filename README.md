@@ -69,5 +69,6 @@ The following options are available.
 
  * `--lsm_host` remote orchestrator to use for the remote_orchestrator fixture, overrides INMANTA_LSM_HOST
  * `--lsm_user` username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER
+ * `--lsm_port` port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT
  * `--lsm_environment` the environment to use on the remote server (it is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT
  * `--lsm_noclean` Don't cleanup the orchestrator after last test (for debugging purposes)
