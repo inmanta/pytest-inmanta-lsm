@@ -41,6 +41,7 @@ class RemoteOrchestrator:
         project: Project,
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
+        ssh_port: int,
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
@@ -56,6 +57,7 @@ class RemoteOrchestrator:
         self._env = environment
         self._host = host
         self._ssh_user = ssh_user
+        self._ssh_port = ssh_port
         self._settings = settings
         self.noclean = noclean
 
@@ -160,6 +162,7 @@ class RemoteOrchestrator:
         subprocess.check_output(
             SSH_CMD
             + [
+                f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
                 f"sudo sh -c '([[ -d {cache_path} ]] && mv {cache_path} {server_path}) || true'",
             ],
@@ -171,6 +174,7 @@ class RemoteOrchestrator:
         subprocess.check_output(
             SSH_CMD
             + [
+                f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
                 f"sudo sh -c 'mkdir -p {server_path}; chown -R {self._ssh_user}:{self._ssh_user} {server_path}'",
             ],
@@ -188,7 +192,7 @@ class RemoteOrchestrator:
                 "--exclude",
                 "env",
                 "-e",
-                " ".join(SSH_CMD),
+                " ".join(SSH_CMD + [f"-p {self._ssh_port}"]),
                 "-rl",
                 f"{project._test_project_dir}/",
                 remote_path,
@@ -200,7 +204,17 @@ class RemoteOrchestrator:
         LOGGER.debug("Syncing module paths %s to orchestrator", modules_path)
         for path in modules_path:
             subprocess.check_output(
-                ["rsync", "--delete", "--exclude", ".git", "-e", " ".join(SSH_CMD), "-rl", f"{path}/", f"{remote_path}libs/"],
+                [
+                    "rsync",
+                    "--delete",
+                    "--exclude",
+                    ".git",
+                    "-e",
+                    " ".join(SSH_CMD + [f"-p {self._ssh_port}"]),
+                    "-rl",
+                    f"{path}/",
+                    f"{remote_path}libs/",
+                ],
                 stderr=subprocess.PIPE,
             )
 
@@ -209,6 +223,7 @@ class RemoteOrchestrator:
         subprocess.check_output(
             SSH_CMD
             + [
+                f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
                 f"sudo sh -c 'touch {server_path}/.git; chown -R inmanta:inmanta {server_path}'",
             ],
@@ -239,7 +254,12 @@ class RemoteOrchestrator:
         """Cache the project on the server so that a sync can be faster."""
         LOGGER.info(f"Caching project on server ({self._server_path}) to cache dir: {self._server_cache_path}")
         subprocess.check_output(
-            SSH_CMD + [f"{self._ssh_user}@{self.host}", f"sudo cp -a {self._server_path} {self._server_cache_path}"],
+            SSH_CMD
+            + [
+                f"-p {self._ssh_port}",
+                f"{self._ssh_user}@{self.host}",
+                f"sudo cp -a {self._server_path} {self._server_cache_path}",
+            ],
             stderr=subprocess.PIPE,
         )
 
