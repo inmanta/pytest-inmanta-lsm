@@ -37,7 +37,7 @@ class RemoteOrchestrator:
         self,
         host: str,
         ssh_user: str,
-        ssh_port: str,
+        ssh_port: str = 22,
         environment: UUID,
         project: Project,
         settings: Dict[str, Union[bool, str, int]],
