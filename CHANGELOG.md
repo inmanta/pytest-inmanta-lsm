@@ -1,3 +1,6 @@
+# v 1.3.0 (?)
+Changes in this release:
+
 # v 1.2.0 (2021-06-21)
 Changes in this release:
 - Ensuring that files removed from the project (and modules), are removed on the orchestrator as well.
