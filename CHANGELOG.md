@@ -1,4 +1,4 @@
-# v 1.2.0 (?)
+# v 1.2.0 (2021-06-21)
 Changes in this release:
 - Ensuring that files removed from the project (and modules), are removed on the orchestrator as well.
 - Added option to select another port for ssh. (#109)
