@@ -1,3 +1,8 @@
+# v 1.2.0 (2021-06-21)
+Changes in this release:
+- Ensuring that files removed from the project (and modules), are removed on the orchestrator as well.
+- Added option to select another port for ssh. (#109)
+
 # v 1.1.0 (2020-12-16)
 Changes in this release:
 - Ensure that wait_for_state always fails when a passing through a bad state, even if this is very short

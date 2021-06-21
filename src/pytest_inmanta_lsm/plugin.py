@@ -33,6 +33,7 @@ LOGGER = logging.getLogger(__name__)
 option_to_env = {
     "inm_lsm_remote_host": "INMANTA_LSM_HOST",
     "inm_lsm_remote_user": "INMANTA_LSM_USER",
+    "inm_lsm_remote_port": "INMANTA_LSM_PORT",
     "inm_lsm_env": "INMANTA_LSM_ENVIRONMENT",
     "inm_lsm_noclean": "INMANTA_LSM_NOCLEAN",
 }
@@ -49,6 +50,11 @@ def pytest_addoption(parser):
         "--lsm_user",
         dest="inm_lsm_remote_user",
         help="username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER",
+    )
+    group.addoption(
+        "--lsm_port",
+        dest="inm_lsm_remote_port",
+        help="port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT",
     )
     group.addoption(
         "--lsm_environment",
@@ -88,6 +94,7 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     env = get_opt_or_env_or(request.config, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
     host = get_opt_or_env_or(request.config, "inm_lsm_remote_host", "127.0.0.1")
     user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
+    port = get_opt_or_env_or(request.config, "inm_lsm_remote_port", "22")
     noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
 
     # set the defaults here and lets the fixture override specific values
@@ -103,7 +110,15 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     }
     settings.update(remote_orchestrator_settings)
 
-    remote_orchestrator = RemoteOrchestrator(host, user, UUID(env), project, settings, noclean)
+    remote_orchestrator = RemoteOrchestrator(
+        host=host,
+        ssh_user=user,
+        ssh_port=port,
+        environment=UUID(env),
+        project=project,
+        settings=settings,
+        noclean=noclean,
+    )
     remote_orchestrator.clean()
 
     yield remote_orchestrator
