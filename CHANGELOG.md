@@ -1,5 +1,6 @@
-# v 1.3.0 (?)
+# v 1.2.1 (2021-08-18)
 Changes in this release:
+- Fixed `inmanta_plugins` loading issue
 
 # v 1.2.0 (2021-06-21)
 Changes in this release:
