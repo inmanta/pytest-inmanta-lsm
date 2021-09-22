@@ -165,7 +165,7 @@ class RemoteOrchestrator:
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo 'test -d {cache_path}' && sudo mv {cache_path} {server_path}) || true",
+                f"sudo test -d {cache_path} && sudo mv {cache_path} {server_path}) || true",
             ],
             stderr=subprocess.PIPE,
         )
