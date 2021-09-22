@@ -1,3 +1,7 @@
+# # v 1.3.1 (2021-08-22)
+Changes in this release:
+- Modify shell commands to be more sudo friendly.
+
 # v 1.3.0 (?)
 Changes in this release:
 
