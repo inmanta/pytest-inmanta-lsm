@@ -1,2 +1,2 @@
-inmanta-dev-dependencies==1.42.0
+inmanta-dev-dependencies==1.57.0
 types-PyYAML
