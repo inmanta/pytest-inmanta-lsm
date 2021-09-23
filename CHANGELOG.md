@@ -1,4 +1,4 @@
-# v 1.2.2 (?)
+# v 1.3.0 (?)
 Changes in this release:
 - Modify shell commands to be more sudo friendly.
 
