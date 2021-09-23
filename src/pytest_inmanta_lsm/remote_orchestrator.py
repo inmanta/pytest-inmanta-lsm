@@ -165,7 +165,7 @@ class RemoteOrchestrator:
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo sh -c '([[ -d {cache_path} ]] && mv {cache_path} {server_path}) || true'",
+                f"sudo test -d {cache_path} && sudo mv {cache_path} {server_path} || true",
             ],
             stderr=subprocess.PIPE,
         )
@@ -177,7 +177,7 @@ class RemoteOrchestrator:
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo sh -c 'mkdir -p {server_path}; chown -R {self._ssh_user}:{self._ssh_user} {server_path}'",
+                f"sudo mkdir -p {server_path}; sudo chown -R {self._ssh_user}:{self._ssh_user} {server_path}",
             ],
             stderr=subprocess.PIPE,
         )
@@ -226,7 +226,7 @@ class RemoteOrchestrator:
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo sh -c 'touch {server_path}/.git; chown -R inmanta:inmanta {server_path}'",
+                f"sudo touch {server_path}/.git; sudo chown -R inmanta:inmanta {server_path}",
             ],
             stderr=subprocess.PIPE,
         )
