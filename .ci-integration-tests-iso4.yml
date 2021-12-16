@@ -5,7 +5,7 @@ lock:
     variable: INMANTA_LSM_HOST
     quantity: 1
 additional_constraints:
-    - inmanta-lsm~=1.6
+    - inmanta-lsm~=1.6.dev
 directories_to_lint:
     - examples
     - src
