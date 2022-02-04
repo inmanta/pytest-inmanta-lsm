@@ -6,6 +6,8 @@ lock:
     quantity: 1
 additional_constraints:
     - inmanta-lsm~=2.0.dev
+env_vars:
+    INMANTA_LSM_USER: rocky
 directories_to_lint:
     - examples
     - src
