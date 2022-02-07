@@ -9,7 +9,6 @@
 import logging
 import os
 import subprocess
-from packaging.version import Version
 from pprint import pformat
 from typing import Dict, Optional, Union
 from uuid import UUID
@@ -18,6 +17,7 @@ import yaml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from inmanta.protocol.endpoints import SyncClient
+from packaging.version import Version
 from pytest_inmanta.plugin import Project
 
 from pytest_inmanta_lsm import managed_service_instance, retry_limited
@@ -256,7 +256,7 @@ class RemoteOrchestrator:
                 + [
                     f"-p {self._ssh_port}",
                     f"{self._ssh_user}@{self.host}",
-                    f"sudo -u inmanta /opt/inmanta/bin/python -c '{install_script_inline}'"
+                    f"sudo -u inmanta /opt/inmanta/bin/python -c '{install_script_inline}'",
                 ],
                 stderr=subprocess.PIPE,
             )
