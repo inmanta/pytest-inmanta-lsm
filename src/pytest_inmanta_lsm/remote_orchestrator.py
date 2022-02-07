@@ -243,19 +243,20 @@ class RemoteOrchestrator:
             raise Exception("Unexpected response for server status API call")
         # iso5 requires explicit project installation
         if server_version >= Version("5.dev"):
+            venv_path: str = os.path.join(server_path, ".env")
+            # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
+            install_script_inline: str = (
+                # use only double quotes in script so it can be wrapped in single quotes
+                "from inmanta.module import Project;"
+                f'project = Project("{server_path}", venv_path="{venv_path}");'
+                "project.install_modules();"
+            )
             subprocess.check_output(
                 SSH_CMD
                 + [
                     f"-p {self._ssh_port}",
                     f"{self._ssh_user}@{self.host}",
-                    # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script
-                    (
-                        "sudo -u inmanta /opt/inmanta/bin/python3 -c '"
-                        "from inmanta.project import Project;"
-                        f'project = Project("{server_path}", venv_path="{server_path}/.env");'
-                        "project.install_modules();"
-                        "'"
-                    ),
+                    f"sudo -u inmanta /opt/inmanta/bin/python -c '{install_script_inline}'"
                 ],
                 stderr=subprocess.PIPE,
             )
