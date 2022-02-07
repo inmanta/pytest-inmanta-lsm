@@ -14,6 +14,7 @@ entity TestService extends lsm::ServiceEntity:
         :attr service_id: A free form unique service id determined by the customer.
     """
     string service_id
+    bool fail = false
 end
 
 index TestService(service_id)
@@ -28,7 +29,7 @@ for instance in lsm::all(binding):
     TestService(
         instance_id=instance["id"],
         entity_binding=binding,
-        service_id=instance["attributes"]["service_id"],
+        **instance["attributes"],
     )
 end
 
@@ -36,7 +37,7 @@ implementation testService for TestService:
     r = NullResource(
         name=self.instance_id,
         desired_value="{{self.service_id}}",
-        fail=true,
+        fail=self.fail,
         skip=false,
         send_event=true,
     )
