@@ -9,12 +9,14 @@
 import logging
 import os
 import subprocess
+from packaging.version import Version
 from pprint import pformat
 from typing import Dict, Optional, Union
 from uuid import UUID
 
 import yaml
 from inmanta.agent import config as inmanta_config
+from inmanta.protocol.common import Result
 from inmanta.protocol.endpoints import SyncClient
 from pytest_inmanta.plugin import Project
 
@@ -230,6 +232,33 @@ class RemoteOrchestrator:
             ],
             stderr=subprocess.PIPE,
         )
+
+        server_status: Result = self._client.get_server_status()
+        if server_status.code != 200:
+            raise Exception(f"Failed to get server status for {self._host}")
+        server_version: Version
+        try:
+            server_version = Version(server_status.result["data"]["version"])
+        except (KeyError, TypeError):
+            raise Exception("Unexpected response for server status API call")
+        # iso5 requires explicit project installation
+        if server_version >= Version("5.dev"):
+            subprocess.check_output(
+                SSH_CMD
+                + [
+                    f"-p {self._ssh_port}",
+                    f"{self._ssh_user}@{self.host}",
+                    # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script
+                    (
+                        "sudo -u inmanta python3 -c '"
+                        "from inmanta.project import Project;"
+                        f'project = Project("{server_path}", venv_path="{server_path}/.env");'
+                        "project.install_modules();"
+                        "'"
+                    ),
+                ],
+                stderr=subprocess.PIPE,
+            )
 
         # Server cache create, set variables, so cache can be used
         self._server_path = server_path
