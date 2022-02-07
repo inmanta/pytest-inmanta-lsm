@@ -233,7 +233,7 @@ class RemoteOrchestrator:
             stderr=subprocess.PIPE,
         )
 
-        server_status: Result = self._client.get_server_status()
+        server_status: Result = self.client.get_server_status()
         if server_status.code != 200:
             raise Exception(f"Failed to get server status for {self._host}")
         server_version: Version
