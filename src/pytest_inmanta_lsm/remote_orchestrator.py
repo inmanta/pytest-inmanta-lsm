@@ -250,7 +250,7 @@ class RemoteOrchestrator:
                     f"{self._ssh_user}@{self.host}",
                     # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script
                     (
-                        "sudo -u inmanta python3 -c '"
+                        "sudo -u inmanta /opt/inmanta/bin/python3 -c '"
                         "from inmanta.project import Project;"
                         f'project = Project("{server_path}", venv_path="{server_path}/.env");'
                         "project.install_modules();"
