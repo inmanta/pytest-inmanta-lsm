@@ -6,6 +6,9 @@
     :license: Inmanta EULA
 """
 
+# import a Python requirement to verify project installation
+import lorem
+
 from inmanta import resources
 from inmanta.agent import handler
 
