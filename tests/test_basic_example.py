@@ -14,7 +14,7 @@ def test_deployment_failure(testdir):
     testdir.copy_example("test_service")
 
     result = testdir.runpytest_inprocess("tests/test_deployment_failure.py")
-    result.assert_outcomes(passed=1)
+    result.assert_outcomes(passed=2)
 
 
 def test_basic_example(testdir):

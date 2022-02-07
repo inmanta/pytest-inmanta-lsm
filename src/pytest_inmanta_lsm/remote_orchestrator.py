@@ -15,7 +15,9 @@ from uuid import UUID
 
 import yaml
 from inmanta.agent import config as inmanta_config
+from inmanta.protocol.common import Result
 from inmanta.protocol.endpoints import SyncClient
+from packaging.version import Version
 from pytest_inmanta.plugin import Project
 
 from pytest_inmanta_lsm import managed_service_instance, retry_limited
@@ -230,6 +232,34 @@ class RemoteOrchestrator:
             ],
             stderr=subprocess.PIPE,
         )
+
+        server_status: Result = self.client.get_server_status()
+        if server_status.code != 200:
+            raise Exception(f"Failed to get server status for {self._host}")
+        server_version: Version
+        try:
+            server_version = Version(server_status.result["data"]["version"])
+        except (KeyError, TypeError):
+            raise Exception("Unexpected response for server status API call")
+        # iso5 requires explicit project installation
+        if server_version >= Version("5.dev"):
+            venv_path: str = os.path.join(server_path, ".env")
+            # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
+            install_script_inline: str = (
+                # use only double quotes in script so it can be wrapped in single quotes
+                "from inmanta.module import Project;"
+                f'project = Project("{server_path}", venv_path="{venv_path}");'
+                "project.install_modules();"
+            )
+            subprocess.check_output(
+                SSH_CMD
+                + [
+                    f"-p {self._ssh_port}",
+                    f"{self._ssh_user}@{self.host}",
+                    f"sudo -u inmanta /opt/inmanta/bin/python -c '{install_script_inline}'",
+                ],
+                stderr=subprocess.PIPE,
+            )
 
         # Server cache create, set variables, so cache can be used
         self._server_path = server_path
