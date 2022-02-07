@@ -7,8 +7,7 @@
 """
 
 # import a Python requirement to verify project installation
-import lorem
-
+import lorem  # noqa: F401
 from inmanta import resources
 from inmanta.agent import handler
 
