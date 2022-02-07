@@ -8,7 +8,6 @@
 
 # import a Python requirement to verify project installation
 import lorem
-raise Exception("Tests should fail")
 
 from inmanta import resources
 from inmanta.agent import handler
