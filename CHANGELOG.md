@@ -1,3 +1,6 @@
+# v 1.5.0 (?)
+Changes in this release:
+
 # v 1.4.0 (2022-02-07)
 Changes in this release:
 - Compatibility with `inmanta-service-orchestrator>=5`
