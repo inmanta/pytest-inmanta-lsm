@@ -22,7 +22,6 @@ class Resource(resources.PurgeableResource):
 @handler.provider("test_service::NullResource", name="test")
 class ResourceHandler(handler.CRUDHandler):
     def read_resource(self, ctx: handler.HandlerContext, resource: resources.PurgeableResource) -> None:
-        raise Exception("TESTS SHOULD FAIL")
         ctx.info("Resource fail %(fail)s skip %(skip)s", fail=resource.fail, skip=resource.skip)
 
         if resource.skip:
