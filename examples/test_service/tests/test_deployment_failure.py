@@ -11,7 +11,8 @@ import pytest
 SERVICE_NAME = "test-service"
 
 
-def test_full_cycle(project, remote_orchestrator):
+@pytest.mark.parametrize("fail", (True, False))
+def test_full_cycle(project, remote_orchestrator, fail: bool):
     # get connection to remote_orchestrator
     client = remote_orchestrator.client
 
@@ -30,10 +31,19 @@ def test_full_cycle(project, remote_orchestrator):
 
     service_instance = remote_orchestrator.get_managed_instance(SERVICE_NAME)
 
-    # create an instance and wait for it to be up
-    with pytest.raises(RuntimeError):
+    def create() -> None:
+        """
+        create an instance and wait for it to be up
+        """
+
         service_instance.create(
-            attributes={"service_id": "id"},
+            attributes={"service_id": "id", "fail": fail},
             wait_for_state="up",
             bad_states=["rejected", "failed", "deleting", "create_failed"],
         )
+
+    if fail:
+        with pytest.raises(RuntimeError):
+            create()
+    else:
+        create()
