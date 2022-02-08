@@ -8,6 +8,7 @@
 
 import logging
 import os
+import shlex
 import subprocess
 from pprint import pformat
 from typing import Dict, Optional, Union
@@ -245,18 +246,24 @@ class RemoteOrchestrator:
         if server_version >= Version("5.dev"):
             venv_path: str = os.path.join(server_path, ".env")
             # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
-            install_script_inline: str = (
-                # use only double quotes in script so it can be wrapped in single quotes
+            python_script_inline: str = (
                 "from inmanta.module import Project;"
-                f'project = Project("{server_path}", venv_path="{venv_path}");'
+                f"project = Project('{server_path}', venv_path='{venv_path}');"
                 "project.install_modules();"
+            )
+            shell_script_inline: str = (
+                "sudo -u inmanta"
+                # set the environment for this command to run in, remove comments
+                " env $(sed 's/#.*$//' /etc/sysconfig/inmanta-server)"
+                " /opt/inmanta/bin/python -c %s"
+                % shlex.quote(python_script_inline)
             )
             subprocess.check_output(
                 SSH_CMD
                 + [
                     f"-p {self._ssh_port}",
                     f"{self._ssh_user}@{self.host}",
-                    f"sudo -u inmanta /opt/inmanta/bin/python -c '{install_script_inline}'",
+                    shell_script_inline,
                 ],
                 stderr=subprocess.PIPE,
             )
