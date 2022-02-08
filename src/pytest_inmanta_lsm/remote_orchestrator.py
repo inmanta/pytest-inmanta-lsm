@@ -255,8 +255,7 @@ class RemoteOrchestrator:
                 "sudo -u inmanta"
                 # set the environment for this command to run in, remove comments
                 " env $(sed 's/#.*$//' /etc/sysconfig/inmanta-server)"
-                " /opt/inmanta/bin/python -c %s"
-                % shlex.quote(python_script_inline)
+                " /opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
             )
             subprocess.check_output(
                 SSH_CMD
