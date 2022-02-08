@@ -252,9 +252,8 @@ class RemoteOrchestrator:
                 "project.install_modules();"
             )
             shell_script_inline: str = (
-                "sudo -u inmanta"
-                # set the environment for this command to run in, remove comments
-                " env $(sed 's/#.*$//' /etc/sysconfig/inmanta-server)"
+                # use the server's environment variables for the installation
+                "sudo systemd-run User=inmanta EnvironmentFile=/etc/sysconfig/inmanta-server"
                 " /opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
             )
             subprocess.check_output(
