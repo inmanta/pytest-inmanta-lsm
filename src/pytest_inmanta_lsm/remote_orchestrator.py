@@ -256,15 +256,20 @@ class RemoteOrchestrator:
                 "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server --wait"
                 " /opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
             )
-            subprocess.check_output(
-                SSH_CMD
-                + [
-                    f"-p {self._ssh_port}",
-                    f"{self._ssh_user}@{self.host}",
-                    shell_script_inline,
-                ],
-                stderr=subprocess.PIPE,
-            )
+            try:
+                subprocess.check_output(
+                    SSH_CMD
+                    + [
+                        f"-p {self._ssh_port}",
+                        f"{self._ssh_user}@{self.host}",
+                        shell_script_inline,
+                    ],
+                    stderr=subprocess.PIPE,
+                )
+            except subprocess.CalledProcessError as e:
+                LOGGER.error("Process failed out: " + e.output.decode())
+                LOGGER.error("Process failed err: " + e.stderr.decode())
+                raise
 
         # Server cache create, set variables, so cache can be used
         self._server_path = server_path
