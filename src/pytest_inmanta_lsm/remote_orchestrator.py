@@ -253,7 +253,7 @@ class RemoteOrchestrator:
             )
             shell_script_inline: str = (
                 # use the server's environment variables for the installation
-                "sudo systemd-run User=inmanta EnvironmentFile=/etc/sysconfig/inmanta-server"
+                "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server --wait"
                 " /opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
             )
             subprocess.check_output(
