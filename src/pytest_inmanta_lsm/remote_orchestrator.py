@@ -99,8 +99,8 @@ class RemoteOrchestrator:
 
     def export_service_entities(self) -> None:
         """Initialize the remote orchestrator with the service model and check if all preconditions hold"""
-        self.sync_project()
         self._project._exporter.run_export_plugin("service_entities_exporter")
+        self.sync_project()
 
     def _ensure_environment(self) -> None:
         """Make sure the environment exists"""
