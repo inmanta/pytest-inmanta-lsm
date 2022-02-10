@@ -1,3 +1,7 @@
+# v 1.4.1 (2022-02-10)
+Changes in this release:
+- Run project installation with server's environment variables
+
 # v 1.4.0 (2022-02-07)
 Changes in this release:
 - Compatibility with `inmanta-service-orchestrator>=5`

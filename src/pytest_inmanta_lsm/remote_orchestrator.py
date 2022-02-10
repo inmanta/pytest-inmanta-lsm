@@ -8,6 +8,7 @@
 
 import logging
 import os
+import shlex
 import subprocess
 from pprint import pformat
 from typing import Dict, Optional, Union
@@ -98,8 +99,8 @@ class RemoteOrchestrator:
 
     def export_service_entities(self) -> None:
         """Initialize the remote orchestrator with the service model and check if all preconditions hold"""
-        self.sync_project()
         self._project._exporter.run_export_plugin("service_entities_exporter")
+        self.sync_project()
 
     def _ensure_environment(self) -> None:
         """Make sure the environment exists"""
@@ -245,21 +246,30 @@ class RemoteOrchestrator:
         if server_version >= Version("5.dev"):
             venv_path: str = os.path.join(server_path, ".env")
             # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
-            install_script_inline: str = (
-                # use only double quotes in script so it can be wrapped in single quotes
+            python_script_inline: str = (
                 "from inmanta.module import Project;"
-                f'project = Project("{server_path}", venv_path="{venv_path}");'
+                f"project = Project('{server_path}', venv_path='{venv_path}');"
                 "project.install_modules();"
             )
-            subprocess.check_output(
-                SSH_CMD
-                + [
-                    f"-p {self._ssh_port}",
-                    f"{self._ssh_user}@{self.host}",
-                    f"sudo -u inmanta /opt/inmanta/bin/python -c '{install_script_inline}'",
-                ],
-                stderr=subprocess.PIPE,
+            shell_script_inline: str = (
+                # use the server's environment variables for the installation
+                "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server --wait"
+                " /opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
             )
+            try:
+                subprocess.check_output(
+                    SSH_CMD
+                    + [
+                        f"-p {self._ssh_port}",
+                        f"{self._ssh_user}@{self.host}",
+                        shell_script_inline,
+                    ],
+                    stderr=subprocess.PIPE,
+                )
+            except subprocess.CalledProcessError as e:
+                LOGGER.error("Process failed out: " + e.output.decode())
+                LOGGER.error("Process failed err: " + e.stderr.decode())
+                raise
 
         # Server cache create, set variables, so cache can be used
         self._server_path = server_path
