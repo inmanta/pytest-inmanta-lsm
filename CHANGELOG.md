@@ -1,7 +1,7 @@
 # v 1.5.0 (?)
 Changes in this release:
 
-# v 1.4.1 (2022-02-09)
+# v 1.4.1 (2022-02-10)
 Changes in this release:
 - Run project installation with server's environment variables
 
