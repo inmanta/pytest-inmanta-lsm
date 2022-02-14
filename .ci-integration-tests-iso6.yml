@@ -1,11 +1,11 @@
 pipeline_template: ci/inmanta-tools/Jenkinsfile-integration-tests
 repo_name: pytest-inmanta-lsm
 lock:
-    label: pytest-inmanta-lsm-iso4-dev
+    label: pytest-inmanta-lsm-iso6-dev
     variable: INMANTA_LSM_HOST
     quantity: 1
 additional_constraints:
-    - inmanta-lsm~=1.9.2.dev
+    - inmanta-lsm>=3.dev
 env_vars:
     INMANTA_LSM_USER: rocky
 directories_to_lint:
