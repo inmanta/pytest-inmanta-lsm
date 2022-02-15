@@ -45,6 +45,9 @@ class RemoteOrchestrator:
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
         ssh_port: str = "22",
+        ssl: str = "false",
+        token: str = "admin",
+        ca_cert: str = "admin",
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
@@ -57,6 +60,9 @@ class RemoteOrchestrator:
         :param settings: The inmanta environment settings that should be set on the remote orchestrator
         :param noclean: Option to indicate that after the run clean should not run. This exposes the attribute to other
                         fixtures.
+        :param ssl: Option to indicate wether SSL should be used or not. Defaults to false
+        :param token: Token used for authentication
+        :param ca_cert: Certificate used for authentication
         """
         self._env = environment
         self._host = host
@@ -64,13 +70,22 @@ class RemoteOrchestrator:
         self._ssh_port = ssh_port
         self._settings = settings
         self.noclean = noclean
+        self._ssl = ssl
+        self._token = token
+        self._ca_cert = ca_cert
 
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self._env))
-        inmanta_config.Config.set("compiler_rest_transport", "host", host)
-        inmanta_config.Config.set("compiler_rest_transport", "port", "8888")
-        inmanta_config.Config.set("client_rest_transport", "host", host)
-        inmanta_config.Config.set("client_rest_transport", "port", "8888")
+
+        for section in ["compiler_rest_transport", "client_rest_transport"]:
+            inmanta_config.Config.set(section, "host", host)
+            inmanta_config.Config.set(section, "port", "8888")
+
+            # Config for SSL and authentication:
+            inmanta_config.Config.set(section, "inm_ssl", ssl)
+            inmanta_config.Config.set(section, "inm_token", token)
+            inmanta_config.Config.set(section, "inm_ca_cert", ca_cert)
+
 
         self._project = project
 
