@@ -9,7 +9,7 @@
 
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
 def test_deployment_failure(testdir):
-    """ Testing that a failed test doesn't make the plugin fail """
+    """Testing that a failed test doesn't make the plugin fail"""
 
     testdir.copy_example("test_service")
 
