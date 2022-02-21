@@ -86,7 +86,6 @@ class RemoteOrchestrator:
             inmanta_config.Config.set(section, "inm_token", token)
             inmanta_config.Config.set(section, "inm_ca_cert", ca_cert)
 
-
         self._project = project
 
         self._client: Optional[SyncClient] = None
