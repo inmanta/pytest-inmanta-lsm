@@ -45,7 +45,7 @@ class RemoteOrchestrator:
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
         ssh_port: str = "22",
-        ssl: str = "false",
+        ssl: bool = False,
         token: str = "admin",
         ca_cert: str = "admin",
     ) -> None:
@@ -82,9 +82,9 @@ class RemoteOrchestrator:
             inmanta_config.Config.set(section, "port", "8888")
 
             # Config for SSL and authentication:
-            inmanta_config.Config.set(section, "inm_ssl", ssl)
-            inmanta_config.Config.set(section, "inm_token", token)
-            inmanta_config.Config.set(section, "inm_ca_cert", ca_cert)
+            inmanta_config.Config.set(section, "ssl", ssl)
+            inmanta_config.Config.set(section, "token", token)
+            inmanta_config.Config.set(section, "ssl_ca_cert_file", ca_cert)
 
         self._project = project
 

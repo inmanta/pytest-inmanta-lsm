@@ -36,9 +36,9 @@ option_to_env = {
     "inm_lsm_remote_port": "INMANTA_LSM_PORT",
     "inm_lsm_env": "INMANTA_LSM_ENVIRONMENT",
     "inm_lsm_noclean": "INMANTA_LSM_NOCLEAN",
-    "inm_ssl": "INMANTA_SSL",
-    "inm_token": "INMANTA_TOKEN",
-    "inm_ca_cert": "INMANTA_CA_CERT",
+    "inm_lsm_ssl": "INMANTA_LSM_SSL",
+    "inm_lsm_token": "INMANTA_LSM_TOKEN",
+    "inm_lsm_ca_cert": "INMANTA_LSM_CA_CERT",
 }
 
 
@@ -47,22 +47,22 @@ def pytest_addoption(parser):
     group.addoption(
         "--lsm_host",
         dest="inm_lsm_remote_host",
-        help="remote orchestrator to use for the remote_inmanta fixture, overrides INMANTA_LSM_HOST",
+        help="Remote orchestrator to use for the remote_inmanta fixture, overrides INMANTA_LSM_HOST",
     )
     group.addoption(
         "--lsm_user",
         dest="inm_lsm_remote_user",
-        help="username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER",
+        help="Username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER",
     )
     group.addoption(
         "--lsm_port",
         dest="inm_lsm_remote_port",
-        help="port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT",
+        help="Port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT",
     )
     group.addoption(
         "--lsm_environment",
         dest="inm_lsm_env",
-        help="the environment to use on the remote server (is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT",
+        help="The environment to use on the remote server (is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT",
     )
     group.addoption(
         "--lsm_noclean",
@@ -70,19 +70,19 @@ def pytest_addoption(parser):
         help="Don't cleanup the orchestrator after tests (for debugging purposes)",
     )
     group.addoption(
-        "--ssl",
-        dest="inm_ssl",
-        help="Use SSL",
+        "--lsm_ssl",
+        dest="inm_lsm_ssl",
+        help="Connect to the remote orchestrator using SSL/TLS",
     )
     group.addoption(
-        "--token",
-        dest="inm_token",
-        help="the token to use when using SSL, overrides INMANTA_TOKEN",
+        "--lsm_token",
+        dest="inm_lsm_token",
+        help="The token used to authenticate to the remote orchestrator when authentication is enabled, overrides INMANTA_LSM_TOKEN",  # NOQA E501
     )
     group.addoption(
-        "--ca_cert",
-        dest="inm_ca_cert",
-        help="the certificate to use when performing authentication, overrides INMANTA_CA_CERT",
+        "--lsm_ca_cert",
+        dest="inm_lsm_ca_cert",
+        help="The path to the CA certificate file used to authenticate the remote orchestrator, overrides INMANTA_LSM_CA_CERT",
     )
 
 
@@ -114,9 +114,9 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
     port = get_opt_or_env_or(request.config, "inm_lsm_remote_port", "22")
     noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
-    ssl = get_opt_or_env_or(request.config, "inm_ssl", "false")
-    token = get_opt_or_env_or(request.config, "inm_token", "admin")
-    ca_cert = get_opt_or_env_or(request.config, "inm_ca_cert", "admin")
+    ssl = get_opt_or_env_or(request.config, "inm_lsm_ssl", "false").lower() == "true"
+    token = get_opt_or_env_or(request.config, "inm_lsm_token")
+    ca_cert = get_opt_or_env_or(request.config, "inm_lsm_ca_cert")
 
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
