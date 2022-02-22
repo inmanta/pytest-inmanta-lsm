@@ -115,8 +115,8 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     port = get_opt_or_env_or(request.config, "inm_lsm_remote_port", "22")
     noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
     ssl = get_opt_or_env_or(request.config, "inm_lsm_ssl", "false").lower() == "true"
-    token = get_opt_or_env_or(request.config, "inm_lsm_token")
-    ca_cert = get_opt_or_env_or(request.config, "inm_lsm_ca_cert")
+    token = get_opt_or_env_or(request.config, "inm_lsm_token", None)
+    ca_cert = get_opt_or_env_or(request.config, "inm_lsm_ca_cert", None)
 
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
