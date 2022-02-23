@@ -72,7 +72,7 @@ The following options are available.
  * `--lsm_port` port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT
  * `--lsm_environment` the environment to use on the remote server (it is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT
  * `--lsm_noclean` Don't cleanup the orchestrator after last test (for debugging purposes)
- * `--lsm_ssl` Connect to the remote orchestrator using SSL/TLS
- * `--lsm_token` The token used to authenticate to the remote orchestrator when authentication is enabled.
- * `--lsm_ca_cert` The path to the CA certificate file used to authenticate the remote orchestrator.
+ * `--lsm_ssl` Connect to the remote orchestrator using SSL/TLS, overrides INMANTA_LSM_SSL
+ * `--lsm_token` The token used to authenticate to the remote orchestrator when authentication is enabled, overrides INMANTA_LSM_TOKEN
+ * `--lsm_ca_cert` The path to the CA certificate file used to authenticate the remote orchestrator, overrides INMANTA_LSM_CA_CERT
  
