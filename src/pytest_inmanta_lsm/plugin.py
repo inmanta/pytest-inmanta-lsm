@@ -118,6 +118,11 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     token = get_opt_or_env_or(request.config, "inm_lsm_token", None)
     ca_cert = get_opt_or_env_or(request.config, "inm_lsm_ca_cert", None)
 
+    if ssl:
+        if not os.path.isfile(ca_cert):
+            raise FileNotFoundError("Invalid path to CA certificate file")
+        ca_cert = os.path.abspath(ca_cert)
+
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
         "auto_deploy": True,
