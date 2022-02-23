@@ -44,8 +44,8 @@ class RemoteOrchestrator:
         project: Project,
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
-        token: str,
-        ca_cert: str,
+        token: Optional[str],
+        ca_cert: Optional[str],
         ssh_port: str = "22",
         ssl: bool = False,
     ) -> None:
