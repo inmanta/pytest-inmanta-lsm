@@ -72,7 +72,7 @@ def pytest_addoption(parser):
     group.addoption(
         "--lsm_ssl",
         dest="inm_lsm_ssl",
-        help="Connect to the remote orchestrator using SSL/TLS",
+        help="[True | False] Choose whether to use SSL/TLS or not when connecting to the remote orchestrator, overrides INMANTA_LSM_SSL",
     )
     group.addoption(
         "--lsm_token",
