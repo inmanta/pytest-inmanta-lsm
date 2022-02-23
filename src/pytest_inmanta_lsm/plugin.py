@@ -9,7 +9,7 @@
 import logging
 import os
 import os.path
-from typing import Dict, Iterator, Union
+from typing import Dict, Iterator, Optional, Union
 from uuid import UUID
 
 import pytest
@@ -86,7 +86,7 @@ def pytest_addoption(parser):
     )
 
 
-def get_opt_or_env_or(config, key: str, default: str) -> str:
+def get_opt_or_env_or(config, key: str, default: Optional[str]) -> Optional[str]:
     if config.getoption(key):
         return config.getoption(key)
     if option_to_env[key] in os.environ:
