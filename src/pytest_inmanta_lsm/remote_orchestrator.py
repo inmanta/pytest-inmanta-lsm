@@ -44,10 +44,10 @@ class RemoteOrchestrator:
         project: Project,
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
+        token: str,
+        ca_cert: str,
         ssh_port: str = "22",
         ssl: bool = False,
-        token: str = "admin",
-        ca_cert: str = "admin",
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
@@ -60,7 +60,7 @@ class RemoteOrchestrator:
         :param settings: The inmanta environment settings that should be set on the remote orchestrator
         :param noclean: Option to indicate that after the run clean should not run. This exposes the attribute to other
                         fixtures.
-        :param ssl: Option to indicate wether SSL should be used or not. Defaults to false
+        :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
         :param token: Token used for authentication
         :param ca_cert: Certificate used for authentication
         """
@@ -82,7 +82,7 @@ class RemoteOrchestrator:
             inmanta_config.Config.set(section, "port", "8888")
 
             # Config for SSL and authentication:
-            inmanta_config.Config.set(section, "ssl", ssl)
+            inmanta_config.Config.set(section, "ssl", str(ssl))
             inmanta_config.Config.set(section, "token", token)
             inmanta_config.Config.set(section, "ssl_ca_cert_file", ca_cert)
 
