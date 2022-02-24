@@ -126,7 +126,6 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
         if ca_cert:
             LOGGER.warning("ssl option is set to False, so the CA certificate won't be used")
 
-
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
         "auto_deploy": True,
