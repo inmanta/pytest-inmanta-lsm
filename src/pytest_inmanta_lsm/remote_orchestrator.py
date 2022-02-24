@@ -84,8 +84,10 @@ class RemoteOrchestrator:
             # Config for SSL and authentication:
             if ssl:
                 inmanta_config.Config.set(section, "ssl", str(ssl))
-                inmanta_config.Config.set(section, "token", token)
-                inmanta_config.Config.set(section, "ssl_ca_cert_file", ca_cert)
+                if token:
+                    inmanta_config.Config.set(section, "token", token)
+                if ca_cert:
+                    inmanta_config.Config.set(section, "ssl_ca_cert_file", ca_cert)
 
         self._project = project
 
@@ -132,7 +134,7 @@ class RemoteOrchestrator:
             result = client.project_list()
             assert (
                 result.code == 200
-            ), f"Wrong reponse code while verifying project, got {result.code} (expected 200): \n{result}"
+            ), f"Wrong reponse code while verifying project, got {result.code} (expected 200): \n{result.result}"
             for project in result.result["data"]:
                 if project["name"] == project_name:
                     return project["id"]
