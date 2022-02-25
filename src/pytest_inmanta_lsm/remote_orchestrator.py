@@ -84,10 +84,10 @@ class RemoteOrchestrator:
             # Config for SSL and authentication:
             if ssl:
                 inmanta_config.Config.set(section, "ssl", str(ssl))
-                if token:
-                    inmanta_config.Config.set(section, "token", token)
                 if ca_cert:
                     inmanta_config.Config.set(section, "ssl_ca_cert_file", ca_cert)
+            if token:
+                inmanta_config.Config.set(section, "token", token)
 
         self._project = project
 
