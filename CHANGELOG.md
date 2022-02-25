@@ -1,8 +1,5 @@
 # v 1.5.0 (?)
 Changes in this release:
-
-# v 1.4.2 (2022-02-25)
-Changes in this release:
 - Add support for SSL and anthentication (#186)
 
 # v 1.4.1 (2022-02-10)
