@@ -321,7 +321,7 @@ class ManagedServiceInstance:
                     # Version is not given, so version does not need to be verified
                     return True
                 elif current_state.version not in desired_versions:
-                    raise VersionMismatchError(self, desired_versions, current_state.version)
+                    raise VersionMismatchError(self, desired_versions, current_state.version or 0)
                 else:
                     return True
             elif (
