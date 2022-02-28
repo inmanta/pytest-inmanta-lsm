@@ -45,6 +45,7 @@ class RemoteOrchestrator:
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
         ssh_port: str = "22",
+        container_env: bool = False,
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
@@ -64,6 +65,7 @@ class RemoteOrchestrator:
         self._ssh_port = ssh_port
         self._settings = settings
         self.noclean = noclean
+        self.container_env = container_env
 
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self._env))
@@ -251,11 +253,14 @@ class RemoteOrchestrator:
                 f"project = Project('{server_path}', venv_path='{venv_path}');"
                 "project.install_modules();"
             )
-            shell_script_inline: str = (
+            shell_script_inline: str = "/opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
+            if not self.container_env:
                 # use the server's environment variables for the installation
-                "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server --wait"
-                " /opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
-            )
+                shell_script_inline = (
+                    "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
+                    "--wait %s" % shell_script_inline
+                )
+
             try:
                 subprocess.check_output(
                     SSH_CMD
