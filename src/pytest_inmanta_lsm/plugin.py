@@ -36,6 +36,7 @@ option_to_env = {
     "inm_lsm_remote_port": "INMANTA_LSM_PORT",
     "inm_lsm_env": "INMANTA_LSM_ENVIRONMENT",
     "inm_lsm_noclean": "INMANTA_LSM_NOCLEAN",
+    "inm_lsm_container_env": "INMANTA_LSM_CONTAINER_ENV",
 }
 
 
@@ -65,6 +66,15 @@ def pytest_addoption(parser):
         "--lsm_noclean",
         dest="inm_lsm_noclean",
         help="Don't cleanup the orchestrator after tests (for debugging purposes)",
+    )
+    group.addoption(
+        "--lsm_container_env",
+        dest="inm_lsm_container_env",
+        help=(
+            "If set to true, expect the the orchestrator to be running in a container without systemd.  "
+            "It then assumes that all environment variables required to install the modules are loaded into "
+            "each ssh session automatically."
+        ),
     )
 
 
@@ -96,6 +106,7 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
     port = get_opt_or_env_or(request.config, "inm_lsm_remote_port", "22")
     noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
+    container_env = get_opt_or_env_or(request.config, "inm_lsm_container_env", "false").lower() == "true"
 
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
@@ -118,6 +129,7 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
         project=project,
         settings=settings,
         noclean=noclean,
+        container_env=container_env,
     )
     remote_orchestrator.clean()
 
