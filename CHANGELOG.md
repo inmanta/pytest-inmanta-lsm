@@ -1,5 +1,6 @@
 # v 1.5.0 (?)
 Changes in this release:
+- Add support for iso5 container environment (#192)
 - Add support for SSL and anthentication (#186)
 
 # v 1.4.1 (2022-02-10)
