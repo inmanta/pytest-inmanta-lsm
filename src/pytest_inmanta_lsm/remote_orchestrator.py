@@ -45,10 +45,10 @@ class RemoteOrchestrator:
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
         ssh_port: str = "22",
-        container_env: bool = False,
         token: Optional[str] = None,
         ca_cert: Optional[str] = None,
         ssl: bool = False,
+        container_env: bool = False,
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
@@ -64,6 +64,7 @@ class RemoteOrchestrator:
         :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
         :param token: Token used for authentication
         :param ca_cert: Certificate used for authentication
+        :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
         """
         self._env = environment
         self._host = host
@@ -71,10 +72,10 @@ class RemoteOrchestrator:
         self._ssh_port = ssh_port
         self._settings = settings
         self.noclean = noclean
-        self.container_env = container_env
         self._ssl = ssl
         self._token = token
         self._ca_cert = ca_cert
+        self.container_env = container_env
 
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self._env))

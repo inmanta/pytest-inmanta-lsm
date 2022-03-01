@@ -74,9 +74,9 @@ def pytest_addoption(parser):
         "--lsm_container_env",
         dest="inm_lsm_container_env",
         help=(
-            "If set to true, expect the the orchestrator to be running in a container without systemd.  "
+            "If set to true, expect the orchestrator to be running in a container without systemd.  "
             "It then assumes that all environment variables required to install the modules are loaded into "
-            "each ssh session automatically."
+            "each ssh session automatically.  Overrides INMANTA_LSM_CONTAINER_ENV."
         ),
     )
     group.addoption(
@@ -164,10 +164,10 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
         project=project,
         settings=settings,
         noclean=noclean,
-        container_env=container_env,
         ssl=ssl,
         token=token,
         ca_cert=ca_cert,
+        container_env=container_env,
     )
     remote_orchestrator.clean()
 
