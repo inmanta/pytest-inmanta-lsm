@@ -36,6 +36,7 @@ option_to_env = {
     "inm_lsm_remote_port": "INMANTA_LSM_PORT",
     "inm_lsm_env": "INMANTA_LSM_ENVIRONMENT",
     "inm_lsm_noclean": "INMANTA_LSM_NOCLEAN",
+    "inm_lsm_container_env": "INMANTA_LSM_CONTAINER_ENV",
     "inm_lsm_ssl": "INMANTA_LSM_SSL",
     "inm_lsm_token": "INMANTA_LSM_TOKEN",
     "inm_lsm_ca_cert": "INMANTA_LSM_CA_CERT",
@@ -70,14 +71,29 @@ def pytest_addoption(parser):
         help="Don't cleanup the orchestrator after tests (for debugging purposes)",
     )
     group.addoption(
+        "--lsm_container_env",
+        dest="inm_lsm_container_env",
+        help=(
+            "If set to true, expect the orchestrator to be running in a container without systemd.  "
+            "It then assumes that all environment variables required to install the modules are loaded into "
+            "each ssh session automatically.  Overrides INMANTA_LSM_CONTAINER_ENV."
+        ),
+    )
+    group.addoption(
         "--lsm_ssl",
         dest="inm_lsm_ssl",
-        help="[True | False] Choose whether to use SSL/TLS or not when connecting to the remote orchestrator, overrides INMANTA_LSM_SSL",  # NOQA E501
+        help=(
+            "[True | False] Choose whether to use SSL/TLS or not when connecting to the remote orchestrator, "
+            "overrides INMANTA_LSM_SSL"
+        ),
     )
     group.addoption(
         "--lsm_token",
         dest="inm_lsm_token",
-        help="The token used to authenticate to the remote orchestrator when authentication is enabled, overrides INMANTA_LSM_TOKEN",  # NOQA E501
+        help=(
+            "The token used to authenticate to the remote orchestrator when authentication is enabled, "
+            "overrides INMANTA_LSM_TOKEN"
+        ),
     )
     group.addoption(
         "--lsm_ca_cert",
@@ -114,6 +130,7 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
     user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
     port = get_opt_or_env_or(request.config, "inm_lsm_remote_port", "22")
     noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
+    container_env = get_opt_or_env_or(request.config, "inm_lsm_container_env", "false").lower() == "true"
     ssl = get_opt_or_env_or(request.config, "inm_lsm_ssl", "false").lower() == "true"
     token = get_opt_or_env_or(request.config, "inm_lsm_token", None)
     ca_cert = get_opt_or_env_or(request.config, "inm_lsm_ca_cert", None)
@@ -150,6 +167,7 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
         ssl=ssl,
         token=token,
         ca_cert=ca_cert,
+        container_env=container_env,
     )
     remote_orchestrator.clean()
 

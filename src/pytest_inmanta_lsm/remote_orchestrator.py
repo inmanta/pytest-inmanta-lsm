@@ -48,6 +48,7 @@ class RemoteOrchestrator:
         token: Optional[str] = None,
         ca_cert: Optional[str] = None,
         ssl: bool = False,
+        container_env: bool = False,
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
@@ -63,6 +64,7 @@ class RemoteOrchestrator:
         :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
         :param token: Token used for authentication
         :param ca_cert: Certificate used for authentication
+        :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
         """
         self._env = environment
         self._host = host
@@ -73,6 +75,7 @@ class RemoteOrchestrator:
         self._ssl = ssl
         self._token = token
         self._ca_cert = ca_cert
+        self.container_env = container_env
 
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self._env))
@@ -268,11 +271,14 @@ class RemoteOrchestrator:
                 f"project = Project('{server_path}', venv_path='{venv_path}');"
                 "project.install_modules();"
             )
-            shell_script_inline: str = (
+            shell_script_inline: str = "/opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
+            if not self.container_env:
                 # use the server's environment variables for the installation
-                "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server --wait"
-                " /opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
-            )
+                shell_script_inline = (
+                    "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
+                    "--wait %s" % shell_script_inline
+                )
+
             try:
                 subprocess.check_output(
                     SSH_CMD
