@@ -2,6 +2,7 @@
 Changes in this release:
 - Add support for iso5 container environment (#192)
 - Add support for SSL and anthentication (#186)
+- Report skipped and deploying resources when reaching a bad lifecycle state
 
 # v 1.4.1 (2022-02-10)
 Changes in this release:
