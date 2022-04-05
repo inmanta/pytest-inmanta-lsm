@@ -14,12 +14,10 @@ import yaml
 
 
 def add_version_constraint_to_project(testdir):
-    # TODO: document this env var
-    # TODO: document how to run tests
     constraints = os.environ.get("INMANTA_LSM_MODULE_CONSTRAINTS", "")
     if constraints:
         with open(testdir.tmpdir / "module.yml", "r") as fh:
-            module_config = yaml.load(fh)
+            module_config = yaml.safe_load(fh)
             module_config["requires"] = constraints.split(";")
         with open(testdir.tmpdir / "module.yml", "w") as fh:
             yaml.dump(module_config, fh)
