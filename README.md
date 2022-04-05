@@ -76,3 +76,39 @@ The following options are available.
  * `--lsm_token` The token used to authenticate to the remote orchestrator when authentication is enabled, overrides INMANTA_LSM_TOKEN
  * `--lsm_ca_cert` The path to the CA certificate file used to authenticate the remote orchestrator, overrides INMANTA_LSM_CA_CERT
  
+## Environment variables
+
+The following environment variables are available:
+
+ * `INMANTA_LSM_MODULE_CONSTRAINTS` : semi-colon separated list of constraints e.g : `"lsm~=2.12.0"`
+
+## Running tests
+
+### Pre-requisites
+ Testing (and using) pytest-inmanta-lsm requires:
+- an available orchestrator to test against
+- ssh access to this orchestrator
+
+### Steps
+1. install dependencies:
+```bash
+ pip install -r  requirements.dev.txt  -r  requirements.txt
+```
+
+2. pass the config for pytest-inmanta-lsm via environment variables. e.g.
+```bash
+export INMANTA_LSM_HOST=<the orchestrator>
+export INMANTA_LSM_USER=<user>
+```
+
+3. set the repo for inmanta to pull LSM from
+ 
+ ```bash
+export INMANTA_MODULE_REPO=https://USER:LICENSE_TOKEN@modules.inmanta.com/git/inmanta-service-orchestrator/5/{}.git
+```
+4. run the tests
+ 
+ ```bash
+    pytest tests
+```
+

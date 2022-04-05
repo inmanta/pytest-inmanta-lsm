@@ -1,3 +1,8 @@
+# v 1.5.1 (2022-04-05)
+Changes in this release:
+- Fix the iso4 jenkins job by adding a constraint on the lsm module's version
+- Add the possibility to add other constraints through the INMANTA_LSM_MODULE_CONSTRAINTS environment variable
+
 # v 1.5.0 (?)
 Changes in this release:
 - Add support for iso5 container environment (#192)

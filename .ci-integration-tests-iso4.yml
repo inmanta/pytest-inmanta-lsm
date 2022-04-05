@@ -8,6 +8,7 @@ additional_constraints:
     - inmanta-lsm~=1.9.2.dev
 env_vars:
     INMANTA_LSM_USER: rocky
+    INMANTA_LSM_MODULE_CONSTRAINTS: "lsm~=2.12.0"
 directories_to_lint:
     - examples
     - src
