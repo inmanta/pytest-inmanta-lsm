@@ -40,6 +40,8 @@ class ManagedServiceInstance:
 
     ALL_BAD_STATES = list(set(CREATE_FLOW_BAD_STATES + UPDATE_FLOW_BAD_STATES + DELETE_FLOW_BAD_STATES))
 
+    DEFAULT_TIMEOUT = 600
+
     def __init__(
         self,
         remote_orchestrator: "r_orchestrator.RemoteOrchestrator",
@@ -70,6 +72,7 @@ class ManagedServiceInstance:
         version: Optional[int] = None,
         versions: Optional[Collection[int]] = None,
         bad_states: Collection[str] = CREATE_FLOW_BAD_STATES,
+        timeout: int = DEFAULT_TIMEOUT,
     ) -> None:
         """
         Create the service instance and wait for it to go into `wait_for_state` or one of `wait_for_states` and
@@ -82,6 +85,7 @@ class ManagedServiceInstance:
         :param version: the target state should have this version number, defaults to None
         :param versions: the target state should have one of those version numbers, defaults to None
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to CREATE_FLOW_BAD_STATES
+        :param timeout: how long can we wait for service to achieve given state (in seconds)
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If both of state and states are set
@@ -122,6 +126,7 @@ class ManagedServiceInstance:
             version=version,
             versions=versions,
             bad_states=bad_states,
+            timeout=timeout,
         )
 
     def update(
@@ -133,6 +138,7 @@ class ManagedServiceInstance:
         current_version: Optional[int] = None,
         attribute_updates: Dict[str, Union[str, int]] = {},
         bad_states: Collection[str] = UPDATE_FLOW_BAD_STATES,
+        timeout: int = DEFAULT_TIMEOUT,
     ) -> None:
         """
         Update the service instance with the given `attributes_updates` and wait for it to go into `wait_for_state` or one
@@ -146,6 +152,7 @@ class ManagedServiceInstance:
         :param current_version: current version, defaults to None
         :param attribute_updates: dictionary containing the key(s) and value(s) to be updates, defaults to {}
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to UPDATE_FLOW_BAD_STATES
+        :param timeout: how long can we wait for service to achieve given state (in seconds)
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If both of state and states are set
@@ -179,6 +186,7 @@ class ManagedServiceInstance:
             versions=new_versions,
             bad_states=bad_states,
             start_version=current_version,
+            timeout=timeout,
         )
 
     def delete(
@@ -189,6 +197,7 @@ class ManagedServiceInstance:
         versions: Optional[Collection[int]] = None,
         current_version: Optional[int] = None,
         bad_states: Collection[str] = DELETE_FLOW_BAD_STATES,
+        timeout: int = DEFAULT_TIMEOUT,
     ) -> None:
         """
         Delete the service instance and wait for it to go into `wait_for_state` or one of `wait_for_states` and
@@ -201,6 +210,7 @@ class ManagedServiceInstance:
         :param new_versions: the target state should have one of those version numbers, defaults to None
         :param current_version: current version, defaults to None
         :param bad_states: stop waiting and fail if any of these states are reached, defaults to UPDATE_FLOW_BAD_STATES
+        :param timeout: how long can we wait for service to achieve given state (in seconds)
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
         :raises ValueError: If both of state and states are set
@@ -232,6 +242,7 @@ class ManagedServiceInstance:
             versions=versions,
             bad_states=bad_states,
             start_version=current_version,
+            timeout=timeout,
         )
 
     def get_state(
@@ -276,7 +287,7 @@ class ManagedServiceInstance:
         states: Optional[Collection[str]] = None,
         version: Optional[int] = None,
         versions: Optional[Collection[int]] = None,
-        timeout: int = 600,
+        timeout: int = DEFAULT_TIMEOUT,
         bad_states: Collection[str] = ALL_BAD_STATES,
         start_version: Optional[int] = None,
     ) -> None:
