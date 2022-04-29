@@ -1,3 +1,6 @@
+# v 1.6.0 (?)
+Changes in this release:
+
 # v 1.5.0 (2022-04-29)
 Changes in this release:
 - Add support for iso5 container environment (#192)
