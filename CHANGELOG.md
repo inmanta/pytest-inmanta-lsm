@@ -1,14 +1,14 @@
-# v 1.5.1 (2022-04-05)
+# v 1.6.0 (?)
 Changes in this release:
-- Fix the iso4 jenkins job by adding a constraint on the lsm module's version
-- Add the possibility to add other constraints through the INMANTA_LSM_MODULE_CONSTRAINTS environment variable
+- Add timeout parameter to managed service
 
-# v 1.5.0 (?)
+# v 1.5.0 (2022-04-29)
 Changes in this release:
 - Add support for iso5 container environment (#192)
 - Add support for SSL and anthentication (#186)
 - Report skipped and deploying resources when reaching a bad lifecycle state (#199)
-- Add timeout parameter to managed service
+- Fix the iso4 jenkins job by adding a constraint on the lsm module's version
+- Add the possibility to add other constraints through the INMANTA_LSM_MODULE_CONSTRAINTS environment variable
 
 # v 1.4.1 (2022-02-10)
 Changes in this release:
