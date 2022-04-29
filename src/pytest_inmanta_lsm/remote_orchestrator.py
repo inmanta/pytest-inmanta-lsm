@@ -45,6 +45,10 @@ class RemoteOrchestrator:
         settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
         ssh_port: str = "22",
+        token: Optional[str] = None,
+        ca_cert: Optional[str] = None,
+        ssl: bool = False,
+        container_env: bool = False,
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
@@ -57,6 +61,10 @@ class RemoteOrchestrator:
         :param settings: The inmanta environment settings that should be set on the remote orchestrator
         :param noclean: Option to indicate that after the run clean should not run. This exposes the attribute to other
                         fixtures.
+        :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
+        :param token: Token used for authentication
+        :param ca_cert: Certificate used for authentication
+        :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
         """
         self._env = environment
         self._host = host
@@ -64,13 +72,25 @@ class RemoteOrchestrator:
         self._ssh_port = ssh_port
         self._settings = settings
         self.noclean = noclean
+        self._ssl = ssl
+        self._token = token
+        self._ca_cert = ca_cert
+        self.container_env = container_env
 
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self._env))
-        inmanta_config.Config.set("compiler_rest_transport", "host", host)
-        inmanta_config.Config.set("compiler_rest_transport", "port", "8888")
-        inmanta_config.Config.set("client_rest_transport", "host", host)
-        inmanta_config.Config.set("client_rest_transport", "port", "8888")
+
+        for section in ["compiler_rest_transport", "client_rest_transport"]:
+            inmanta_config.Config.set(section, "host", host)
+            inmanta_config.Config.set(section, "port", "8888")
+
+            # Config for SSL and authentication:
+            if ssl:
+                inmanta_config.Config.set(section, "ssl", str(ssl))
+                if ca_cert:
+                    inmanta_config.Config.set(section, "ssl_ca_cert_file", ca_cert)
+            if token:
+                inmanta_config.Config.set(section, "token", token)
 
         self._project = project
 
@@ -117,7 +137,7 @@ class RemoteOrchestrator:
             result = client.project_list()
             assert (
                 result.code == 200
-            ), f"Wrong reponse code while verifying project, got {result.code} (expected 200): \n{result}"
+            ), f"Wrong reponse code while verifying project, got {result.code} (expected 200): \n{result.result}"
             for project in result.result["data"]:
                 if project["name"] == project_name:
                     return project["id"]
@@ -125,7 +145,7 @@ class RemoteOrchestrator:
             result = client.project_create(name=project_name)
             assert (
                 result.code == 200
-            ), f"Wrong reponse code while creating project, got {result.code} (expected 200): \n{result}"
+            ), f"Wrong reponse code while creating project, got {result.code} (expected 200): \n{result.result}"
             return result.result["data"]["id"]
 
         result = client.create_environment(
@@ -135,7 +155,7 @@ class RemoteOrchestrator:
         )
         assert (
             result.code == 200
-        ), f"Wrong response code while creating environment, got {result.code} (expected 200): \n{result}"
+        ), f"Wrong response code while creating environment, got {result.code} (expected 200): \n{result.result}"
 
     def sync_project(self) -> None:
         """Synchronize the project to the lab orchestrator"""
@@ -251,11 +271,14 @@ class RemoteOrchestrator:
                 f"project = Project('{server_path}', venv_path='{venv_path}');"
                 "project.install_modules();"
             )
-            shell_script_inline: str = (
+            shell_script_inline: str = "/opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
+            if not self.container_env:
                 # use the server's environment variables for the installation
-                "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server --wait"
-                " /opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
-            )
+                shell_script_inline = (
+                    "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
+                    "--wait %s" % shell_script_inline
+                )
+
             try:
                 subprocess.check_output(
                     SSH_CMD

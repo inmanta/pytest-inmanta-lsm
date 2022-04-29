@@ -34,9 +34,8 @@ class FailedResourcesLogs:
         for resource in get_version_result["resources"]:
             resource_id = resource["resource_id"]
 
-            # Only interested in failed resources
-            if resource["status"] != "failed":
-                continue
+            if resource["status"] in ["deploying", "skipped", "failed"]:
+                logs.append((f"Resource in status {resource['status']}", resource_id))
 
             for action in resource["actions"]:
                 if "messages" not in action:
