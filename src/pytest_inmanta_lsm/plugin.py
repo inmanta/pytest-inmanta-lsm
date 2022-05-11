@@ -29,8 +29,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_token,
 )
 from pytest_inmanta_lsm.remote_orchestrator import RemoteOrchestrator
-from pytest_inmanta_lsm.test_parameter import ParameterNotSetException
-from pytest_inmanta_lsm.test_parameter.parameter import TestParameter
+from pytest_inmanta_lsm.test_parameter import ParameterNotSetException, TestParameter
 
 try:
     # make sure that lsm methods are loaded
