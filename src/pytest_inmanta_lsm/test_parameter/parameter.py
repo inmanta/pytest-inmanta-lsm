@@ -111,8 +111,8 @@ class TestParameter(Generic[ParameterType]):
         """
         return "store"
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def validate(cls, raw_value: str) -> ParameterType:
         """
         This method is called when any value is received from parameters or
