@@ -15,6 +15,8 @@
 
     Contact: code@inmanta.com
 """
+from typing import Optional
+
 from .parameter import TestParameter
 
 
@@ -24,9 +26,16 @@ class BooleanTestParameter(TestParameter[bool]):
     """
 
     def __init__(
-        self, argument: str, environment_variable: str, usage: str, default=False
+        self,
+        argument: str,
+        environment_variable: str,
+        usage: str,
+        *,
+        default=False,
+        key: Optional[str] = None,
+        group: Optional[str] = None,
     ) -> None:
-        super().__init__(argument, environment_variable, usage, default)
+        super().__init__(argument, environment_variable, usage, default=default, key=key, group=group)
 
     @property
     def action(self) -> str:

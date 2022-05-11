@@ -1,6 +1,9 @@
-from pytest_inmanta_lsm.test_parameter import StringTestParameter, IntegerTestParameter, BooleanTestParameter, PathTestParameter
-
-
+from pytest_inmanta_lsm.test_parameter import (
+    BooleanTestParameter,
+    IntegerTestParameter,
+    PathTestParameter,
+    StringTestParameter,
+)
 
 param_group = "pytest-inmanta-lsm"
 
@@ -17,7 +20,7 @@ inm_lsm_srv_port = IntegerTestParameter(
     argument="--lsm-srv-port",
     environment_variable="INMANTA_LSM_SRV_PORT",
     usage="Port the orchestrator api is listening to",
-    # default=8888,
+    default=8888,
     group=param_group,
 )
 
@@ -84,5 +87,5 @@ inm_lsm_ca_cert = PathTestParameter(
     argument="--lsm-ca-cert",
     environment_variable="INMANTA_LSM_CA_CERT",
     usage="The path to the CA certificate file used to authenticate the remote orchestrator.",
-    group=param_group
+    group=param_group,
 )

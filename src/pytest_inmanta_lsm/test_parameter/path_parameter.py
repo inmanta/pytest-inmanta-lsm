@@ -16,6 +16,7 @@
     Contact: code@inmanta.com
 """
 import os
+
 from .parameter import TestParameter
 
 

@@ -16,9 +16,9 @@
     Contact: code@inmanta.com
 """
 import os
+import uuid
 from abc import abstractmethod
 from typing import Dict, Generic, List, Optional, Set, TypeVar
-import uuid
 
 from _pytest.config import Config
 
@@ -42,27 +42,23 @@ class TestParameterRegistry:
         if key is None:
             key = str(uuid.uuid4())
         cls.__test_parameters[key] = test_parameter
-        
+
         if group not in cls.__test_parameter_groups:
             cls.__test_parameter_groups[group] = set()
-        
+
         cls.__test_parameter_groups[group].add(test_parameter)
 
     @classmethod
     def test_parameters(cls) -> List["TestParameter"]:
-        return list(cls.__test_parameters)
+        return list(cls.__test_parameters.values())
 
     @classmethod
     def test_parameter_groups(cls) -> Dict[Optional[str], List["TestParameter"]]:
-        return {
-            group: list(parameters)
-            for group, parameters in cls.__test_parameter_groups.items()
-        }
+        return {group: list(parameters) for group, parameters in cls.__test_parameter_groups.items()}
 
     @classmethod
     def test_parameter(cls, key: str) -> "TestParameter":
         return cls.__test_parameters[key]
-
 
 
 class TestParameter(Generic[ParameterType]):
@@ -76,6 +72,7 @@ class TestParameter(Generic[ParameterType]):
         argument: str,
         environment_variable: str,
         usage: str,
+        *,
         default: Optional[ParameterType] = None,
         key: Optional[str] = None,
         group: Optional[str] = None,
@@ -94,7 +91,6 @@ class TestParameter(Generic[ParameterType]):
         self.default = default
 
         TestParameterRegistry.register(key, self)
-
 
     @property
     def help(self) -> str:

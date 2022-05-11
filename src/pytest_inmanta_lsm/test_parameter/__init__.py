@@ -15,13 +15,20 @@
 
     Contact: code@inmanta.com
 """
-from .parameter import TestParameter, TestParameterRegistry, ParameterNotSetException  # noqa: F401
+from typing import Union
+
+from _pytest.config.argparsing import OptionGroup, Parser
+
 from .boolean_parameter import BooleanTestParameter  # noqa: F401
 from .integer_parameter import IntegerTestParameter  # noqa: F401
-from .string_parameter import StringTestParameter  # noqa: F401
+from .parameter import (  # noqa: F401
+    ParameterNotSetException,
+    ParameterType,
+    TestParameter,
+    TestParameterRegistry,
+)
 from .path_parameter import PathTestParameter  # noqa: F401
-
-from _pytest.config.argparsing import Parser
+from .string_parameter import StringTestParameter  # noqa: F401
 
 
 def pytest_addoption(parser: Parser) -> None:
@@ -29,7 +36,12 @@ def pytest_addoption(parser: Parser) -> None:
     Setting up test parameters
     """
     for group_name, parameters in TestParameterRegistry.test_parameter_groups().items():
-        group = parser.getgroup(group_name)
+        group: Union[Parser, OptionGroup]
+        if group_name is None:
+            group = parser
+        else:
+            group = parser.getgroup(group_name)
+
         for param in parameters:
             group.addoption(
                 param.argument,

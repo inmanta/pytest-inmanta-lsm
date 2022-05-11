@@ -13,9 +13,24 @@ from typing import Dict, Iterator, Optional, Union
 from uuid import UUID
 
 import pytest
+from _pytest.config.argparsing import Parser
 from pytest_inmanta.plugin import Project
 
+from pytest_inmanta_lsm.parameters import (
+    inm_lsm_ca_cert,
+    inm_lsm_container_env,
+    inm_lsm_env,
+    inm_lsm_host,
+    inm_lsm_noclean,
+    inm_lsm_srv_port,
+    inm_lsm_ssh_port,
+    inm_lsm_ssh_user,
+    inm_lsm_ssl,
+    inm_lsm_token,
+)
 from pytest_inmanta_lsm.remote_orchestrator import RemoteOrchestrator
+from pytest_inmanta_lsm.test_parameter import ParameterNotSetException
+from pytest_inmanta_lsm.test_parameter.parameter import TestParameter
 
 try:
     # make sure that lsm methods are loaded
@@ -42,68 +57,87 @@ option_to_env = {
     "inm_lsm_ca_cert": "INMANTA_LSM_CA_CERT",
 }
 
+option_to_arg = {
+    "inm_lsm_remote_host": "--lsm_host",
+    "inm_lsm_remote_user": "--lsm_user",
+    "inm_lsm_remote_port": "--lsm_port",
+    "inm_lsm_env": "--lsm_environment",
+    "inm_lsm_noclean": "--lsm_noclean",
+    "inm_lsm_container_env": "--lsm_container_env",
+    "inm_lsm_ssl": "--lsm_ssl",
+    "inm_lsm_token": "--lsm_token",
+    "inm_lsm_ca_cert": "--lsm_ca_cert",
+}
 
-def pytest_addoption(parser):
+
+def pytest_addoption(parser: Parser):
     group = parser.getgroup("inmanta_lsm", "inmanta module testing plugin for lsm")
     group.addoption(
-        "--lsm_host",
+        option_to_arg["inm_lsm_remote_host"],
         dest="inm_lsm_remote_host",
-        help="Remote orchestrator to use for the remote_inmanta fixture, overrides INMANTA_LSM_HOST",
+        help="DEPRECATED Remote orchestrator to use for the remote_inmanta fixture, overrides INMANTA_LSM_HOST",
     )
     group.addoption(
-        "--lsm_user",
+        option_to_arg["inm_lsm_remote_user"],
         dest="inm_lsm_remote_user",
-        help="Username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER",
+        help="DEPRECATED Username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER",
     )
     group.addoption(
-        "--lsm_port",
+        option_to_arg["inm_lsm_remote_port"],
         dest="inm_lsm_remote_port",
-        help="Port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT",
+        help="DEPRECATED Port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT",
     )
     group.addoption(
-        "--lsm_environment",
+        option_to_arg["inm_lsm_env"],
         dest="inm_lsm_env",
-        help="The environment to use on the remote server (is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT",
+        help=(
+            "DEPRECATED The environment to use on the remote server (is created if it doesn't exist), "
+            "overrides INMANTA_LSM_ENVIRONMENT"
+        ),
     )
     group.addoption(
-        "--lsm_noclean",
+        option_to_arg["inm_lsm_noclean"],
         dest="inm_lsm_noclean",
-        help="Don't cleanup the orchestrator after tests (for debugging purposes)",
+        help="DEPRECATED Don't cleanup the orchestrator after tests (for debugging purposes)",
     )
     group.addoption(
-        "--lsm_container_env",
+        option_to_arg["inm_lsm_container_env"],
         dest="inm_lsm_container_env",
         help=(
-            "If set to true, expect the orchestrator to be running in a container without systemd.  "
+            "DEPRECATED If set to true, expect the orchestrator to be running in a container without systemd.  "
             "It then assumes that all environment variables required to install the modules are loaded into "
             "each ssh session automatically.  Overrides INMANTA_LSM_CONTAINER_ENV."
         ),
     )
     group.addoption(
-        "--lsm_ssl",
+        option_to_arg["inm_lsm_ssl"],
         dest="inm_lsm_ssl",
         help=(
-            "[True | False] Choose whether to use SSL/TLS or not when connecting to the remote orchestrator, "
+            "DEPRECATED [True | False] Choose whether to use SSL/TLS or not when connecting to the remote orchestrator, "
             "overrides INMANTA_LSM_SSL"
         ),
     )
     group.addoption(
-        "--lsm_token",
+        option_to_arg["inm_lsm_token"],
         dest="inm_lsm_token",
         help=(
-            "The token used to authenticate to the remote orchestrator when authentication is enabled, "
+            "DEPRECATED The token used to authenticate to the remote orchestrator when authentication is enabled, "
             "overrides INMANTA_LSM_TOKEN"
         ),
     )
     group.addoption(
-        "--lsm_ca_cert",
+        option_to_arg["inm_lsm_ca_cert"],
         dest="inm_lsm_ca_cert",
-        help="The path to the CA certificate file used to authenticate the remote orchestrator, overrides INMANTA_LSM_CA_CERT",
+        help=(
+            "DEPRECATED The path to the CA certificate file used to authenticate the remote orchestrator, "
+            "overrides INMANTA_LSM_CA_CERT"
+        ),
     )
 
 
 def get_opt_or_env_or(config, key: str, default: Optional[str]) -> Optional[str]:
     if config.getoption(key):
+        LOGGER.warning(f"Usage of option {option_to_arg[key]} is deprecated")
         return config.getoption(key)
     if option_to_env[key] in os.environ:
         return os.environ[option_to_env[key]]
@@ -122,18 +156,30 @@ def remote_orchestrator_settings() -> Dict[str, Union[str, int, bool]]:
 
 
 @pytest.fixture
-def remote_orchestrator(project: Project, request, remote_orchestrator_settings) -> Iterator[RemoteOrchestrator]:
+def remote_orchestrator(
+    project: Project,
+    request: pytest.FixtureRequest,
+    remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
+) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
-    env = get_opt_or_env_or(request.config, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
-    host = get_opt_or_env_or(request.config, "inm_lsm_remote_host", "127.0.0.1")
-    user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
-    port = get_opt_or_env_or(request.config, "inm_lsm_remote_port", "22")
-    noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
-    container_env = get_opt_or_env_or(request.config, "inm_lsm_container_env", "false").lower() == "true"
-    ssl = get_opt_or_env_or(request.config, "inm_lsm_ssl", "false").lower() == "true"
-    token = get_opt_or_env_or(request.config, "inm_lsm_token", None)
-    ca_cert = get_opt_or_env_or(request.config, "inm_lsm_ca_cert", None)
+    def backward_compatible_option(test_parameter: TestParameter, key: str, default: str) -> str:
+        try:
+            return str(test_parameter.resolve(request.config))
+        except ParameterNotSetException:
+            # This is kept for backward compatibility
+            return get_opt_or_env_or(request.config, key, default)
+
+    env = backward_compatible_option(inm_lsm_env, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
+    host = backward_compatible_option(inm_lsm_host, "inm_lsm_remote_host", "127.0.0.1")
+    port = inm_lsm_srv_port.resolve(request.config)
+    ssh_user = backward_compatible_option(inm_lsm_ssh_user, "inm_lsm_remote_user", "centos")
+    ssh_port = backward_compatible_option(inm_lsm_ssh_port, "inm_lsm_remote_port", "22")
+    noclean = backward_compatible_option(inm_lsm_noclean, "inm_lsm_noclean", "false")
+    container_env = backward_compatible_option(inm_lsm_container_env, "inm_lsm_container_env", "false").lower() == "true"
+    ssl = backward_compatible_option(inm_lsm_ssl, "inm_lsm_ssl", "false").lower() == "true"
+    token = backward_compatible_option(inm_lsm_token, "inm_lsm_token", None)
+    ca_cert = backward_compatible_option(inm_lsm_ca_cert, "inm_lsm_ca_cert", None)
 
     if ssl:
         if not os.path.isfile(ca_cert):
@@ -158,8 +204,8 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
 
     remote_orchestrator = RemoteOrchestrator(
         host=host,
-        ssh_user=user,
-        ssh_port=port,
+        ssh_user=ssh_user,
+        ssh_port=ssh_port,
         environment=UUID(env),
         project=project,
         settings=settings,
@@ -168,6 +214,7 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
         token=token,
         ca_cert=ca_cert,
         container_env=container_env,
+        port=port,
     )
     remote_orchestrator.clean()
 
