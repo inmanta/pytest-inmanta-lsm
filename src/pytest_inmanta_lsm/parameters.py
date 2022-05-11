@@ -29,7 +29,7 @@ inm_lsm_host = StringTestParameter(
     argument="--lsm-host",
     environment_variable="INMANTA_LSM_HOST",
     usage="Remote orchestrator to use for the remote_inmanta fixture",
-    # default="127.0.0.1",
+    # default="127.0.0.1",  # TODO change this when old option is removed
     group=param_group,
 )
 
@@ -45,7 +45,7 @@ inm_lsm_ssh_user = StringTestParameter(
     argument="--lsm-ssh-user",
     environment_variable="INMANTA_LSM_SSH_USER",
     usage="Username to use to ssh to the remote orchestrator",
-    # default="centos",
+    # default="centos",  # TODO change this when old option is removed
     group=param_group,
 )
 
@@ -53,7 +53,7 @@ inm_lsm_ssh_port = IntegerTestParameter(
     argument="--lsm-ssh-port",
     environment_variable="INMANTA_LSM_SSH_PORT",
     usage="Port to use to ssh to the remote orchestrator",
-    # default=22,
+    # default=22,  # TODO change this when old option is removed
     group=param_group,
 )
 
@@ -61,7 +61,7 @@ inm_lsm_env = StringTestParameter(
     argument="--lsm-environment",
     environment_variable="INMANTA_LSM_ENVIRONMENT",
     usage="The environment to use on the remote server (is created if it doesn't exist)",
-    # default="719c7ad5-6657-444b-b536-a27174cb7498",
+    # default="719c7ad5-6657-444b-b536-a27174cb7498",  # TODO change this when old option is removed
     group=param_group,
 )
 
@@ -69,7 +69,7 @@ inm_lsm_noclean = BooleanTestParameter(
     argument="--lsm-noclean",
     environment_variable="INMANTA_LSM_NOCLEAN",
     usage="Don't cleanup the orchestrator after tests (for debugging purposes)",
-    # default=False,
+    default=None,  # default=False,  # TODO change this when old option is removed
     group=param_group,
 )
 
@@ -81,7 +81,7 @@ inm_lsm_container_env = BooleanTestParameter(
         "It then assumes that all environment variables required to install the modules are loaded into "
         "each ssh session automatically."
     ),
-    # default=False,
+    default=None,  # default=False,  # TODO change this when old option is removed
     group=param_group,
 )
 
@@ -89,7 +89,7 @@ inm_lsm_ssl = BooleanTestParameter(
     argument="--lsm-ssl",
     environment_variable="INMANTA_LSM_SSL",
     usage="[True | False] Choose whether to use SSL/TLS or not when connecting to the remote orchestrator.",
-    # default=False,
+    default=None,  # default=False,  # TODO change this when old option is removed
     group=param_group,
 )
 
