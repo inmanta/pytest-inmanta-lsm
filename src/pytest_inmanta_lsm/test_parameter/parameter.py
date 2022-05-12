@@ -50,11 +50,14 @@ class TestParameterRegistry:
 
     @classmethod
     def test_parameters(cls) -> List["TestParameter"]:
-        return list(cls.__test_parameters.values())
+        return sorted(cls.__test_parameters.values(), key=lambda param: param.argument)
 
     @classmethod
     def test_parameter_groups(cls) -> Dict[Optional[str], List["TestParameter"]]:
-        return {group: list(parameters) for group, parameters in cls.__test_parameter_groups.items()}
+        return {
+            group: sorted(parameters, key=lambda param: param.argument)
+            for group, parameters in cls.__test_parameter_groups.items()
+        }
 
     @classmethod
     def test_parameter(cls, key: str) -> "TestParameter":
@@ -90,7 +93,7 @@ class TestParameter(Generic[ParameterType]):
         self.usage = usage
         self.default = default
 
-        TestParameterRegistry.register(key, self)
+        TestParameterRegistry.register(key, self, group)
 
     @property
     def help(self) -> str:
