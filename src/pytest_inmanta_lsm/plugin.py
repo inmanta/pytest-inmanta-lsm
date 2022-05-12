@@ -13,7 +13,7 @@ from typing import Dict, Iterator, Optional, Union
 from uuid import UUID
 
 import pytest
-from _pytest.config.argparsing import Parser
+from _pytest.config.argparsing import OptionGroup, Parser
 from pytest_inmanta.plugin import Project
 
 from pytest_inmanta_lsm.parameters import (
@@ -29,7 +29,11 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_token,
 )
 from pytest_inmanta_lsm.remote_orchestrator import RemoteOrchestrator
-from pytest_inmanta_lsm.test_parameter import ParameterNotSetException, TestParameter
+from pytest_inmanta_lsm.test_parameter import (
+    ParameterNotSetException,
+    TestParameter,
+    TestParameterRegistry,
+)
 
 try:
     # make sure that lsm methods are loaded
@@ -70,6 +74,20 @@ option_to_arg = {
 
 
 def pytest_addoption(parser: Parser):
+    for group_name, parameters in TestParameterRegistry.test_parameter_groups().items():
+        group: Union[Parser, OptionGroup]
+        if group_name is None:
+            group = parser
+        else:
+            group = parser.getgroup(group_name)
+
+        for param in parameters:
+            group.addoption(
+                param.argument,
+                action=param.action,
+                help=param.help,
+            )
+
     group = parser.getgroup("inmanta_lsm", "inmanta module testing plugin for lsm")
     group.addoption(
         option_to_arg["inm_lsm_remote_host"],

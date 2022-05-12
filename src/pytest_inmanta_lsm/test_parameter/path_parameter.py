@@ -15,19 +15,20 @@
 
     Contact: code@inmanta.com
 """
-import os
+from pathlib import Path
 
 from .parameter import TestParameter
 
 
-class PathTestParameter(TestParameter[str]):
+class PathTestParameter(TestParameter[Path]):
     """
     A test parameter that should contain a valid path
     """
 
     @classmethod
-    def validate(cls, raw_value: str) -> str:
-        if not os.path.exists(raw_value):
+    def validate(cls, raw_value: str) -> Path:
+        path = Path(raw_value)
+        if not path.exists():
             raise ValueError(f"Invalid path: {raw_value}")
 
-        return os.path.abspath(raw_value)
+        return path.absolute()
