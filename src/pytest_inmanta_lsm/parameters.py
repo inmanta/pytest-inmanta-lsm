@@ -17,7 +17,7 @@
 """
 from pathlib import Path
 
-from pytest_inmanta_lsm.test_parameter import (
+from pytest_inmanta.test_parameter import (
     BooleanTestParameter,
     IntegerTestParameter,
     PathTestParameter,

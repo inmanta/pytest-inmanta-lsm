@@ -15,8 +15,9 @@ from uuid import UUID
 
 import pytest
 import requests
-from _pytest.config.argparsing import OptionGroup, Parser
+from _pytest.config.argparsing import Parser
 from pytest_inmanta.plugin import Project
+from pytest_inmanta.test_parameter import ParameterNotSetException, TestParameter
 
 from pytest_inmanta_lsm.docker_orchestrator import (
     DockerOrchestrator,
@@ -44,11 +45,6 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_token,
 )
 from pytest_inmanta_lsm.remote_orchestrator import RemoteOrchestrator
-from pytest_inmanta_lsm.test_parameter import (
-    ParameterNotSetException,
-    TestParameter,
-    TestParameterRegistry,
-)
 
 try:
     # make sure that lsm methods are loaded
@@ -106,20 +102,6 @@ def backward_compatible_option(
 
 
 def pytest_addoption(parser: Parser):
-    for group_name, parameters in TestParameterRegistry.test_parameter_groups().items():
-        group: Union[Parser, OptionGroup]
-        if group_name is None:
-            group = parser
-        else:
-            group = parser.getgroup(group_name)
-
-        for param in parameters:
-            group.addoption(
-                param.argument,
-                action=param.action,
-                help=param.help,
-            )
-
     # TODO (#212) all options below should be removed
     group = parser.getgroup("inmanta_lsm", "inmanta module testing plugin for lsm")
     group.addoption(
@@ -205,7 +187,8 @@ def docker_orchestrator(
     """
     enabled = inm_lsm_docker_orchestrator.resolve(request.config)
     if not enabled:
-        return None
+        yield None
+        return
 
     LOGGER.debug("Deploying an orchestrator using docker")
     with DockerOrchestrator(
