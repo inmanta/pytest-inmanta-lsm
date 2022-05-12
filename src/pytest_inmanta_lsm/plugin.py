@@ -205,7 +205,9 @@ def remote_orchestrator(
     ssh_user = backward_compatible_option(request, inm_lsm_ssh_user, "inm_lsm_remote_user", "centos")
     ssh_port = backward_compatible_option(request, inm_lsm_ssh_port, "inm_lsm_remote_port", "22")
     noclean = backward_compatible_option(request, inm_lsm_noclean, "inm_lsm_noclean", "false")
-    container_env = backward_compatible_option(request, inm_lsm_container_env, "inm_lsm_container_env", "false").lower() == "true"
+    container_env = (
+        backward_compatible_option(request, inm_lsm_container_env, "inm_lsm_container_env", "false").lower() == "true"
+    )
     ssl = backward_compatible_option(request, inm_lsm_ssl, "inm_lsm_ssl", "false").lower() == "true"
     token = backward_compatible_option(request, inm_lsm_token, "inm_lsm_token", None)
     ca_cert = backward_compatible_option(request, inm_lsm_ca_cert, "inm_lsm_ca_cert", None)
