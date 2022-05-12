@@ -26,7 +26,18 @@ ParameterType = TypeVar("ParameterType", bound=object)
 
 
 class ParameterNotSetException(ValueError):
-    pass
+    """
+    This exception is raised when a parameter is accessed but no value has
+    been set by the user.
+    """
+
+    def __init__(self, parameter: "TestParameter") -> None:
+        super().__init__(
+            f"Couldn't resolve a test parameter.  "
+            f"You can set it using {parameter.argument} argument or "
+            f"{parameter.environment_variable} environment variable."
+        )
+        self.parameter = parameter
 
 
 class TestParameterRegistry:
@@ -145,8 +156,4 @@ class TestParameter(Generic[ParameterType]):
         if self.default is not None:
             return self.default
 
-        raise ParameterNotSetException(
-            f"Couldn't resolve a test parameter.  "
-            f"You can set it using {self.argument} argument or "
-            f"{self.environment_variable} environment variable."
-        )
+        raise ParameterNotSetException(self)
