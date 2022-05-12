@@ -48,6 +48,7 @@ except ImportError:
 LOGGER = logging.getLogger(__name__)
 
 
+# TODO (#212) option_to_env should be removed
 option_to_env = {
     "inm_lsm_remote_host": "INMANTA_LSM_HOST",
     "inm_lsm_remote_user": "INMANTA_LSM_USER",
@@ -60,6 +61,7 @@ option_to_env = {
     "inm_lsm_ca_cert": "INMANTA_LSM_CA_CERT",
 }
 
+# TODO (#212) option_to_arg should be removed
 option_to_arg = {
     "inm_lsm_remote_host": "--lsm_host",
     "inm_lsm_remote_user": "--lsm_user",
@@ -71,6 +73,21 @@ option_to_arg = {
     "inm_lsm_token": "--lsm_token",
     "inm_lsm_ca_cert": "--lsm_ca_cert",
 }
+
+
+# TODO (#212) backward_compatible_option should be removed
+# and replaced by test_parameter.resolve(request.config)
+def backward_compatible_option(
+    request: pytest.FixtureRequest,
+    test_parameter: TestParameter,
+    key: str,
+    default: str,
+) -> str:
+    try:
+        return str(test_parameter.resolve(request.config))
+    except ParameterNotSetException:
+        # This is kept for backward compatibility
+        return get_opt_or_env_or(request.config, key, default) or ""
 
 
 def pytest_addoption(parser: Parser):
@@ -88,6 +105,7 @@ def pytest_addoption(parser: Parser):
                 help=param.help,
             )
 
+    # TODO (#212) all options below should be removed
     group = parser.getgroup("inmanta_lsm", "inmanta module testing plugin for lsm")
     group.addoption(
         option_to_arg["inm_lsm_remote_host"],
@@ -152,6 +170,7 @@ def pytest_addoption(parser: Parser):
     )
 
 
+# TODO (#212) get_opt_or_env_or should be removed
 def get_opt_or_env_or(config, key: str, default: Optional[str]) -> Optional[str]:
     if config.getoption(key):
         LOGGER.warning(f"Usage of option {option_to_arg[key]} is deprecated")
@@ -179,13 +198,6 @@ def remote_orchestrator(
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
 ) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
-
-    def backward_compatible_option(test_parameter: TestParameter, key: str, default: str) -> str:
-        try:
-            return str(test_parameter.resolve(request.config))
-        except ParameterNotSetException:
-            # This is kept for backward compatibility
-            return get_opt_or_env_or(request.config, key, default)
 
     env = backward_compatible_option(inm_lsm_env, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
     host = backward_compatible_option(inm_lsm_host, "inm_lsm_remote_host", "127.0.0.1")
