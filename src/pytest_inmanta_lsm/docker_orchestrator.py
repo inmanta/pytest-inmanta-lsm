@@ -15,7 +15,9 @@
 
     Contact: code@inmanta.com
 """
+import logging
 import shutil
+from configparser import Interpolation
 from ipaddress import IPv4Address
 from pathlib import Path
 from tempfile import mkdtemp
@@ -23,23 +25,34 @@ from textwrap import dedent
 from types import TracebackType
 from typing import List, Optional, Type
 
-import toml
-from compose.cli.command import get_project
-from compose.container import Container
-from compose.project import Project
-from compose.service import ImageType
+from compose.cli.command import get_project  # type: ignore
+from compose.container import Container  # type: ignore
+from compose.project import Project  # type: ignore
+from compose.service import ImageType  # type: ignore
+from inmanta.config import LenientConfigParser
+
+LOGGER = logging.getLogger(__name__)
+
+
+class DoNotCleanOrchestrator(RuntimeError):
+    """
+    If this error is raised from the DockerOrchestrator context manager block
+    the deployed lab won't be deleted, the user will have to do it manually.
+    """
 
 
 class DockerOrchestrator:
     def __init__(
         self,
-        compose_file: Path = Path(__file__).parent / "resources/docker-compose.yml",
+        compose_file: Path,
         *,
-        orchestrator_image: str = "containers.inmanta.com/containers/service-orchestrator:4",
-        postgres_version: str = "10",
-        public_key_file: Path = Path.home() / ".ssh/id_rsa.pub",
-        license_file: Path = Path("/etc/inmanta/license/com.inmanta.license"),
-        entitlement_file: str = Path("/etc/inmanta/license/com.inmanta.jwe"),
+        orchestrator_image: str,
+        postgres_version: str,
+        public_key_file: Path,
+        license_file: Path,
+        entitlement_file: Path,
+        config_file: Path,
+        env_file: Path,
     ) -> None:
         self.compose_file = compose_file
         self.orchestrator_image = orchestrator_image
@@ -47,10 +60,13 @@ class DockerOrchestrator:
         self.public_key_file = public_key_file
         self.license_file = license_file
         self.entitlement_file = entitlement_file
+        self.config_file = config_file
+        self.env_file = env_file
 
         # This will populated when using the context __enter__ method
         self._cwd: Optional[Path] = None
         self._project: Optional[Project] = None
+        self._config: Optional[LenientConfigParser] = None
 
     @property
     def project(self) -> Project:
@@ -61,27 +77,29 @@ class DockerOrchestrator:
             raise RuntimeError("No temporary directory has been configured")
 
         # Generate a unique name for the db host (we use the same strategy as docker-compose)
-        db_hostname = f"{self._cwd.name}-postgres_1"
+        db_hostname = f"{self._cwd.name}_postgres_1"
 
         env_file = f"""
-            INMANTA_LSM_CONTAINER_DB_HOSTNAME="{db_hostname}"
-            INMANTA_LSM_CONTAINER_DB_VERSION="{self.postgres_version}"
-            INMANTA_LSM_CONTAINER_ORCHESTRATOR_IMAGE="{self.orchestrator_image}"
-            INMANTA_LSM_CONTAINER_PUBLIC_KEY_FILE="{self.public_key_file}"
-            INMANTA_LSM_CONTAINER_LICENSE_FILE="{self.license_file}"
-            INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE="{self.entitlement_file}"
+            INMANTA_LSM_CONTAINER_DB_HOSTNAME={db_hostname}
+            INMANTA_LSM_CONTAINER_DB_VERSION={self.postgres_version}
+            INMANTA_LSM_CONTAINER_ORCHESTRATOR_IMAGE={self.orchestrator_image}
+            INMANTA_LSM_CONTAINER_PUBLIC_KEY_FILE={self.public_key_file}
+            INMANTA_LSM_CONTAINER_LICENSE_FILE={self.license_file}
+            INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE={self.entitlement_file}
         """
-        env_file = dedent(env_file.strip())
+        env_file = dedent(env_file.strip("\n"))
 
         # Writing the env file containing all the values
         (self._cwd / ".env").write_text(env_file)
 
         # Change the db host in the server config
-        raw_config = (self._cwd / "my-server-conf.cfg").read_text()
-        config = toml.loads(raw_config)
-        config["database"]["host"] = db_hostname
-        raw_config = toml.dumps(config)
-        (self._cwd / "my-server-conf.cfg").write_text(raw_config)
+        config_path = self._cwd / "my-server-conf.cfg"
+
+        self._config = LenientConfigParser(interpolation=Interpolation())
+        self._config.read([str(config_path)])
+        self._config.set("database", "host", db_hostname)
+        with config_path.open("w") as f:
+            self._config.write(f)
 
         self._project = get_project(str(self._cwd))
         return self._project
@@ -114,6 +132,10 @@ class DockerOrchestrator:
             IPv4Address(network["IPAddress"]) for network in self.orchestrator.inspect()["NetworkSettings"]["Networks"].values()
         ]
 
+    @property
+    def orchestrator_port(self) -> int:
+        return int(self._config.get("server", "bind-port", vars={"fallback": "8888"}))
+
     def _up(self) -> None:
         self.project.up(detached=True)
 
@@ -129,6 +151,9 @@ class DockerOrchestrator:
         docker_compose_dir = self.compose_file.parent
         shutil.copytree(str(docker_compose_dir), str(self._cwd), dirs_exist_ok=True)
 
+        shutil.copy(str(self.config_file), str(self._cwd / "my-server-conf.cfg"))
+        shutil.copy(str(self.env_file), str(self._cwd / "my-env-file"))
+
         self._up()
         return self
 
@@ -137,7 +162,14 @@ class DockerOrchestrator:
         exc_type: Optional[Type],
         exc_value: Optional[Exception],
         exc_traceback: Optional[TracebackType],
-    ) -> None:
+    ) -> Optional[bool]:
+        if exc_type == DoNotCleanOrchestrator:
+            LOGGER.info(
+                "The orchestrator won't be cleaned up, do it manually once you are done with it.  "
+                f"`cd {self._cwd} && docker-compose down -v`"
+            )
+            return True
+
         if self._project is not None:
             self._down()
             self._project = None
@@ -145,3 +177,5 @@ class DockerOrchestrator:
         if self._cwd is not None:
             shutil.rmtree(str(self._cwd))
             self._cwd = None
+
+        return None

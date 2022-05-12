@@ -148,3 +148,35 @@ inm_lsm_docker_orchestrator_pub_key = PathTestParameter(
     default=Path.home() / ".ssh/id_rsa.pub",
     group=param_group,
 )
+
+inm_lsm_docker_orchestrator_license = PathTestParameter(
+    argument="--lsm-doc-orch-license",
+    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_LICENSE",
+    usage="A path to a license file, required by the orchestrator",
+    default=Path("/etc/inmanta/license/com.inmanta.license"),
+    group=param_group,
+)
+
+inm_lsm_docker_orchestrator_entitlement = PathTestParameter(
+    argument="--lsm-doc-orch-jwe",
+    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_JWE",
+    usage="A path to an entitlement file, required by the orchestrator",
+    default=Path("/etc/inmanta/license/com.inmanta.jwe"),
+    group=param_group,
+)
+
+inm_lsm_docker_orchestrator_config = PathTestParameter(
+    argument="--lsm-doc-orch-cfg",
+    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_CONFIG",
+    usage="A path to a config file that should be loaded inside the container a server conf.",
+    default=Path(__file__).parent / "resources/my-server-conf.cfg",
+    group=param_group,
+)
+
+inm_lsm_docker_orchestrator_env = PathTestParameter(
+    argument="--lsm-doc-orch-env",
+    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_ENV",
+    usage="A path to an env file that should be loaded in the container.",
+    default=Path(__file__).parent / "resources/my-env-file",
+    group=param_group,
+)

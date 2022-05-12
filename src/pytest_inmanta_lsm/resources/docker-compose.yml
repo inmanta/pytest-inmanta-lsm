@@ -14,4 +14,5 @@ services:
       - ${INMANTA_LSM_CONTAINER_LICENSE_FILE}:/etc/inmanta/license/com.inmanta.license
       - ${INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE}:/etc/inmanta/license/com.inmanta.jwe
       - ./my-server-conf.cfg:/etc/inmanta/inmanta.cfg
+      - ./my-env-file:/etc/inmanta/env
     command: "server-with-ssh --wait-for-host ${INMANTA_LSM_CONTAINER_DB_HOSTNAME} --wait-for-port 5432"
