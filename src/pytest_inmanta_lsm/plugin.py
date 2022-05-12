@@ -199,16 +199,16 @@ def remote_orchestrator(
 ) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
-    env = backward_compatible_option(inm_lsm_env, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
-    host = backward_compatible_option(inm_lsm_host, "inm_lsm_remote_host", "127.0.0.1")
+    env = backward_compatible_option(request, inm_lsm_env, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
+    host = backward_compatible_option(request, inm_lsm_host, "inm_lsm_remote_host", "127.0.0.1")
     port = inm_lsm_srv_port.resolve(request.config)
-    ssh_user = backward_compatible_option(inm_lsm_ssh_user, "inm_lsm_remote_user", "centos")
-    ssh_port = backward_compatible_option(inm_lsm_ssh_port, "inm_lsm_remote_port", "22")
-    noclean = backward_compatible_option(inm_lsm_noclean, "inm_lsm_noclean", "false")
-    container_env = backward_compatible_option(inm_lsm_container_env, "inm_lsm_container_env", "false").lower() == "true"
-    ssl = backward_compatible_option(inm_lsm_ssl, "inm_lsm_ssl", "false").lower() == "true"
-    token = backward_compatible_option(inm_lsm_token, "inm_lsm_token", None)
-    ca_cert = backward_compatible_option(inm_lsm_ca_cert, "inm_lsm_ca_cert", None)
+    ssh_user = backward_compatible_option(request, inm_lsm_ssh_user, "inm_lsm_remote_user", "centos")
+    ssh_port = backward_compatible_option(request, inm_lsm_ssh_port, "inm_lsm_remote_port", "22")
+    noclean = backward_compatible_option(request, inm_lsm_noclean, "inm_lsm_noclean", "false")
+    container_env = backward_compatible_option(request, inm_lsm_container_env, "inm_lsm_container_env", "false").lower() == "true"
+    ssl = backward_compatible_option(request, inm_lsm_ssl, "inm_lsm_ssl", "false").lower() == "true"
+    token = backward_compatible_option(request, inm_lsm_token, "inm_lsm_token", None)
+    ca_cert = backward_compatible_option(request, inm_lsm_ca_cert, "inm_lsm_ca_cert", None)
 
     if ssl:
         if not os.path.isfile(ca_cert):
