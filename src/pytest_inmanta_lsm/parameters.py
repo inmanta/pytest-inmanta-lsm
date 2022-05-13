@@ -100,6 +100,8 @@ inm_lsm_ca_cert = PathTestParameter(
     environment_variable="INMANTA_LSM_CA_CERT",
     usage="The path to the CA certificate file used to authenticate the remote orchestrator.",
     group=param_group,
+    exists=True,
+    is_file=True,
 )
 
 inm_lsm_token = StringTestParameter(
@@ -123,6 +125,8 @@ inm_lsm_docker_orchestrator_compose = PathTestParameter(
     usage="The path to a docker-compose file, that should be used to setup an orchestrator",
     default=Path(__file__).parent / "resources/docker-compose.yml",
     group=param_group,
+    exists=True,
+    is_file=True,
 )
 
 inm_lsm_docker_orchestrator_image = StringTestParameter(
@@ -147,6 +151,8 @@ inm_lsm_docker_orchestrator_pub_key = PathTestParameter(
     usage="A path to a public key that should be set in the container",
     default=Path.home() / ".ssh/id_rsa.pub",
     group=param_group,
+    exists=True,
+    is_file=True,
 )
 
 inm_lsm_docker_orchestrator_license = PathTestParameter(
@@ -155,6 +161,8 @@ inm_lsm_docker_orchestrator_license = PathTestParameter(
     usage="A path to a license file, required by the orchestrator",
     default=Path("/etc/inmanta/license/com.inmanta.license"),
     group=param_group,
+    exists=True,
+    is_file=True,
 )
 
 inm_lsm_docker_orchestrator_entitlement = PathTestParameter(
@@ -163,6 +171,8 @@ inm_lsm_docker_orchestrator_entitlement = PathTestParameter(
     usage="A path to an entitlement file, required by the orchestrator",
     default=Path("/etc/inmanta/license/com.inmanta.jwe"),
     group=param_group,
+    exists=True,
+    is_file=True,
 )
 
 inm_lsm_docker_orchestrator_config = PathTestParameter(
@@ -171,6 +181,8 @@ inm_lsm_docker_orchestrator_config = PathTestParameter(
     usage="A path to a config file that should be loaded inside the container a server conf.",
     default=Path(__file__).parent / "resources/my-server-conf.cfg",
     group=param_group,
+    exists=True,
+    is_file=True,
 )
 
 inm_lsm_docker_orchestrator_env = PathTestParameter(
@@ -179,4 +191,6 @@ inm_lsm_docker_orchestrator_env = PathTestParameter(
     usage="A path to an env file that should be loaded in the container.",
     default=Path(__file__).parent / "resources/my-env-file",
     group=param_group,
+    exists=True,
+    is_file=True,
 )

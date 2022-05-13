@@ -25,7 +25,11 @@ setup(
     long_description_content_type="text/markdown",
     packages=["pytest_inmanta_lsm"],
     package_dir={"": "src"},
-    install_requires=["pytest-inmanta", "inmanta-lsm"],
+    install_requires=[
+        "pytest-inmanta~=2.3",
+        "docker-compose~=1.29",
+        "inmanta-lsm",
+    ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Framework :: Pytest",
