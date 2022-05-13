@@ -82,21 +82,18 @@ pytest-inmanta-lsm:
   --lsm-doc-orch-cfg=LSM_DOC_ORCH_CFG
                         A path to a config file that should be loaded inside the container a server
                         conf. (overrides INMANTA_LSM_DOCKER_ORCHESTRATOR_CONFIG, defaults to
-                        /home/guillaume/.virtualenvs/pytest-inmanta-lsm/lib/python3.9/site-
-                        packages/pytest_inmanta_lsm/resources/my-server-conf.cfg)
+                        src/pytest_inmanta_lsm/resources/my-server-conf.cfg)
   --lsm-doc-orch-compose=LSM_DOC_ORCH_COMPOSE
                         The path to a docker-compose file, that should be used to setup an
                         orchestrator (overrides INMANTA_LSM_DOCKER_ORCHESTRATOR_COMPOSE, defaults
-                        to /home/guillaume/.virtualenvs/pytest-inmanta-lsm/lib/python3.9/site-
-                        packages/pytest_inmanta_lsm/resources/docker-compose.yml)
+                        to src/pytest_inmanta_lsm/resources/docker-compose.yml)
   --lsm-doc-orch-db-version=LSM_DOC_ORCH_DB_VERSION
                         The version of postgresql to use for the db of the orchestrator (overrides
                         INMANTA_LSM_DOCKER_ORCHESTRATOR_DB_VERSION, defaults to 10)
   --lsm-doc-orch-env=LSM_DOC_ORCH_ENV
                         A path to an env file that should be loaded in the container. (overrides
                         INMANTA_LSM_DOCKER_ORCHESTRATOR_ENV, defaults to
-                        /home/guillaume/.virtualenvs/pytest-inmanta-lsm/lib/python3.9/site-
-                        packages/pytest_inmanta_lsm/resources/my-env-file)
+                        src/pytest_inmanta_lsm/resources/my-env-file)
   --lsm-doc-orch-image=LSM_DOC_ORCH_IMAGE
                         The docker image to use for the orchestrator (overrides
                         INMANTA_LSM_DOCKER_ORCHESTRATOR_IMAGE, defaults to
@@ -112,7 +109,7 @@ pytest-inmanta-lsm:
   --lsm-doc-orch-pub-key=LSM_DOC_ORCH_PUB_KEY
                         A path to a public key that should be set in the container (overrides
                         INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY, defaults to
-                        /home/guillaume/.ssh/id_rsa.pub)
+                        $HOME/.ssh/id_rsa.pub)
   --lsm-environment=LSM_ENVIRONMENT
                         The environment to use on the remote server (is created if it doesn't
                         exist) (overrides INMANTA_LSM_ENVIRONMENT)
