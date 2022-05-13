@@ -29,30 +29,22 @@ def test_full_cycle(project, remote_orchestrator):
 
     service_instance = remote_orchestrator.get_managed_instance(SERVICE_NAME)
 
-    try:
-        # create an instance and wait for it to be up
-        service_instance.create(
-            attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-            wait_for_state="up",
-        )
+    # create an instance and wait for it to be up
+    service_instance.create(
+        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
+        wait_for_state="up",
+    )
 
-        # make validation fail by creating a duplicate
-        remote_orchestrator.get_managed_instance(SERVICE_NAME).create(
-            attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-            wait_for_state="rejected",
-        )
+    # make validation fail by creating a duplicate
+    remote_orchestrator.get_managed_instance(SERVICE_NAME).create(
+        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
+        wait_for_state="rejected",
+    )
 
-        service_instance.update(
-            attribute_updates={"vlan_id": 42},
-            wait_for_state="up",
-        )
-    except Exception:
-        from inmanta_plugins.lsm import global_cache
-
-        try:
-            project.compile("import quickstart")
-        except Exception:
-            print(global_cache)
+    service_instance.update(
+        attribute_updates={"vlan_id": 42},
+        wait_for_state="up",
+    )
 
     # break it down
     service_instance.delete()
