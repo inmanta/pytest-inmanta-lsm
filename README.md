@@ -81,47 +81,44 @@ pytest-inmanta-lsm:
   --lsm-ctr             If set, the fixtures will deploy and orchestrator on the
                         host, using docker (overrides INMANTA_LSM_CONTAINER,
                         defaults to False)
-  --lsm-ctr-cfg=LSM_CTR_CFG
+  --lsm-ctr-cfg-file=LSM_CTR_CFG_FILE
                         A path to a config file that should be loaded inside the
                         container a server conf. (overrides
-                        INMANTA_LSM_CONTAINER_CONFIG, defaults to
-                        /home/guillaume/.virtualenvs/connect/lib/python3.9/site-
-                        packages/pytest_inmanta_lsm/resources/my-server-
+                        INMANTA_LSM_CONTAINER_CONFIG_FILE, defaults to
+                        src/pytest_inmanta_lsm/resources/my-server-
                         conf.cfg)
-  --lsm-ctr-compose=LSM_CTR_COMPOSE
+  --lsm-ctr-compose-file=LSM_CTR_COMPOSE_FILE
                         The path to a docker-compose file, that should be used
                         to setup an orchestrator (overrides
-                        INMANTA_LSM_CONTAINER_ORCHESTRATOR_COMPOSE, defaults to
-                        /home/guillaume/.virtualenvs/connect/lib/python3.9/site-
-                        packages/pytest_inmanta_lsm/resources/docker-
+                        INMANTA_LSM_CONTAINER_COMPOSE_FILE, defaults to
+                        src/pytest_inmanta_lsm/resources/docker-
                         compose.yml)
   --lsm-ctr-db-version=LSM_CTR_DB_VERSION
                         The version of postgresql to use for the db of the
                         orchestrator (overrides
                         INMANTA_LSM_CONTAINER_DB_VERSION, defaults to 10)
-  --lsm-ctr-env=LSM_CTR_ENV
+  --lsm-ctr-env-file=LSM_CTR_ENV_FILE
                         A path to an env file that should be loaded in the
-                        container. (overrides INMANTA_LSM_CONTAINER_ENV,
+                        container. (overrides INMANTA_LSM_CONTAINER_ENV_FILE,
                         defaults to
-                        /home/guillaume/.virtualenvs/connect/lib/python3.9/site-
-                        packages/pytest_inmanta_lsm/resources/my-env-file)
+                        src/pytest_inmanta_lsm/resources/my-env-file)
   --lsm-ctr-image=LSM_CTR_IMAGE
                         The container image to use for the orchestrator
                         (overrides INMANTA_LSM_CONTAINER_IMAGE, defaults to
                         containers.inmanta.com/containers/service-
                         orchestrator:4)
-  --lsm-ctr-jwe=LSM_CTR_JWE
+  --lsm-ctr-jwe-file=LSM_CTR_JWE_FILE
                         A path to an entitlement file, required by the
-                        orchestrator (overrides INMANTA_LSM_CONTAINER_JWE,
+                        orchestrator (overrides INMANTA_LSM_CONTAINER_JWE_FILE,
                         defaults to /etc/inmanta/license/com.inmanta.jwe)
-  --lsm-ctr-license=LSM_CTR_LICENSE
+  --lsm-ctr-license-file=LSM_CTR_LICENSE_FILE
                         A path to a license file, required by the orchestrator
-                        (overrides INMANTA_LSM_CONTAINERLICENSE, defaults to
-                        /etc/inmanta/license/com.inmanta.license)
-  --lsm-ctr-pub-key=LSM_CTR_PUB_KEY
+                        (overrides INMANTA_LSM_CONTAINER_LICENSE_FILE, defaults
+                        to /etc/inmanta/license/com.inmanta.license)
+  --lsm-ctr-pub-key-file=LSM_CTR_PUB_KEY_FILE
                         A path to a public key that should be set in the
-                        container (overrides INMANTA_LSM_CONTAINER_PUB_KEY,
-                        defaults to /home/guillaume/.ssh/id_rsa.pub)
+                        container (overrides INMANTA_LSM_CONTAINER_PUB_KEY_FILE,
+                        defaults to $HOME/.ssh/id_rsa.pub)
   --lsm-environment=LSM_ENVIRONMENT
                         The environment to use on the remote server (is created
                         if it doesn't exist) (overrides INMANTA_LSM_ENVIRONMENT,
@@ -148,6 +145,7 @@ pytest-inmanta-lsm:
                         The token used to authenticate to the remote
                         orchestrator when authentication is enabled. (overrides
                         INMANTA_LSM_TOKEN)
+
 ```
 
 ## Running tests

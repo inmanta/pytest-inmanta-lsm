@@ -238,8 +238,8 @@ inm_lsm_ctr = BooleanTestParameter(
 )
 
 inm_lsm_ctr_compose = PathTestParameter(
-    argument="--lsm-ctr-compose",
-    environment_variable="INMANTA_LSM_CONTAINER_ORCHESTRATOR_COMPOSE",
+    argument="--lsm-ctr-compose-file",
+    environment_variable="INMANTA_LSM_CONTAINER_COMPOSE_FILE",
     usage="The path to a docker-compose file, that should be used to setup an orchestrator",
     default=Path(__file__).parent / "resources/docker-compose.yml",
     group=param_group,
@@ -264,8 +264,8 @@ inm_lsm_ctr_db_version = StringTestParameter(
 )
 
 inm_lsm_ctr_pub_key = PathTestParameter(
-    argument="--lsm-ctr-pub-key",
-    environment_variable="INMANTA_LSM_CONTAINER_PUB_KEY",
+    argument="--lsm-ctr-pub-key-file",
+    environment_variable="INMANTA_LSM_CONTAINER_PUB_KEY_FILE",
     usage="A path to a public key that should be set in the container",
     default=Path.home() / ".ssh/id_rsa.pub",
     group=param_group,
@@ -274,8 +274,8 @@ inm_lsm_ctr_pub_key = PathTestParameter(
 )
 
 inm_lsm_ctr_license = PathTestParameter(
-    argument="--lsm-ctr-license",
-    environment_variable="INMANTA_LSM_CONTAINERLICENSE",
+    argument="--lsm-ctr-license-file",
+    environment_variable="INMANTA_LSM_CONTAINER_LICENSE_FILE",
     usage="A path to a license file, required by the orchestrator",
     default=Path("/etc/inmanta/license/com.inmanta.license"),
     group=param_group,
@@ -284,8 +284,8 @@ inm_lsm_ctr_license = PathTestParameter(
 )
 
 inm_lsm_ctr_entitlement = PathTestParameter(
-    argument="--lsm-ctr-jwe",
-    environment_variable="INMANTA_LSM_CONTAINER_JWE",
+    argument="--lsm-ctr-jwe-file",
+    environment_variable="INMANTA_LSM_CONTAINER_JWE_FILE",
     usage="A path to an entitlement file, required by the orchestrator",
     default=Path("/etc/inmanta/license/com.inmanta.jwe"),
     group=param_group,
@@ -294,8 +294,8 @@ inm_lsm_ctr_entitlement = PathTestParameter(
 )
 
 inm_lsm_ctr_config = PathTestParameter(
-    argument="--lsm-ctr-cfg",
-    environment_variable="INMANTA_LSM_CONTAINER_CONFIG",
+    argument="--lsm-ctr-cfg-file",
+    environment_variable="INMANTA_LSM_CONTAINER_CONFIG_FILE",
     usage="A path to a config file that should be loaded inside the container a server conf.",
     default=Path(__file__).parent / "resources/my-server-conf.cfg",
     group=param_group,
@@ -304,8 +304,8 @@ inm_lsm_ctr_config = PathTestParameter(
 )
 
 inm_lsm_ctr_env = PathTestParameter(
-    argument="--lsm-ctr-env",
-    environment_variable="INMANTA_LSM_CONTAINER_ENV",
+    argument="--lsm-ctr-env-file",
+    environment_variable="INMANTA_LSM_CONTAINER_ENV_FILE",
     usage="A path to an env file that should be loaded in the container.",
     default=Path(__file__).parent / "resources/my-env-file",
     group=param_group,
