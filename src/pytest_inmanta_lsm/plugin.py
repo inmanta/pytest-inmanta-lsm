@@ -7,17 +7,14 @@
 """
 
 import logging
-import os
-import os.path
 import time
 from typing import Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
 
 import pytest
 import requests
-from _pytest.config.argparsing import Parser
 from pytest_inmanta.plugin import Project
-from pytest_inmanta.test_parameter import ParameterNotSetException, TestParameter
+from pytest_inmanta.test_parameter import ParameterNotSetException
 
 from pytest_inmanta_lsm.docker_orchestrator import (
     DockerOrchestrator,
@@ -37,7 +34,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_docker_orchestrator_pub_key,
     inm_lsm_env,
     inm_lsm_host,
-    inm_lsm_noclean,
+    inm_lsm_no_clean,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
     inm_lsm_ssh_user,
@@ -57,124 +54,6 @@ except ImportError:
 
 
 LOGGER = logging.getLogger(__name__)
-
-
-# TODO (#212) option_to_env should be removed
-option_to_env = {
-    "inm_lsm_remote_host": "INMANTA_LSM_HOST",
-    "inm_lsm_remote_user": "INMANTA_LSM_USER",
-    "inm_lsm_remote_port": "INMANTA_LSM_PORT",
-    "inm_lsm_env": "INMANTA_LSM_ENVIRONMENT",
-    "inm_lsm_noclean": "INMANTA_LSM_NOCLEAN",
-    "inm_lsm_container_env": "INMANTA_LSM_CONTAINER_ENV",
-    "inm_lsm_ssl": "INMANTA_LSM_SSL",
-    "inm_lsm_token": "INMANTA_LSM_TOKEN",
-    "inm_lsm_ca_cert": "INMANTA_LSM_CA_CERT",
-}
-
-# TODO (#212) option_to_arg should be removed
-option_to_arg = {
-    "inm_lsm_remote_host": "--lsm_host",
-    "inm_lsm_remote_user": "--lsm_user",
-    "inm_lsm_remote_port": "--lsm_port",
-    "inm_lsm_env": "--lsm_environment",
-    "inm_lsm_noclean": "--lsm_noclean",
-    "inm_lsm_container_env": "--lsm_container_env",
-    "inm_lsm_ssl": "--lsm_ssl",
-    "inm_lsm_token": "--lsm_token",
-    "inm_lsm_ca_cert": "--lsm_ca_cert",
-}
-
-
-# TODO (#212) backward_compatible_option should be removed
-# and replaced by test_parameter.resolve(request.config)
-def backward_compatible_option(
-    request: pytest.FixtureRequest,
-    test_parameter: TestParameter,
-    key: str,
-    default: str,
-) -> str:
-    try:
-        return str(test_parameter.resolve(request.config))
-    except ParameterNotSetException:
-        # This is kept for backward compatibility
-        return get_opt_or_env_or(request.config, key, default) or ""
-
-
-def pytest_addoption(parser: Parser):
-    # TODO (#212) all options below should be removed
-    group = parser.getgroup("inmanta_lsm", "inmanta module testing plugin for lsm")
-    group.addoption(
-        option_to_arg["inm_lsm_remote_host"],
-        dest="inm_lsm_remote_host",
-        help="DEPRECATED Remote orchestrator to use for the remote_inmanta fixture, overrides INMANTA_LSM_HOST",
-    )
-    group.addoption(
-        option_to_arg["inm_lsm_remote_user"],
-        dest="inm_lsm_remote_user",
-        help="DEPRECATED Username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER",
-    )
-    group.addoption(
-        option_to_arg["inm_lsm_remote_port"],
-        dest="inm_lsm_remote_port",
-        help="DEPRECATED Port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT",
-    )
-    group.addoption(
-        option_to_arg["inm_lsm_env"],
-        dest="inm_lsm_env",
-        help=(
-            "DEPRECATED The environment to use on the remote server (is created if it doesn't exist), "
-            "overrides INMANTA_LSM_ENVIRONMENT"
-        ),
-    )
-    group.addoption(
-        option_to_arg["inm_lsm_noclean"],
-        dest="inm_lsm_noclean",
-        help="DEPRECATED Don't cleanup the orchestrator after tests (for debugging purposes)",
-    )
-    group.addoption(
-        option_to_arg["inm_lsm_container_env"],
-        dest="inm_lsm_container_env",
-        help=(
-            "DEPRECATED If set to true, expect the orchestrator to be running in a container without systemd.  "
-            "It then assumes that all environment variables required to install the modules are loaded into "
-            "each ssh session automatically.  Overrides INMANTA_LSM_CONTAINER_ENV."
-        ),
-    )
-    group.addoption(
-        option_to_arg["inm_lsm_ssl"],
-        dest="inm_lsm_ssl",
-        help=(
-            "DEPRECATED [True | False] Choose whether to use SSL/TLS or not when connecting to the remote orchestrator, "
-            "overrides INMANTA_LSM_SSL"
-        ),
-    )
-    group.addoption(
-        option_to_arg["inm_lsm_token"],
-        dest="inm_lsm_token",
-        help=(
-            "DEPRECATED The token used to authenticate to the remote orchestrator when authentication is enabled, "
-            "overrides INMANTA_LSM_TOKEN"
-        ),
-    )
-    group.addoption(
-        option_to_arg["inm_lsm_ca_cert"],
-        dest="inm_lsm_ca_cert",
-        help=(
-            "DEPRECATED The path to the CA certificate file used to authenticate the remote orchestrator, "
-            "overrides INMANTA_LSM_CA_CERT"
-        ),
-    )
-
-
-# TODO (#212) get_opt_or_env_or should be removed
-def get_opt_or_env_or(config, key: str, default: Optional[str]) -> Optional[str]:
-    if config.getoption(key):
-        LOGGER.warning(f"Usage of option {option_to_arg[key]} is deprecated")
-        return config.getoption(key)
-    if option_to_env[key] in os.environ:
-        return os.environ[option_to_env[key]]
-    return default
 
 
 @pytest.fixture(scope="session")
@@ -210,7 +89,7 @@ def docker_orchestrator(
 
 @pytest.fixture(scope="session")
 def remote_orchestrator_environment(request: pytest.FixtureRequest) -> str:
-    return backward_compatible_option(request, inm_lsm_env, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
+    return inm_lsm_env.resolve(request.config)
 
 
 @pytest.fixture(scope="session")
@@ -219,7 +98,7 @@ def remote_orchestrator_noclean(request: pytest.FixtureRequest) -> bool:
     Check if the user specified that the orchestrator shouldn't be cleaned up after a failure.
     Returns True if the orchestrator should be left as is, False otherwise.
     """
-    return backward_compatible_option(request, inm_lsm_noclean, "inm_lsm_noclean", "false").lower() == "true"
+    return inm_lsm_no_clean.resolve(request.config)
 
 
 @pytest.fixture(scope="session")
@@ -235,7 +114,7 @@ def remote_orchestrator_host(
     """
     host, port = (
         (
-            backward_compatible_option(request, inm_lsm_host, "inm_lsm_remote_host", "127.0.0.1"),
+            inm_lsm_host.resolve(request.config),
             inm_lsm_srv_port.resolve(request.config),
         )
         if docker_orchestrator is None
@@ -283,11 +162,9 @@ def remote_orchestrator(
     host, port = remote_orchestrator_host
 
     if docker_orchestrator is None:
-        ssh_user = backward_compatible_option(request, inm_lsm_ssh_user, "inm_lsm_remote_user", "centos")
-        ssh_port = backward_compatible_option(request, inm_lsm_ssh_port, "inm_lsm_remote_port", "22")
-        container_env = (
-            backward_compatible_option(request, inm_lsm_container_env, "inm_lsm_container_env", "false").lower() == "true"
-        )
+        ssh_user = inm_lsm_ssh_user.resolve(request.config)
+        ssh_port = str(inm_lsm_ssh_port.resolve(request.config))
+        container_env = inm_lsm_container_env.resolve(request.config)
     else:
         # If the orchestrator is running in a container we deployed ourself, we overwrite
         # a few configuration parameters with what matches the deployed orchestrator
@@ -297,17 +174,16 @@ def remote_orchestrator(
         ssh_port = "22"
         container_env = True
 
-    ssl = backward_compatible_option(request, inm_lsm_ssl, "inm_lsm_ssl", "false").lower() == "true"
-    token = backward_compatible_option(request, inm_lsm_token, "inm_lsm_token", "") or None
-    ca_cert = backward_compatible_option(request, inm_lsm_ca_cert, "inm_lsm_ca_cert", "")
-
+    ssl = inm_lsm_ssl.resolve(request.config)
+    ca_cert: Optional[str] = None
     if ssl:
-        if not os.path.isfile(ca_cert):
-            raise FileNotFoundError(f"Invalid path to CA certificate file: {ca_cert}")
-        ca_cert = os.path.abspath(ca_cert)
-    else:
-        if ca_cert:
-            LOGGER.warning("ssl option is set to False, so the CA certificate won't be used")
+        ca_cert = str(inm_lsm_ca_cert.resolve(request.config))
+
+    token: Optional[str]
+    try:
+        token = inm_lsm_token.resolve(request.config)
+    except ParameterNotSetException:
+        token = None
 
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
