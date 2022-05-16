@@ -20,7 +20,7 @@ import shutil
 from configparser import Interpolation
 from ipaddress import IPv4Address
 from pathlib import Path
-from tempfile import TemporaryFile, mkdtemp, mkstemp, mktemp
+from tempfile import TemporaryFile, mkdtemp
 from textwrap import dedent
 from types import TracebackType
 from typing import IO, List, Optional, Type
