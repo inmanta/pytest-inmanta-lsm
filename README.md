@@ -63,24 +63,90 @@ def test_full_cycle(project, remote_orchestrator):
     service_instance.delete()
 
 ```
-## Options
+## Options and environment variables
 
-The following options are available.
+The following options are available, each with a corresponding environment variable.
 
- * `--lsm_host` remote orchestrator to use for the remote_orchestrator fixture, overrides INMANTA_LSM_HOST
- * `--lsm_user` username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER
- * `--lsm_port` port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT
- * `--lsm_environment` the environment to use on the remote server (it is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT
- * `--lsm_noclean` Don't cleanup the orchestrator after last test (for debugging purposes)
- * `--lsm_ssl` Connect to the remote orchestrator using SSL/TLS, overrides INMANTA_LSM_SSL
- * `--lsm_token` The token used to authenticate to the remote orchestrator when authentication is enabled, overrides INMANTA_LSM_TOKEN
- * `--lsm_ca_cert` The path to the CA certificate file used to authenticate the remote orchestrator, overrides INMANTA_LSM_CA_CERT
- 
-## Environment variables
 
-The following environment variables are available:
+```
+pytest-inmanta-lsm:
+  --lsm-ca-cert=LSM_CA_CERT
+                        The path to the CA certificate file used to authenticate
+                        the remote orchestrator. (overrides INMANTA_LSM_CA_CERT)
+  --lsm-container-env   If set to true, expect the orchestrator to be running in
+                        a container without systemd.  It then assumes that all
+                        environment variables required to install the modules
+                        are loaded into each ssh session automatically.
+                        (overrides INMANTA_LSM_CONTAINER_ENV, defaults to False)
+  --lsm-ctr             If set, the fixtures will deploy and orchestrator on the
+                        host, using docker (overrides INMANTA_LSM_CONTAINER,
+                        defaults to False)
+  --lsm-ctr-cfg-file=LSM_CTR_CFG_FILE
+                        A path to a config file that should be loaded inside the
+                        container a server conf. (overrides
+                        INMANTA_LSM_CONTAINER_CONFIG_FILE, defaults to
+                        src/pytest_inmanta_lsm/resources/my-server-
+                        conf.cfg)
+  --lsm-ctr-compose-file=LSM_CTR_COMPOSE_FILE
+                        The path to a docker-compose file, that should be used
+                        to setup an orchestrator (overrides
+                        INMANTA_LSM_CONTAINER_COMPOSE_FILE, defaults to
+                        src/pytest_inmanta_lsm/resources/docker-
+                        compose.yml)
+  --lsm-ctr-db-version=LSM_CTR_DB_VERSION
+                        The version of postgresql to use for the db of the
+                        orchestrator (overrides
+                        INMANTA_LSM_CONTAINER_DB_VERSION, defaults to 10)
+  --lsm-ctr-env-file=LSM_CTR_ENV_FILE
+                        A path to an env file that should be loaded in the
+                        container. (overrides INMANTA_LSM_CONTAINER_ENV_FILE,
+                        defaults to
+                        src/pytest_inmanta_lsm/resources/my-env-file)
+  --lsm-ctr-image=LSM_CTR_IMAGE
+                        The container image to use for the orchestrator
+                        (overrides INMANTA_LSM_CONTAINER_IMAGE, defaults to
+                        containers.inmanta.com/containers/service-
+                        orchestrator:4)
+  --lsm-ctr-jwe-file=LSM_CTR_JWE_FILE
+                        A path to an entitlement file, required by the
+                        orchestrator (overrides INMANTA_LSM_CONTAINER_JWE_FILE,
+                        defaults to /etc/inmanta/license/com.inmanta.jwe)
+  --lsm-ctr-license-file=LSM_CTR_LICENSE_FILE
+                        A path to a license file, required by the orchestrator
+                        (overrides INMANTA_LSM_CONTAINER_LICENSE_FILE, defaults
+                        to /etc/inmanta/license/com.inmanta.license)
+  --lsm-ctr-pub-key-file=LSM_CTR_PUB_KEY_FILE
+                        A path to a public key that should be set in the
+                        container (overrides INMANTA_LSM_CONTAINER_PUB_KEY_FILE,
+                        defaults to $HOME/.ssh/id_rsa.pub)
+  --lsm-environment=LSM_ENVIRONMENT
+                        The environment to use on the remote server (is created
+                        if it doesn't exist) (overrides INMANTA_LSM_ENVIRONMENT,
+                        defaults to 719c7ad5-6657-444b-b536-a27174cb7498)
+  --lsm-host=LSM_HOST   Remote orchestrator to use for the remote_inmanta
+                        fixture (overrides INMANTA_LSM_HOST, defaults to
+                        127.0.0.1)
+  --lsm-no-clean        Don't cleanup the orchestrator after tests (for
+                        debugging purposes) (overrides INMANTA_LSM_NO_CLEAN,
+                        defaults to False)
+  --lsm-srv-port=LSM_SRV_PORT
+                        Port the orchestrator api is listening to (overrides
+                        INMANTA_LSM_SRV_PORT, defaults to 8888)
+  --lsm-ssh-port=LSM_SSH_PORT
+                        Port to use to ssh to the remote orchestrator (overrides
+                        INMANTA_LSM_SSH_PORT, defaults to 22)
+  --lsm-ssh-user=LSM_SSH_USER
+                        Username to use to ssh to the remote orchestrator
+                        (overrides INMANTA_LSM_SSH_USER, defaults to centos)
+  --lsm-ssl             [True | False] Choose whether to use SSL/TLS or not when
+                        connecting to the remote orchestrator. (overrides
+                        INMANTA_LSM_SSL, defaults to False)
+  --lsm-token=LSM_TOKEN
+                        The token used to authenticate to the remote
+                        orchestrator when authentication is enabled. (overrides
+                        INMANTA_LSM_TOKEN)
 
- * `INMANTA_LSM_MODULE_CONSTRAINTS` : semi-colon separated list of constraints e.g : `"lsm~=2.12.0"`
+```
 
 ## Running tests
 
@@ -112,3 +178,56 @@ export INMANTA_MODULE_REPO=https://USER:LICENSE_TOKEN@modules.inmanta.com/git/in
     pytest tests
 ```
 
+### Deploy a local orchestrator
+
+It is possible to deploy an orchestrator locally and run the tests against it.  The orchestrator will be deployed as a container, using docker.  Here are the prerequisites in order to make it work:
+ 1. Have [docker](https://docs.docker.com/get-docker/) installed on your machine.
+    ```console
+    $ docker info
+    ```
+
+ 2. Have access to an orchestrator image (e.g. `containers.inmanta.com/containers/service-orchestrator:4`).
+    ```console
+    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_IMAGE=containers.inmanta.com/containers/service-orchestrator:4
+    $ docker pull $INMANTA_LSM_DOCKER_ORCHESTRATOR_IMAGE
+    ```
+
+ 3. Have a license and an entitlement file for the orchestrator.
+    ```console
+    $ ls /etc/inmanta/license/com.inmanta.*
+    /etc/inmanta/license/com.inmanta.jwe  /etc/inmanta/license/com.inmanta.license
+    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_LICENSE=/etc/inmanta/license/com.inmanta.license
+    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_JWE=/etc/inmanta/license/com.inmanta.jwe
+    ```
+
+ 4. Have a pair of private/public key to access the orchestrator.
+    ```console
+    $ export PRIVATE_KEY=$HOME/.ssh/id_rsa
+    $ if [ -f $PRIVATE_KEY ]; then echo "Private key already exists"; else ssh-keygen -t rsa -b 4096 -f $PRIVATE_KEY -N ''; fi
+    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY="${PRIVATE_KEY}.pub"
+    $ if [ -f $INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY ]; then echo "Public key already exists"; else ssh-keygen -y -f $PRIVATE_KEY > $INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY; fi
+    ```
+
+If this is properly setup, you need to do set this option:
+```
+  --lsm-doc-orch        If set, the fixtures will deploy and orchestrator on the host, using docker (overrides INMANTA_LSM_DOCKER_ORCHESTRATOR, defaults to False)
+```
+
+Then any of the other option starting with `lsm-doc-orch` prefix to configure pytest-inmanta-lsm properly.  You can specify:
+ - The path to the license and entitlement files
+ - The container image to use
+ - The version of postgres to use
+ - The public key to add in the orchestrator
+ - Any env file that should be loaded by the orchestrator
+ - A new docker-compose file to overwrite the one used by pytest-inmanta-lsm.
+ - A new server config file
+
+> :warning: **Some options have no effect when `--lsm-doc-orch` is set**.  This is the case of:
+>  - `--lsm-host` The host will be overwritten with the ip of the container
+>  - `--lsm-srv-port` The port will be overwritten with the port the server in the container is listening to
+>  - `--lsm-ssh-port` The port will be `22`
+>  - `--lsm-ssh-user` The user will be `inmanta`
+>  - `--lsm-container-env` This is set to true automatically
+
+> :bulb: **Some options change their behavior when `--lsm-doc-orch` is set**.  This is the case of:
+>  - `--lsm-no-clean` When set, the docker orchestrator won't be cleaned up when the tests are done.  You will have to do it manually.
