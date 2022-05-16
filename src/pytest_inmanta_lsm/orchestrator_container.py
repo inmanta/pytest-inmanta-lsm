@@ -20,13 +20,14 @@ import shutil
 from configparser import Interpolation
 from ipaddress import IPv4Address
 from pathlib import Path
-from tempfile import mkdtemp
+from tempfile import TemporaryFile, mkdtemp, mkstemp, mktemp
 from textwrap import dedent
 from types import TracebackType
-from typing import List, Optional, Type
+from typing import IO, List, Optional, Type
 
 from compose.cli.command import get_project  # type: ignore
 from compose.container import Container  # type: ignore
+from compose.parallel import ParallelStreamWriter  # type: ignore
 from compose.project import Project  # type: ignore
 from compose.service import ImageType  # type: ignore
 from inmanta.config import LenientConfigParser
@@ -111,6 +112,7 @@ class OrchestratorContainer:
         self._cwd: Optional[Path] = None
         self._project: Optional[Project] = None
         self._config: Optional[LenientConfigParser] = None
+        self._io: Optional[IO] = None
 
     @property
     def project(self) -> Project:
@@ -199,6 +201,12 @@ class OrchestratorContainer:
     def __enter__(self) -> "OrchestratorContainer":
         self._cwd = Path(mkdtemp())
 
+        # We manually set the parallel instance so that sys.stderr doesn't get used
+        # Writing to stderr can cause issues when the process has been killed, as the
+        # fd might be closed, this is a workaround for this issue.
+        self._io = TemporaryFile("w+", encoding="utf-8", newline="\n")
+        ParallelStreamWriter.get_or_assign_instance(ParallelStreamWriter(self._io))
+
         docker_compose_dir = self.compose_file.parent
         shutil.copytree(str(docker_compose_dir), str(self._cwd), dirs_exist_ok=True)
 
@@ -230,5 +238,11 @@ class OrchestratorContainer:
         if self._cwd is not None:
             shutil.rmtree(str(self._cwd))
             self._cwd = None
+
+        if self._io is not None:
+            logs = "\n".join(self._io.readlines())
+            LOGGER.debug(f"docker-compose logs:\n{logs}")
+            self._io.close()
+            self._io = None
 
         return None

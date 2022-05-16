@@ -124,7 +124,7 @@ class _LegacyBooleanTestParameter(BooleanTestParameter):
 
         This helper function comes to overwrite the resolve method in the legacy option.
         """
-        option: str = config.getoption(self.argument) or os.getenv(
+        option: str = config.getoption(self.argument, default=None) or os.getenv(
             self.environment_variable,
             default="",
         )
