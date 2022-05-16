@@ -1,3 +1,6 @@
+# v 1.7.0 (?)
+Changes in this release:
+
 # v 1.6.0 (2022-05-16)
 Changes in this release:
 - Add timeout parameter to managed service
