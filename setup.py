@@ -23,8 +23,16 @@ setup(
     description="Common fixtures for inmanta LSM related modules",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
-    packages=["pytest_inmanta_lsm"],
     package_dir={"": "src"},
+    package_data={
+        "pytest_inmanta_lsm": [
+            "resources/docker-compose.yml",
+            "resources/my-env-file",
+            "resources/my-server-conf.cfg",
+            "py.typed",
+        ]
+    },
+    include_package_data=True,
     install_requires=[
         "pytest-inmanta~=2.3",
         "docker-compose~=1.29",
