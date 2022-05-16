@@ -42,6 +42,35 @@ class DoNotCleanOrchestrator(RuntimeError):
 
 
 class DockerOrchestrator:
+    """
+    This class allows to easily setup an inmanta orchestrator in a container using the official
+    container images for the duration of some tests.
+
+    The class is meant to be used with the python context manager: `with`
+
+    .. code-block:: python
+
+        from pathlib import Path
+
+        with DockerOrchestrator(
+            compose_file=Path(__file__).parent / "resources/docker-compose.yml",
+            orchestrator_image="containers.inmanta.com/containers/service-orchestrator:4",
+            postgres_version="10",
+            public_key_file=Path.home() / ".ssh/id_rsa.pub",
+            license_file=Path("/etc/inmanta/license/com.inmanta.license"),
+            entitlement_file=Path("/etc/inmanta/license/com.inmanta.jwe"),
+            config_file=Path(__file__).parent / "resources/my-server-conf.cfg",
+            env_file=Path(__file__).parent / "resources/my-env-file",
+        ) as orchestrator:
+            print(orchestrator.orchestrator_ips)
+
+    Once you exit the with block, the lab will automatically be cleanup, except if
+    you raised a DoNotCleanOrchestrator exception in the block, in which case, it is
+    your responsibility to remove the running lab.
+
+    This is used by the docker_orchestrator fixture.
+    """
+
     def __init__(
         self,
         compose_file: Path,
@@ -54,6 +83,21 @@ class DockerOrchestrator:
         config_file: Path,
         env_file: Path,
     ) -> None:
+        """
+        :param compose_file: A path to a docker-compose file to overwrite the one used by default.
+            The new file should have at least two services: `postgresql` and `inmanta-server`.
+        :param orchestrator_image: The name of the image that should be set in the docker-compose file.
+        :param postgres_version: The version of postgres that should be used in the lab.  The version
+            is a string that should match a tag of the official postgres docker image.
+        :param public_key_file: A public rsa key that will be added to the container, so that you can
+            ssh to it.
+        :param license_file: A license file that should be used to start the orchestrator, without it,
+            the server won't start.
+        :param entitlement_file: Goes in pair with the license.
+        :param config_file: The configuration file for the inmanta server.
+        :param env_file: An environment file that should be loaded in the container, the main process
+            as well as any ssh session will load it.
+        """
         self.compose_file = compose_file
         self.orchestrator_image = orchestrator_image
         self.postgres_version = postgres_version
