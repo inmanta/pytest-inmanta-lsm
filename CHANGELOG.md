@@ -1,4 +1,4 @@
-# v 1.6.0 (?)
+# v 1.6.0 (2022-05-16)
 Changes in this release:
 - Add timeout parameter to managed service
 - Add support for local container orchestrator deployment
