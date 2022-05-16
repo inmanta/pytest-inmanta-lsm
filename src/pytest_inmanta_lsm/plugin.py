@@ -17,8 +17,8 @@ from pytest_inmanta.plugin import Project
 from pytest_inmanta.test_parameter import ParameterNotSetException
 
 from pytest_inmanta_lsm.orchestrator_container import (
-    OrchestratorContainer,
     DoNotCleanOrchestratorContainer,
+    OrchestratorContainer,
 )
 from pytest_inmanta_lsm.parameters import (
     inm_lsm_ca_cert,
