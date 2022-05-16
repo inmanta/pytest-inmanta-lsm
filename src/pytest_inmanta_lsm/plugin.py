@@ -7,14 +7,40 @@
 """
 
 import logging
-import os
-import os.path
-from typing import Dict, Iterator, Optional, Union
+import time
+from typing import Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
 
 import pytest
+import requests
 from pytest_inmanta.plugin import Project
+from pytest_inmanta.test_parameter import ParameterNotSetException
 
+from pytest_inmanta_lsm.orchestrator_container import (
+    DoNotCleanOrchestratorContainer,
+    OrchestratorContainer,
+)
+from pytest_inmanta_lsm.parameters import (
+    inm_lsm_ca_cert,
+    inm_lsm_container_env,
+    inm_lsm_ctr,
+    inm_lsm_ctr_compose,
+    inm_lsm_ctr_config,
+    inm_lsm_ctr_db_version,
+    inm_lsm_ctr_entitlement,
+    inm_lsm_ctr_env,
+    inm_lsm_ctr_image,
+    inm_lsm_ctr_license,
+    inm_lsm_ctr_pub_key,
+    inm_lsm_env,
+    inm_lsm_host,
+    inm_lsm_no_clean,
+    inm_lsm_srv_port,
+    inm_lsm_ssh_port,
+    inm_lsm_ssh_user,
+    inm_lsm_ssl,
+    inm_lsm_token,
+)
 from pytest_inmanta_lsm.remote_orchestrator import RemoteOrchestrator
 
 try:
@@ -30,84 +56,84 @@ except ImportError:
 LOGGER = logging.getLogger(__name__)
 
 
-option_to_env = {
-    "inm_lsm_remote_host": "INMANTA_LSM_HOST",
-    "inm_lsm_remote_user": "INMANTA_LSM_USER",
-    "inm_lsm_remote_port": "INMANTA_LSM_PORT",
-    "inm_lsm_env": "INMANTA_LSM_ENVIRONMENT",
-    "inm_lsm_noclean": "INMANTA_LSM_NOCLEAN",
-    "inm_lsm_container_env": "INMANTA_LSM_CONTAINER_ENV",
-    "inm_lsm_ssl": "INMANTA_LSM_SSL",
-    "inm_lsm_token": "INMANTA_LSM_TOKEN",
-    "inm_lsm_ca_cert": "INMANTA_LSM_CA_CERT",
-}
+@pytest.fixture(scope="session")
+def remote_orchestrator_container(
+    request: pytest.FixtureRequest,
+    remote_orchestrator_no_clean: bool,
+) -> Generator[Optional[OrchestratorContainer], None, None]:
+    """
+    Deploy, if the user required it, an orchestrator in a container locally.
+    """
+    enabled = inm_lsm_ctr.resolve(request.config)
+    if not enabled:
+        yield None
+        return
+
+    LOGGER.debug("Deploying an orchestrator using docker")
+    with OrchestratorContainer(
+        compose_file=inm_lsm_ctr_compose.resolve(request.config),
+        orchestrator_image=inm_lsm_ctr_image.resolve(request.config),
+        postgres_version=inm_lsm_ctr_db_version.resolve(request.config),
+        public_key_file=inm_lsm_ctr_pub_key.resolve(request.config),
+        license_file=inm_lsm_ctr_license.resolve(request.config),
+        entitlement_file=inm_lsm_ctr_entitlement.resolve(request.config),
+        config_file=inm_lsm_ctr_config.resolve(request.config),
+        env_file=inm_lsm_ctr_env.resolve(request.config),
+    ) as orchestrator:
+        LOGGER.debug(f"Deployed an orchestrator reachable at {orchestrator.orchestrator_ips} (cwd={orchestrator._cwd})")
+        yield orchestrator
+
+        if remote_orchestrator_no_clean:
+            raise DoNotCleanOrchestratorContainer()
 
 
-def pytest_addoption(parser):
-    group = parser.getgroup("inmanta_lsm", "inmanta module testing plugin for lsm")
-    group.addoption(
-        "--lsm_host",
-        dest="inm_lsm_remote_host",
-        help="Remote orchestrator to use for the remote_inmanta fixture, overrides INMANTA_LSM_HOST",
-    )
-    group.addoption(
-        "--lsm_user",
-        dest="inm_lsm_remote_user",
-        help="Username to use to ssh to the remote orchestrator, overrides INMANTA_LSM_USER",
-    )
-    group.addoption(
-        "--lsm_port",
-        dest="inm_lsm_remote_port",
-        help="Port to use to ssh to the remote orchestrator, overrides INMANTA_LSM_PORT",
-    )
-    group.addoption(
-        "--lsm_environment",
-        dest="inm_lsm_env",
-        help="The environment to use on the remote server (is created if it doesn't exist), overrides INMANTA_LSM_ENVIRONMENT",
-    )
-    group.addoption(
-        "--lsm_noclean",
-        dest="inm_lsm_noclean",
-        help="Don't cleanup the orchestrator after tests (for debugging purposes)",
-    )
-    group.addoption(
-        "--lsm_container_env",
-        dest="inm_lsm_container_env",
-        help=(
-            "If set to true, expect the orchestrator to be running in a container without systemd.  "
-            "It then assumes that all environment variables required to install the modules are loaded into "
-            "each ssh session automatically.  Overrides INMANTA_LSM_CONTAINER_ENV."
-        ),
-    )
-    group.addoption(
-        "--lsm_ssl",
-        dest="inm_lsm_ssl",
-        help=(
-            "[True | False] Choose whether to use SSL/TLS or not when connecting to the remote orchestrator, "
-            "overrides INMANTA_LSM_SSL"
-        ),
-    )
-    group.addoption(
-        "--lsm_token",
-        dest="inm_lsm_token",
-        help=(
-            "The token used to authenticate to the remote orchestrator when authentication is enabled, "
-            "overrides INMANTA_LSM_TOKEN"
-        ),
-    )
-    group.addoption(
-        "--lsm_ca_cert",
-        dest="inm_lsm_ca_cert",
-        help="The path to the CA certificate file used to authenticate the remote orchestrator, overrides INMANTA_LSM_CA_CERT",
-    )
+@pytest.fixture(scope="session")
+def remote_orchestrator_environment(request: pytest.FixtureRequest) -> str:
+    return inm_lsm_env.resolve(request.config)
 
 
-def get_opt_or_env_or(config, key: str, default: Optional[str]) -> Optional[str]:
-    if config.getoption(key):
-        return config.getoption(key)
-    if option_to_env[key] in os.environ:
-        return os.environ[option_to_env[key]]
-    return default
+@pytest.fixture(scope="session")
+def remote_orchestrator_no_clean(request: pytest.FixtureRequest) -> bool:
+    """
+    Check if the user specified that the orchestrator shouldn't be cleaned up after a failure.
+    Returns True if the orchestrator should be left as is, False otherwise.
+    """
+    return inm_lsm_no_clean.resolve(request.config)
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_host(
+    remote_orchestrator_container: Optional[OrchestratorContainer],
+    request: pytest.FixtureRequest,
+) -> Tuple[str, int]:
+    """
+    Resolve the host and port options or take the values from the deployed docker orchestrator.
+    Tries to reach the orchestrator 10 times, if it fails, raises a RuntimeError.
+
+    Returns a tuple containing the host and port at which the orchestrator has been reached.
+    """
+    host, port = (
+        (
+            inm_lsm_host.resolve(request.config),
+            inm_lsm_srv_port.resolve(request.config),
+        )
+        if remote_orchestrator_container is None
+        else (str(remote_orchestrator_container.orchestrator_ips[0]), remote_orchestrator_container.orchestrator_port)
+    )
+
+    for _ in range(0, 10):
+        try:
+            response = requests.get(f"http://{host}:{port}/api/v1/serverstatus", timeout=1)
+            response.raise_for_status()
+        except Exception as exc:
+            LOGGER.warning(str(exc))
+            time.sleep(1)
+            continue
+
+        if response.status_code == 200:
+            return host, port
+
+    raise RuntimeError(f"Couldn't reach the orchestrator at {host}:{port}")
 
 
 @pytest.fixture
@@ -122,26 +148,47 @@ def remote_orchestrator_settings() -> Dict[str, Union[str, int, bool]]:
 
 
 @pytest.fixture
-def remote_orchestrator(project: Project, request, remote_orchestrator_settings) -> Iterator[RemoteOrchestrator]:
+def remote_orchestrator(
+    project: Project,
+    request: pytest.FixtureRequest,
+    remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
+    remote_orchestrator_container: Optional[OrchestratorContainer],
+    remote_orchestrator_environment: str,
+    remote_orchestrator_no_clean: bool,
+    remote_orchestrator_host: Tuple[str, int],
+) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
-    env = get_opt_or_env_or(request.config, "inm_lsm_env", "719c7ad5-6657-444b-b536-a27174cb7498")
-    host = get_opt_or_env_or(request.config, "inm_lsm_remote_host", "127.0.0.1")
-    user = get_opt_or_env_or(request.config, "inm_lsm_remote_user", "centos")
-    port = get_opt_or_env_or(request.config, "inm_lsm_remote_port", "22")
-    noclean = get_opt_or_env_or(request.config, "inm_lsm_noclean", "false").lower() == "true"
-    container_env = get_opt_or_env_or(request.config, "inm_lsm_container_env", "false").lower() == "true"
-    ssl = get_opt_or_env_or(request.config, "inm_lsm_ssl", "false").lower() == "true"
-    token = get_opt_or_env_or(request.config, "inm_lsm_token", None)
-    ca_cert = get_opt_or_env_or(request.config, "inm_lsm_ca_cert", None)
+    host, port = remote_orchestrator_host
 
-    if ssl:
-        if not os.path.isfile(ca_cert):
-            raise FileNotFoundError(f"Invalid path to CA certificate file: {ca_cert}")
-        ca_cert = os.path.abspath(ca_cert)
+    if remote_orchestrator_container is None:
+        ssh_user = inm_lsm_ssh_user.resolve(request.config)
+        ssh_port = str(inm_lsm_ssh_port.resolve(request.config))
+        container_env = inm_lsm_container_env.resolve(request.config)
     else:
-        if ca_cert:
-            LOGGER.warning("ssl option is set to False, so the CA certificate won't be used")
+        # If the orchestrator is running in a container we deployed ourself, we overwrite
+        # a few configuration parameters with what matches the deployed orchestrator
+        # If the container image behaves differently than assume, those value won't work,
+        # no mechanism exists currently to work around this.
+        ssh_user = "inmanta"
+        ssh_port = "22"
+        container_env = True
+
+    ssl = inm_lsm_ssl.resolve(request.config)
+    ca_cert: Optional[str] = None
+    if ssl:
+        ca_cert = str(inm_lsm_ca_cert.resolve(request.config))
+        if (
+            remote_orchestrator_container is not None
+            and remote_orchestrator_container.compose_file == inm_lsm_ctr_compose.default
+        ):
+            LOGGER.warning("SSL currently doesn't work with the default docker-compose file.")
+
+    token: Optional[str]
+    try:
+        token = inm_lsm_token.resolve(request.config)
+    except ParameterNotSetException:
+        token = None
 
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
@@ -158,21 +205,22 @@ def remote_orchestrator(project: Project, request, remote_orchestrator_settings)
 
     remote_orchestrator = RemoteOrchestrator(
         host=host,
-        ssh_user=user,
-        ssh_port=port,
-        environment=UUID(env),
+        ssh_user=ssh_user,
+        ssh_port=ssh_port,
+        environment=UUID(remote_orchestrator_environment),
         project=project,
         settings=settings,
-        noclean=noclean,
+        noclean=remote_orchestrator_no_clean,
         ssl=ssl,
         token=token,
         ca_cert=ca_cert,
         container_env=container_env,
+        port=port,
     )
     remote_orchestrator.clean()
 
     yield remote_orchestrator
     remote_orchestrator.pre_clean()
 
-    if not noclean:
+    if not remote_orchestrator_no_clean:
         remote_orchestrator.clean()

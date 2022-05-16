@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
     name="pytest-inmanta-lsm",
-    version="1.5.0",
+    version="1.6.0",
     python_requires=">=3.6",  # also update classifiers
     author="Inmanta",
     author_email="code@inmanta.com",
@@ -23,9 +23,21 @@ setup(
     description="Common fixtures for inmanta LSM related modules",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
-    packages=["pytest_inmanta_lsm"],
     package_dir={"": "src"},
-    install_requires=["pytest-inmanta", "inmanta-lsm"],
+    package_data={
+        "pytest_inmanta_lsm": [
+            "resources/docker-compose.yml",
+            "resources/my-env-file",
+            "resources/my-server-conf.cfg",
+            "py.typed",
+        ]
+    },
+    include_package_data=True,
+    install_requires=[
+        "pytest-inmanta~=2.3",
+        "docker-compose~=1.29",
+        "inmanta-lsm",
+    ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Framework :: Pytest",
