@@ -115,7 +115,7 @@ pytest-inmanta-lsm:
                         exist) (overrides INMANTA_LSM_ENVIRONMENT)
   --lsm-host=LSM_HOST   Remote orchestrator to use for the remote_inmanta fixture (overrides
                         INMANTA_LSM_HOST)
-  --lsm-noclean         Don't cleanup the orchestrator after tests (for debugging purposes)
+  --lsm-no-clean        Don't cleanup the orchestrator after tests (for debugging purposes)
                         (overrides INMANTA_LSM_NOCLEAN)
   --lsm-srv-port=LSM_SRV_PORT
                         Port the orchestrator api is listening to (overrides INMANTA_LSM_SRV_PORT,
@@ -167,8 +167,31 @@ export INMANTA_MODULE_REPO=https://USER:LICENSE_TOKEN@modules.inmanta.com/git/in
 
 It is possible to deploy an orchestrator locally and run the tests against it.  The orchestrator will be deployed as a container, using docker.  Here are the prerequisites in order to make it work:
  1. Have [docker](https://docs.docker.com/get-docker/) installed on your machine.
+    ```console
+    $ docker info
+    ```
+
  2. Have access to an orchestrator image (e.g. `containers.inmanta.com/containers/service-orchestrator:4`).
+    ```console
+    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_IMAGE=containers.inmanta.com/containers/service-orchestrator:4
+    $ docker pull $INMANTA_LSM_DOCKER_ORCHESTRATOR_IMAGE
+    ```
+
  3. Have a license and an entitlement file for the orchestrator.
+    ```console
+    $ ls /etc/inmanta/license/com.inmanta.*
+    /etc/inmanta/license/com.inmanta.jwe  /etc/inmanta/license/com.inmanta.license
+    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_LICENSE=/etc/inmanta/license/com.inmanta.license
+    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_JWE=/etc/inmanta/license/com.inmanta.jwe
+    ```
+
+ 4. Have a pair of private/public key to access the orchestrator.
+    ```console
+    $ export PRIVATE_KEY=$HOME/.ssh/id_rsa
+    $ if [ -f $PRIVATE_KEY ]; then echo "Private key already exists"; else ssh-keygen -t rsa -b 4096 -f $PRIVATE_KEY -N ''; fi
+    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY="${PRIVATE_KEY}.pub"
+    $ if [ -f $INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY ]; then echo "Public key already exists"; else ssh-keygen -y -f $PRIVATE_KEY > $INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY; fi
+    ```
 
 If this is properly setup, you need to do set this option:
 ```
@@ -192,4 +215,4 @@ Then any of the other option starting with `lsm-doc-orch` prefix to configure py
 >  - `--lsm-container-env` This is set to true automatically
 
 > :bulb: **Some options change their behavior when `--lsm-doc-orch` is set**.  This is the case of:
->  - `--lsm-noclean` When set, the docker orchestrator won't be cleaned up when the tests are done.  You will have to do it manually.
+>  - `--lsm-no-clean` When set, the docker orchestrator won't be cleaned up when the tests are done.  You will have to do it manually.

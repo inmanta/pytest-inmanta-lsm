@@ -16,22 +16,22 @@ import requests
 from pytest_inmanta.plugin import Project
 from pytest_inmanta.test_parameter import ParameterNotSetException
 
-from pytest_inmanta_lsm.docker_orchestrator import (
-    DockerOrchestrator,
-    DoNotCleanOrchestrator,
+from pytest_inmanta_lsm.orchestrator_container import (
+    OrchestratorContainer,
+    DoNotCleanOrchestratorContainer,
 )
 from pytest_inmanta_lsm.parameters import (
     inm_lsm_ca_cert,
     inm_lsm_container_env,
-    inm_lsm_docker_orchestrator,
-    inm_lsm_docker_orchestrator_compose,
-    inm_lsm_docker_orchestrator_config,
-    inm_lsm_docker_orchestrator_db_version,
-    inm_lsm_docker_orchestrator_entitlement,
-    inm_lsm_docker_orchestrator_env,
-    inm_lsm_docker_orchestrator_image,
-    inm_lsm_docker_orchestrator_license,
-    inm_lsm_docker_orchestrator_pub_key,
+    inm_lsm_ctr,
+    inm_lsm_ctr_compose,
+    inm_lsm_ctr_config,
+    inm_lsm_ctr_db_version,
+    inm_lsm_ctr_entitlement,
+    inm_lsm_ctr_env,
+    inm_lsm_ctr_image,
+    inm_lsm_ctr_license,
+    inm_lsm_ctr_pub_key,
     inm_lsm_env,
     inm_lsm_host,
     inm_lsm_no_clean,
@@ -57,34 +57,34 @@ LOGGER = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="session")
-def docker_orchestrator(
+def remote_orchestrator_container(
     request: pytest.FixtureRequest,
-    remote_orchestrator_noclean: bool,
-) -> Generator[Optional[DockerOrchestrator], None, None]:
+    remote_orchestrator_no_clean: bool,
+) -> Generator[Optional[OrchestratorContainer], None, None]:
     """
-    Deploy, if the user required, an orchestrator in a container locally.
+    Deploy, if the user required it, an orchestrator in a container locally.
     """
-    enabled = inm_lsm_docker_orchestrator.resolve(request.config)
+    enabled = inm_lsm_ctr.resolve(request.config)
     if not enabled:
         yield None
         return
 
     LOGGER.debug("Deploying an orchestrator using docker")
-    with DockerOrchestrator(
-        compose_file=inm_lsm_docker_orchestrator_compose.resolve(request.config),
-        orchestrator_image=inm_lsm_docker_orchestrator_image.resolve(request.config),
-        postgres_version=inm_lsm_docker_orchestrator_db_version.resolve(request.config),
-        public_key_file=inm_lsm_docker_orchestrator_pub_key.resolve(request.config),
-        license_file=inm_lsm_docker_orchestrator_license.resolve(request.config),
-        entitlement_file=inm_lsm_docker_orchestrator_entitlement.resolve(request.config),
-        config_file=inm_lsm_docker_orchestrator_config.resolve(request.config),
-        env_file=inm_lsm_docker_orchestrator_env.resolve(request.config),
+    with OrchestratorContainer(
+        compose_file=inm_lsm_ctr_compose.resolve(request.config),
+        orchestrator_image=inm_lsm_ctr_image.resolve(request.config),
+        postgres_version=inm_lsm_ctr_db_version.resolve(request.config),
+        public_key_file=inm_lsm_ctr_pub_key.resolve(request.config),
+        license_file=inm_lsm_ctr_license.resolve(request.config),
+        entitlement_file=inm_lsm_ctr_entitlement.resolve(request.config),
+        config_file=inm_lsm_ctr_config.resolve(request.config),
+        env_file=inm_lsm_ctr_env.resolve(request.config),
     ) as orchestrator:
         LOGGER.debug(f"Deployed an orchestrator reachable at {orchestrator.orchestrator_ips} (cwd={orchestrator._cwd})")
         yield orchestrator
 
-        if remote_orchestrator_noclean:
-            raise DoNotCleanOrchestrator()
+        if remote_orchestrator_no_clean:
+            raise DoNotCleanOrchestratorContainer()
 
 
 @pytest.fixture(scope="session")
@@ -93,7 +93,7 @@ def remote_orchestrator_environment(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture(scope="session")
-def remote_orchestrator_noclean(request: pytest.FixtureRequest) -> bool:
+def remote_orchestrator_no_clean(request: pytest.FixtureRequest) -> bool:
     """
     Check if the user specified that the orchestrator shouldn't be cleaned up after a failure.
     Returns True if the orchestrator should be left as is, False otherwise.
@@ -103,7 +103,7 @@ def remote_orchestrator_noclean(request: pytest.FixtureRequest) -> bool:
 
 @pytest.fixture(scope="session")
 def remote_orchestrator_host(
-    docker_orchestrator: Optional[DockerOrchestrator],
+    remote_orchestrator_container: Optional[OrchestratorContainer],
     request: pytest.FixtureRequest,
 ) -> Tuple[str, int]:
     """
@@ -117,8 +117,8 @@ def remote_orchestrator_host(
             inm_lsm_host.resolve(request.config),
             inm_lsm_srv_port.resolve(request.config),
         )
-        if docker_orchestrator is None
-        else (str(docker_orchestrator.orchestrator_ips[0]), docker_orchestrator.orchestrator_port)
+        if remote_orchestrator_container is None
+        else (str(remote_orchestrator_container.orchestrator_ips[0]), remote_orchestrator_container.orchestrator_port)
     )
 
     for _ in range(0, 10):
@@ -152,16 +152,16 @@ def remote_orchestrator(
     project: Project,
     request: pytest.FixtureRequest,
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
-    docker_orchestrator: Optional[DockerOrchestrator],
+    remote_orchestrator_container: Optional[OrchestratorContainer],
     remote_orchestrator_environment: str,
-    remote_orchestrator_noclean: bool,
+    remote_orchestrator_no_clean: bool,
     remote_orchestrator_host: Tuple[str, int],
 ) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
     host, port = remote_orchestrator_host
 
-    if docker_orchestrator is None:
+    if remote_orchestrator_container is None:
         ssh_user = inm_lsm_ssh_user.resolve(request.config)
         ssh_port = str(inm_lsm_ssh_port.resolve(request.config))
         container_env = inm_lsm_container_env.resolve(request.config)
@@ -178,6 +178,11 @@ def remote_orchestrator(
     ca_cert: Optional[str] = None
     if ssl:
         ca_cert = str(inm_lsm_ca_cert.resolve(request.config))
+        if (
+            remote_orchestrator_container is not None
+            and remote_orchestrator_container.compose_file == inm_lsm_ctr_compose.default
+        ):
+            LOGGER.warning("SSL currently doesn't work with the default docker-compose file.")
 
     token: Optional[str]
     try:
@@ -205,7 +210,7 @@ def remote_orchestrator(
         environment=UUID(remote_orchestrator_environment),
         project=project,
         settings=settings,
-        noclean=remote_orchestrator_noclean,
+        noclean=remote_orchestrator_no_clean,
         ssl=ssl,
         token=token,
         ca_cert=ca_cert,
@@ -217,5 +222,5 @@ def remote_orchestrator(
     yield remote_orchestrator
     remote_orchestrator.pre_clean()
 
-    if not remote_orchestrator_noclean:
+    if not remote_orchestrator_no_clean:
         remote_orchestrator.clean()

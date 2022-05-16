@@ -128,12 +128,9 @@ class _LegacyBooleanTestParameter(BooleanTestParameter):
 
         This helper function comes to overwrite the resolve method in the legacy option.
         """
-        option: str = config.getoption(
-            self.argument,
-            default=os.getenv(
-                self.environment_variable,
-                default="",
-            ),
+        option: str = config.getoption(self.argument) or os.getenv(
+            self.environment_variable,
+            default="",
         )
         return option.lower().strip() == "true"
 
@@ -148,7 +145,7 @@ inm_lsm_noclean_legacy = _LegacyBooleanTestParameter(
 )
 
 inm_lsm_no_clean = BooleanTestParameter(
-    argument="--lsm-noclean",
+    argument="--lsm-no-clean",
     environment_variable="INMANTA_LSM_NO_CLEAN",
     usage=inm_lsm_noclean_legacy.usage,
     default=False,
@@ -232,17 +229,17 @@ inm_lsm_token = StringTestParameter(
     legacy=inm_lsm_token_legacy,
 )
 
-inm_lsm_docker_orchestrator = BooleanTestParameter(
-    argument="--lsm-doc-orch",
-    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR",
+inm_lsm_ctr = BooleanTestParameter(
+    argument="--lsm-ctr",
+    environment_variable="INMANTA_LSM_CONTAINER",
     usage="If set, the fixtures will deploy and orchestrator on the host, using docker",
     default=False,
     group=param_group,
 )
 
-inm_lsm_docker_orchestrator_compose = PathTestParameter(
-    argument="--lsm-doc-orch-compose",
-    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_COMPOSE",
+inm_lsm_ctr_compose = PathTestParameter(
+    argument="--lsm-ctr-compose",
+    environment_variable="INMANTA_LSM_CONTAINER_ORCHESTRATOR_COMPOSE",
     usage="The path to a docker-compose file, that should be used to setup an orchestrator",
     default=Path(__file__).parent / "resources/docker-compose.yml",
     group=param_group,
@@ -250,25 +247,25 @@ inm_lsm_docker_orchestrator_compose = PathTestParameter(
     is_file=True,
 )
 
-inm_lsm_docker_orchestrator_image = StringTestParameter(
-    argument="--lsm-doc-orch-image",
-    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_IMAGE",
-    usage="The docker image to use for the orchestrator",
+inm_lsm_ctr_image = StringTestParameter(
+    argument="--lsm-ctr-image",
+    environment_variable="INMANTA_LSM_CONTAINER_IMAGE",
+    usage="The container image to use for the orchestrator",
     default="containers.inmanta.com/containers/service-orchestrator:4",
     group=param_group,
 )
 
-inm_lsm_docker_orchestrator_db_version = StringTestParameter(
-    argument="--lsm-doc-orch-db-version",
-    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_DB_VERSION",
+inm_lsm_ctr_db_version = StringTestParameter(
+    argument="--lsm-ctr-db-version",
+    environment_variable="INMANTA_LSM_CONTAINER_DB_VERSION",
     usage="The version of postgresql to use for the db of the orchestrator",
     default="10",
     group=param_group,
 )
 
-inm_lsm_docker_orchestrator_pub_key = PathTestParameter(
-    argument="--lsm-doc-orch-pub-key",
-    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY",
+inm_lsm_ctr_pub_key = PathTestParameter(
+    argument="--lsm-ctr-pub-key",
+    environment_variable="INMANTA_LSM_CONTAINER_PUB_KEY",
     usage="A path to a public key that should be set in the container",
     default=Path.home() / ".ssh/id_rsa.pub",
     group=param_group,
@@ -276,9 +273,9 @@ inm_lsm_docker_orchestrator_pub_key = PathTestParameter(
     is_file=True,
 )
 
-inm_lsm_docker_orchestrator_license = PathTestParameter(
-    argument="--lsm-doc-orch-license",
-    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_LICENSE",
+inm_lsm_ctr_license = PathTestParameter(
+    argument="--lsm-ctr-license",
+    environment_variable="INMANTA_LSM_CONTAINERLICENSE",
     usage="A path to a license file, required by the orchestrator",
     default=Path("/etc/inmanta/license/com.inmanta.license"),
     group=param_group,
@@ -286,9 +283,9 @@ inm_lsm_docker_orchestrator_license = PathTestParameter(
     is_file=True,
 )
 
-inm_lsm_docker_orchestrator_entitlement = PathTestParameter(
-    argument="--lsm-doc-orch-jwe",
-    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_JWE",
+inm_lsm_ctr_entitlement = PathTestParameter(
+    argument="--lsm-ctr-jwe",
+    environment_variable="INMANTA_LSM_CONTAINER_JWE",
     usage="A path to an entitlement file, required by the orchestrator",
     default=Path("/etc/inmanta/license/com.inmanta.jwe"),
     group=param_group,
@@ -296,9 +293,9 @@ inm_lsm_docker_orchestrator_entitlement = PathTestParameter(
     is_file=True,
 )
 
-inm_lsm_docker_orchestrator_config = PathTestParameter(
-    argument="--lsm-doc-orch-cfg",
-    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_CONFIG",
+inm_lsm_ctr_config = PathTestParameter(
+    argument="--lsm-ctr-cfg",
+    environment_variable="INMANTA_LSM_CONTAINER_CONFIG",
     usage="A path to a config file that should be loaded inside the container a server conf.",
     default=Path(__file__).parent / "resources/my-server-conf.cfg",
     group=param_group,
@@ -306,9 +303,9 @@ inm_lsm_docker_orchestrator_config = PathTestParameter(
     is_file=True,
 )
 
-inm_lsm_docker_orchestrator_env = PathTestParameter(
-    argument="--lsm-doc-orch-env",
-    environment_variable="INMANTA_LSM_DOCKER_ORCHESTRATOR_ENV",
+inm_lsm_ctr_env = PathTestParameter(
+    argument="--lsm-ctr-env",
+    environment_variable="INMANTA_LSM_CONTAINER_ENV",
     usage="A path to an env file that should be loaded in the container.",
     default=Path(__file__).parent / "resources/my-env-file",
     group=param_group,

@@ -34,14 +34,14 @@ from inmanta.config import LenientConfigParser
 LOGGER = logging.getLogger(__name__)
 
 
-class DoNotCleanOrchestrator(RuntimeError):
+class DoNotCleanOrchestratorContainer(RuntimeError):
     """
-    If this error is raised from the DockerOrchestrator context manager block
+    If this error is raised from the OrchestratorContainer context manager block
     the deployed lab won't be deleted, the user will have to do it manually.
     """
 
 
-class DockerOrchestrator:
+class OrchestratorContainer:
     """
     This class allows to easily setup an inmanta orchestrator in a container using the official
     container images for the duration of some tests.
@@ -52,7 +52,7 @@ class DockerOrchestrator:
 
         from pathlib import Path
 
-        with DockerOrchestrator(
+        with OrchestratorContainer(
             compose_file=Path(__file__).parent / "resources/docker-compose.yml",
             orchestrator_image="containers.inmanta.com/containers/service-orchestrator:4",
             postgres_version="10",
@@ -196,7 +196,7 @@ class DockerOrchestrator:
             include_volumes=True,
         )
 
-    def __enter__(self) -> "DockerOrchestrator":
+    def __enter__(self) -> "OrchestratorContainer":
         self._cwd = Path(mkdtemp())
 
         docker_compose_dir = self.compose_file.parent
@@ -214,7 +214,7 @@ class DockerOrchestrator:
         exc_value: Optional[Exception],
         exc_traceback: Optional[TracebackType],
     ) -> Optional[bool]:
-        if exc_type == DoNotCleanOrchestrator:
+        if exc_type == DoNotCleanOrchestratorContainer:
             LOGGER.info(
                 "The orchestrator won't be cleaned up, do it manually once you are done with it.  "
                 f"`cd {self._cwd} && docker-compose down -v`"
