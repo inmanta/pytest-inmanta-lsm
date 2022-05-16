@@ -104,6 +104,13 @@ class DockerOrchestrator:
         self._project = get_project(str(self._cwd))
         return self._project
 
+    @property
+    def config(self) -> LenientConfigParser:
+        if self._config is None:
+            raise RuntimeError("No config has been loaded, did you use the context manager?")
+
+        return self._config
+
     def _container(self, service_name: str) -> Container:
         containers = self.project.containers(service_names=[service_name], stopped=True)
         if not containers:
@@ -134,7 +141,7 @@ class DockerOrchestrator:
 
     @property
     def orchestrator_port(self) -> int:
-        return int(self._config.get("server", "bind-port", vars={"fallback": "8888"}))
+        return int(self.config.get("server", "bind-port", vars={"fallback": "8888"}))
 
     def _up(self) -> None:
         self.project.up(detached=True)
@@ -169,6 +176,8 @@ class DockerOrchestrator:
                 f"`cd {self._cwd} && docker-compose down -v`"
             )
             return True
+
+        self._config = None
 
         if self._project is not None:
             self._down()
