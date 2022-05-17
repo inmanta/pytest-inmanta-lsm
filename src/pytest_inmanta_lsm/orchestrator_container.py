@@ -15,21 +15,18 @@
 
     Contact: code@inmanta.com
 """
+import json
 import logging
 import shutil
+import subprocess
 from configparser import Interpolation
 from ipaddress import IPv4Address
 from pathlib import Path
-from tempfile import TemporaryFile, mkdtemp
+from tempfile import mkdtemp
 from textwrap import dedent
 from types import TracebackType
-from typing import IO, List, Optional, Type
+from typing import List, Optional, Type
 
-from compose.cli.command import get_project  # type: ignore
-from compose.container import Container  # type: ignore
-from compose.parallel import ParallelStreamWriter  # type: ignore
-from compose.project import Project  # type: ignore
-from compose.service import ImageType  # type: ignore
 from inmanta.config import LenientConfigParser
 
 LOGGER = logging.getLogger(__name__)
@@ -110,17 +107,21 @@ class OrchestratorContainer:
 
         # This will populated when using the context __enter__ method
         self._cwd: Optional[Path] = None
-        self._project: Optional[Project] = None
         self._config: Optional[LenientConfigParser] = None
-        self._io: Optional[IO] = None
+        self._containers: Optional[List[str]] = None
 
     @property
-    def project(self) -> Project:
-        if self._project is not None:
-            return self._project
+    def cwd(self) -> Path:
+        if self._cwd is not None:
+            return self._cwd
 
-        if self._cwd is None:
-            raise RuntimeError("No temporary directory has been configured")
+        self._cwd = Path(mkdtemp())
+
+        docker_compose_dir = self.compose_file.parent
+        shutil.copytree(str(docker_compose_dir), str(self._cwd), dirs_exist_ok=True)
+
+        shutil.copy(str(self.config_file), str(self._cwd / "my-server-conf.cfg"))
+        shutil.copy(str(self.env_file), str(self._cwd / "my-env-file"))
 
         # Generate a unique name for the db host (we use the same strategy as docker-compose)
         db_hostname = f"{self._cwd.name}_postgres_1"
@@ -147,8 +148,7 @@ class OrchestratorContainer:
         with config_path.open("w") as f:
             self._config.write(f)
 
-        self._project = get_project(str(self._cwd))
-        return self._project
+        return self._cwd
 
     @property
     def config(self) -> LenientConfigParser:
@@ -157,8 +157,25 @@ class OrchestratorContainer:
 
         return self._config
 
-    def _container(self, service_name: str) -> Container:
-        containers = self.project.containers(service_names=[service_name], stopped=True)
+    def _container(self, service_name: str) -> dict:
+        if self._containers is None:
+            raise RuntimeError("The lab has not been started properly")
+
+        # Get the created containers information
+        cmd = ["docker", "container", "inspect", *self._containers]
+        result = subprocess.run(
+            args=cmd,
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+            text=True,
+        )
+        result.check_returncode()
+        containers = json.loads(result.stdout)
+
+        containers = [
+            container for container in containers if container["Config"]["Labels"]["com.docker.compose.service"] == service_name
+        ]
+
         if not containers:
             raise LookupError(f"Failed to find a container for service {service_name}")
 
@@ -168,51 +185,63 @@ class OrchestratorContainer:
         return containers[0]
 
     @property
-    def db(self) -> Container:
+    def db(self) -> dict:
         return self._container("postgres")
 
     @property
     def db_ips(self) -> List[IPv4Address]:
-        return [IPv4Address(network["IPAddress"]) for network in self.db.inspect()["NetworkSettings"]["Networks"].values()]
+        return [IPv4Address(network["IPAddress"]) for network in self.db["NetworkSettings"]["Networks"].values()]
 
     @property
-    def orchestrator(self) -> Container:
+    def orchestrator(self) -> dict:
         return self._container("inmanta-server")
 
     @property
     def orchestrator_ips(self) -> List[IPv4Address]:
-        return [
-            IPv4Address(network["IPAddress"]) for network in self.orchestrator.inspect()["NetworkSettings"]["Networks"].values()
-        ]
+        return [IPv4Address(network["IPAddress"]) for network in self.orchestrator["NetworkSettings"]["Networks"].values()]
 
     @property
     def orchestrator_port(self) -> int:
         return int(self.config.get("server", "bind-port", vars={"fallback": "8888"}))
 
     def _up(self) -> None:
-        self.project.up(detached=True)
+        # Starting the lab
+        cmd = ["docker-compose", "up", "-d"]
+        result = subprocess.run(
+            args=cmd,
+            cwd=str(self.cwd),
+            encoding="utf-8",
+            text=True,
+            universal_newlines=True,
+        )
+        result.check_returncode()
+
+        # Getting the containers ids
+        cmd = ["docker-compose", "ps", "-q"]
+        result = subprocess.run(
+            args=cmd,
+            cwd=str(self.cwd),
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+            text=True,
+            universal_newlines=True,
+        )
+        result.check_returncode()
+        self._containers = result.stdout.strip("\n").split("\n")
 
     def _down(self) -> None:
-        self.project.down(
-            remove_image_type=ImageType.none,
-            include_volumes=True,
+        # Stopping the lab
+        cmd = ["docker-compose", "down", "-v"]
+        result = subprocess.run(
+            args=cmd,
+            cwd=str(self.cwd),
+            encoding="utf-8",
+            text=True,
+            universal_newlines=True,
         )
+        result.check_returncode()
 
     def __enter__(self) -> "OrchestratorContainer":
-        self._cwd = Path(mkdtemp())
-
-        # We manually set the parallel instance so that sys.stderr doesn't get used
-        # Writing to stderr can cause issues when the process has been killed, as the
-        # fd might be closed, this is a workaround for this issue.
-        self._io = TemporaryFile("w+", encoding="utf-8", newline="\n")
-        ParallelStreamWriter.get_or_assign_instance(ParallelStreamWriter(self._io))
-
-        docker_compose_dir = self.compose_file.parent
-        shutil.copytree(str(docker_compose_dir), str(self._cwd), dirs_exist_ok=True)
-
-        shutil.copy(str(self.config_file), str(self._cwd / "my-server-conf.cfg"))
-        shutil.copy(str(self.env_file), str(self._cwd / "my-env-file"))
-
         self._up()
         return self
 
@@ -231,18 +260,8 @@ class OrchestratorContainer:
 
         self._config = None
 
-        if self._project is not None:
-            self._down()
-            self._project = None
-
         if self._cwd is not None:
             shutil.rmtree(str(self._cwd))
             self._cwd = None
-
-        if self._io is not None:
-            logs = "\n".join(self._io.readlines())
-            LOGGER.debug(f"docker-compose logs:\n{logs}")
-            self._io.close()
-            self._io = None
 
         return None
