@@ -1,3 +1,3 @@
 inmanta-lsm
-pytest-inmanta==2.3.1
+pytest-inmanta==2.3.2
 docker-compose==1.29.2
