@@ -261,6 +261,7 @@ class OrchestratorContainer:
         self._config = None
 
         if self._cwd is not None:
+            self._down()
             shutil.rmtree(str(self._cwd))
             self._cwd = None
 
