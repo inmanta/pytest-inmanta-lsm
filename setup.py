@@ -24,6 +24,7 @@ setup(
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
     package_dir={"": "src"},
+    packages=["pytest_inmanta_lsm"],
     package_data={
         "pytest_inmanta_lsm": [
             "resources/docker-compose.yml",
@@ -35,7 +36,6 @@ setup(
     include_package_data=True,
     install_requires=[
         "pytest-inmanta~=2.3",
-        "docker-compose~=1.29",
         "inmanta-lsm",
     ],
     classifiers=[
@@ -44,6 +44,8 @@ setup(
         "Intended Audience :: Developers",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Operating System :: OS Independent",
         "Topic :: Software Development :: Testing",
         "Topic :: System :: Systems Administration",

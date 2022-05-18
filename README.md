@@ -183,37 +183,37 @@ export INMANTA_MODULE_REPO=https://USER:LICENSE_TOKEN@modules.inmanta.com/git/in
 It is possible to deploy an orchestrator locally and run the tests against it.  The orchestrator will be deployed as a container, using docker.  Here are the prerequisites in order to make it work:
  1. Have [docker](https://docs.docker.com/get-docker/) installed on your machine.
     ```console
-    $ docker info
+    $ docker version
     ```
 
  2. Have access to an orchestrator image (e.g. `containers.inmanta.com/containers/service-orchestrator:4`).
     ```console
-    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_IMAGE=containers.inmanta.com/containers/service-orchestrator:4
-    $ docker pull $INMANTA_LSM_DOCKER_ORCHESTRATOR_IMAGE
+    $ export INMANTA_LSM_CONTAINER_IMAGE=containers.inmanta.com/containers/service-orchestrator:4
+    $ docker pull $INMANTA_LSM_CONTAINER_IMAGE
     ```
 
  3. Have a license and an entitlement file for the orchestrator.
     ```console
     $ ls /etc/inmanta/license/com.inmanta.*
     /etc/inmanta/license/com.inmanta.jwe  /etc/inmanta/license/com.inmanta.license
-    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_LICENSE=/etc/inmanta/license/com.inmanta.license
-    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_JWE=/etc/inmanta/license/com.inmanta.jwe
+    $ export INMANTA_LSM_CONTAINER_LICENSE_FILE=/etc/inmanta/license/com.inmanta.license
+    $ export INMANTA_LSM_CONTAINER_JWE_FILE=/etc/inmanta/license/com.inmanta.jwe
     ```
 
  4. Have a pair of private/public key to access the orchestrator.
     ```console
     $ export PRIVATE_KEY=$HOME/.ssh/id_rsa
     $ if [ -f $PRIVATE_KEY ]; then echo "Private key already exists"; else ssh-keygen -t rsa -b 4096 -f $PRIVATE_KEY -N ''; fi
-    $ export INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY="${PRIVATE_KEY}.pub"
-    $ if [ -f $INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY ]; then echo "Public key already exists"; else ssh-keygen -y -f $PRIVATE_KEY > $INMANTA_LSM_DOCKER_ORCHESTRATOR_PUB_KEY; fi
+    $ export INMANTA_LSM_CONTAINER_PUB_KEY_FILE="${PRIVATE_KEY}.pub"
+    $ if [ -f $INMANTA_LSM_CONTAINER_PUB_KEY_FILE ]; then echo "Public key already exists"; else ssh-keygen -y -f $PRIVATE_KEY > $INMANTA_LSM_CONTAINER_PUB_KEY_FILE; fi
     ```
 
 If this is properly setup, you need to do set this option:
 ```
-  --lsm-doc-orch        If set, the fixtures will deploy and orchestrator on the host, using docker (overrides INMANTA_LSM_DOCKER_ORCHESTRATOR, defaults to False)
+  --lsm-ctr        If set, the fixtures will deploy and orchestrator on the host, using docker (overrides INMANTA_LSM_CONTAINER, defaults to False)
 ```
 
-Then any of the other option starting with `lsm-doc-orch` prefix to configure pytest-inmanta-lsm properly.  You can specify:
+Then any of the other option starting with `lsm-ctr` prefix to configure pytest-inmanta-lsm properly.  You can specify:
  - The path to the license and entitlement files
  - The container image to use
  - The version of postgres to use
@@ -222,12 +222,12 @@ Then any of the other option starting with `lsm-doc-orch` prefix to configure py
  - A new docker-compose file to overwrite the one used by pytest-inmanta-lsm.
  - A new server config file
 
-> :warning: **Some options have no effect when `--lsm-doc-orch` is set**.  This is the case of:
+> :warning: **Some options have no effect when `--lsm-ctr` is set**.  This is the case of:
 >  - `--lsm-host` The host will be overwritten with the ip of the container
 >  - `--lsm-srv-port` The port will be overwritten with the port the server in the container is listening to
 >  - `--lsm-ssh-port` The port will be `22`
 >  - `--lsm-ssh-user` The user will be `inmanta`
 >  - `--lsm-container-env` This is set to true automatically
 
-> :bulb: **Some options change their behavior when `--lsm-doc-orch` is set**.  This is the case of:
+> :bulb: **Some options change their behavior when `--lsm-ctr` is set**.  This is the case of:
 >  - `--lsm-no-clean` When set, the docker orchestrator won't be cleaned up when the tests are done.  You will have to do it manually.

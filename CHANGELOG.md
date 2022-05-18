@@ -6,7 +6,7 @@ Changes in this release:
 # v 1.5.0 (2022-04-29)
 Changes in this release:
 - Add support for iso5 container environment (#192)
-- Add support for SSL and anthentication (#186)
+- Add support for SSL and authentication (#186)
 - Report skipped and deploying resources when reaching a bad lifecycle state (#199)
 - Fix the iso4 jenkins job by adding a constraint on the lsm module's version
 - Add the possibility to add other constraints through the INMANTA_LSM_MODULE_CONSTRAINTS environment variable
@@ -45,7 +45,7 @@ Changes in this release:
 - Added update method to the remote orchestrator.
 - Added logging for deployment failure (#35) and more explanations on failures overall.
 - Add support to override the environment settings that are set after a clean
-- Expose the noclean boolean in the object returned by remote_orchestator fixtures for other fixtures to hook into
+- Expose the noclean boolean in the object returned by remote_orchestrator fixtures for other fixtures to hook into
 - Fix issue #42 where the fixture fails if a compile is in progress
 - Added support for transient state (by actually waiting for multiple states) (#57)
 
