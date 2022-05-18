@@ -163,6 +163,7 @@ class OrchestratorContainer:
 
         # Get the created containers information
         cmd = ["docker", "container", "inspect", *self._containers]
+        LOGGER.info(f"Running command {cmd}")
         result = subprocess.run(
             args=cmd,
             stdout=subprocess.PIPE,
@@ -170,6 +171,8 @@ class OrchestratorContainer:
             text=True,
         )
         result.check_returncode()
+        LOGGER.debug(f"Stdout: {result.stdout}")
+        LOGGER.debug(f"Stderr: {result.stderr}")
         containers = json.loads(result.stdout)
 
         containers = [
@@ -207,6 +210,7 @@ class OrchestratorContainer:
     def _up(self) -> None:
         # Starting the lab
         cmd = ["docker-compose", "up", "-d"]
+        LOGGER.info(f"Running command {cmd}")
         result = subprocess.run(
             args=cmd,
             cwd=str(self.cwd),
@@ -215,9 +219,12 @@ class OrchestratorContainer:
             universal_newlines=True,
         )
         result.check_returncode()
+        LOGGER.debug(f"Stdout: {result.stdout}")
+        LOGGER.debug(f"Stderr: {result.stderr}")
 
         # Getting the containers ids
         cmd = ["docker-compose", "ps", "-q"]
+        LOGGER.info(f"Running command {cmd}")
         result = subprocess.run(
             args=cmd,
             cwd=str(self.cwd),
@@ -227,11 +234,14 @@ class OrchestratorContainer:
             universal_newlines=True,
         )
         result.check_returncode()
+        LOGGER.debug(f"Stdout: {result.stdout}")
+        LOGGER.debug(f"Stderr: {result.stderr}")
         self._containers = result.stdout.strip("\n").split("\n")
 
     def _down(self) -> None:
         # Stopping the lab
         cmd = ["docker-compose", "down", "-v"]
+        LOGGER.info(f"Running command {cmd}")
         result = subprocess.run(
             args=cmd,
             cwd=str(self.cwd),
@@ -240,6 +250,8 @@ class OrchestratorContainer:
             universal_newlines=True,
         )
         result.check_returncode()
+        LOGGER.debug(f"Stdout: {result.stdout}")
+        LOGGER.debug(f"Stderr: {result.stderr}")
 
     def __enter__(self) -> "OrchestratorContainer":
         self._up()
