@@ -24,6 +24,7 @@ setup(
     long_description=read("README.md"),
     long_description_content_type="text/markdown",
     package_dir={"": "src"},
+    packages=["pytest_inmanta_lsm"],
     package_data={
         "pytest_inmanta_lsm": [
             "resources/docker-compose.yml",
