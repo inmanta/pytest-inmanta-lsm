@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
     name="pytest-inmanta-lsm",
-    version="1.6.0",
+    version="1.6.1",
     python_requires=">=3.6",  # also update classifiers
     author="Inmanta",
     author_email="code@inmanta.com",
