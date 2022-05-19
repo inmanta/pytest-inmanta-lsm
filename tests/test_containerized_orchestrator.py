@@ -36,10 +36,12 @@ def testdir(testdir: Testdir) -> Testdir:
     public_key = ssh_dir / "id_rsa.pub"
 
     ssh_dir.mkdir(mode=755, parents=True, exist_ok=True)
-    if public_key.exists():
-        # We assume that if the public key exists, the private key exists as well
-        assert private_key.exists(), "If the public key exists, the private key should exist as well"
-    elif private_key.exists():
+
+    if not private_key.exists():
+        result = subprocess.run(["ssh-keygen", "-t", "rsa", "-b", "4096", "-f", str(private_key), "-N", ""])
+        result.check_returncode()
+
+    if not public_key.exists():
         result = subprocess.run(
             ["ssh-keygen", "-y", "-f", str(private_key)],
             stdout=subprocess.PIPE,
@@ -49,9 +51,6 @@ def testdir(testdir: Testdir) -> Testdir:
         result.check_returncode()
         public_key.write_text(result.stdout, encoding="utf-8")
         public_key.chmod(0o0600)
-    else:
-        result = subprocess.run(["ssh-keygen", "-t", "rsa", "-b", "4096", "-f", str(private_key), "-N", ""])
-        result.check_returncode()
 
     yield testdir
 
