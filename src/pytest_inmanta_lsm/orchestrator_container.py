@@ -236,8 +236,16 @@ class OrchestratorContainer:
         run_cmd(cmd=cmd, cwd=self.cwd)
 
     def __enter__(self) -> "OrchestratorContainer":
-        self._up()
-        return self
+        try:
+            self._up()
+            return self
+        except subprocess.CalledProcessError as e:
+            self.__exit__(
+                subprocess.CalledProcessError,
+                e,
+                None,
+            )
+            raise e
 
     def __exit__(
         self,
