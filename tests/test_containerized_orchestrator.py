@@ -5,7 +5,6 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
-
 import os
 import shutil
 import subprocess
@@ -41,8 +40,10 @@ def testdir(testdir: Testdir) -> Testdir:
         # We assume that if the public key exists, the private key exists as well
         pass
     elif private_key.exists():
-        result = subprocess.run(["ssh-keygen", "-y", "-f", str(private_key), ">", str(public_key)], shell=True)
+        result = subprocess.run(["ssh-keygen", "-y", "-f", str(private_key)], stdout=subprocess.PIPE)
         result.check_returncode()
+        public_key.write_text(result.stdout, encoding="utf-8")
+        public_key.chmod(0o0600)
     else:
         result = subprocess.run(["ssh-keygen", "-t", "rsa", "-b", "4096", "-f", str(private_key), "-N", ""])
         result.check_returncode()
