@@ -40,7 +40,12 @@ def testdir(testdir: Testdir) -> Testdir:
         # We assume that if the public key exists, the private key exists as well
         pass
     elif private_key.exists():
-        result = subprocess.run(["ssh-keygen", "-y", "-f", str(private_key)], stdout=subprocess.PIPE)
+        result = subprocess.run(
+            ["ssh-keygen", "-y", "-f", str(private_key)],
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+            text=True,
+        )
         result.check_returncode()
         public_key.write_text(result.stdout, encoding="utf-8")
         public_key.chmod(0o0600)
