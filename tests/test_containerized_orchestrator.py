@@ -7,10 +7,28 @@
 """
 
 import os
+import shutil
 
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
 import yaml
-from pytest import Testdir
+from pytest import Testdir, fixture
+
+HOME = os.getenv("HOME", "")
+
+
+@fixture
+def testdir(testdir: Testdir) -> Testdir:
+    """
+    This fixture ensure that when changing the home directory with the testdir
+    fixture we also copy any docker client config that was there.
+    """
+    if os.path.exists(os.path.join(HOME, ".docker")):
+        shutil.copytree(
+            os.path.join(HOME, ".docker"),
+            os.path.join(testdir.tmpdir, ".docker"),
+        )
+
+    return testdir
 
 
 def add_version_constraint_to_project(testdir: Testdir):

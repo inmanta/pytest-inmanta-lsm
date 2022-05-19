@@ -8,7 +8,6 @@ additional_constraints:
     - inmanta-lsm>=3.dev
 env_vars:
     INMANTA_LSM_USER: rocky
-    DOCKER_CONFIG: /home/jenkins/.docker/config.json
     INMANTA_LSM_CONTAINER_IMAGE: code.inmanta.com:4567/solutions/containers/service-orchestrator:6-dev
     INMANTA_LSM_CONTAINER_LICENSE_FILE: /etc/inmanta/license/jenkins.inmanta.com.license
     INMANTA_LSM_CONTAINER_JWE_FILE: /etc/inmanta/license/jenkins.inmanta.com.jwe
