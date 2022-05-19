@@ -53,7 +53,10 @@ def testdir(testdir: Testdir) -> Testdir:
         result = subprocess.run(["ssh-keygen", "-t", "rsa", "-b", "4096", "-f", str(private_key), "-N", ""])
         result.check_returncode()
 
-    return testdir
+    yield testdir
+
+    if os.path.exists(os.path.join(testdir.tmpdir, ".docker")):
+        shutil.rmtree(os.path.join(testdir.tmpdir, ".docker"))
 
 
 def add_version_constraint_to_project(testdir: Testdir):
