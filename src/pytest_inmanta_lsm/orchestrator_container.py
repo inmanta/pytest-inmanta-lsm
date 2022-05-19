@@ -221,6 +221,9 @@ class OrchestratorContainer:
         return int(self.config.get("server", "bind-port", vars={"fallback": "8888"}))
 
     def _up(self) -> None:
+        run_cmd(cmd=["whoami"], cwd=self.cwd)
+        run_cmd(cmd=["env"], cwd=self.cwd)
+
         # Pull container images
         cmd = ["docker-compose", "--verbose", "pull"]
         run_cmd(cmd=cmd, cwd=self.cwd)
