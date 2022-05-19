@@ -221,18 +221,22 @@ class OrchestratorContainer:
         return int(self.config.get("server", "bind-port", vars={"fallback": "8888"}))
 
     def _up(self) -> None:
+        # Pull container images
+        cmd = ["docker-compose", "--verbose", "pull"]
+        run_cmd(cmd=cmd, cwd=self.cwd)
+
         # Starting the lab
-        cmd = ["docker-compose", "up", "-d"]
+        cmd = ["docker-compose", "--verbose", "up", "-d"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
         # Getting the containers ids
-        cmd = ["docker-compose", "ps", "-q"]
+        cmd = ["docker-compose", "--verbose", "ps", "-q"]
         stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
         self._containers = stdout.strip("\n").split("\n")
 
     def _down(self) -> None:
         # Stopping the lab
-        cmd = ["docker-compose", "down", "-v"]
+        cmd = ["docker-compose", "--verbose", "down", "-v"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
     def __enter__(self) -> "OrchestratorContainer":
