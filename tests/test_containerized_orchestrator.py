@@ -38,7 +38,7 @@ def testdir(testdir: Testdir) -> Testdir:
     ssh_dir.mkdir(mode=755, parents=True, exist_ok=True)
     if public_key.exists():
         # We assume that if the public key exists, the private key exists as well
-        pass
+        assert private_key.exists(), "If the public key exists, the private key should exist as well"
     elif private_key.exists():
         result = subprocess.run(
             ["ssh-keygen", "-y", "-f", str(private_key)],
