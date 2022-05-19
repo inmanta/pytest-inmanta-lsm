@@ -8,6 +8,8 @@
 
 import os
 import shutil
+import subprocess
+from pathlib import Path
 
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
 import yaml
@@ -21,12 +23,29 @@ def testdir(testdir: Testdir) -> Testdir:
     """
     This fixture ensure that when changing the home directory with the testdir
     fixture we also copy any docker client config that was there.
+
+    We also ensure that an ssh key pair is available in the user ssh folder.
     """
     if os.path.exists(os.path.join(HOME, ".docker")):
         shutil.copytree(
             os.path.join(HOME, ".docker"),
             os.path.join(testdir.tmpdir, ".docker"),
         )
+
+    ssh_dir = Path(HOME) / ".ssh"
+    private_key = ssh_dir / "id_rsa"
+    public_key = ssh_dir / "id_rsa.pub"
+
+    ssh_dir.mkdir(mode=755, parents=True, exist_ok=True)
+    if public_key.exists():
+        # We assume that if the public key exists, the private key exists as well
+        pass
+    elif private_key.exists():
+        result = subprocess.run(["ssh-keygen", "-y", "-f", str(private_key), ">", str(public_key)], shell=True)
+        result.check_returncode()
+    else:
+        result = subprocess.run(["ssh-keygen", "-t", "rsa", "-b", "4096", "-f", str(private_key), "-N", ""])
+        result.check_returncode()
 
     return testdir
 
