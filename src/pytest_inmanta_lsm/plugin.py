@@ -123,7 +123,8 @@ def remote_orchestrator_host(
 
     for _ in range(0, 10):
         try:
-            response = requests.get(f"http://{host}:{port}/api/v1/serverstatus", timeout=1)
+            http = "https" if inm_lsm_ssl.resolve(request.config) else "http"
+            response = requests.get(f"{http}://{host}:{port}/api/v1/serverstatus", timeout=1, verify=False)
             response.raise_for_status()
         except Exception as exc:
             LOGGER.warning(str(exc))

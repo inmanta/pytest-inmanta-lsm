@@ -25,11 +25,33 @@ from pathlib import Path
 from tempfile import mkdtemp
 from textwrap import dedent
 from types import TracebackType
-from typing import List, Optional, Type
+from typing import List, Optional, Tuple, Type
 
 from inmanta.config import LenientConfigParser
 
 LOGGER = logging.getLogger(__name__)
+
+
+def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
+    """
+    Helper function to run command and log the results.  Raises a CalledProcessError
+    if the command failed.
+    """
+    LOGGER.info(f"Running command: {cmd}")
+    result = subprocess.run(
+        args=cmd,
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        text=True,
+        universal_newlines=True,
+    )
+    LOGGER.debug(f"Return code: {result.returncode}")
+    LOGGER.debug("Stdout: %s", result.stdout)
+    LOGGER.debug("Stderr: %s", result.stderr)
+    result.check_returncode()
+    return result.stdout, result.stderr
 
 
 class DoNotCleanOrchestratorContainer(RuntimeError):
@@ -163,17 +185,8 @@ class OrchestratorContainer:
 
         # Get the created containers information
         cmd = ["docker", "container", "inspect", *self._containers]
-        LOGGER.info(f"Running command {cmd}")
-        result = subprocess.run(
-            args=cmd,
-            stdout=subprocess.PIPE,
-            encoding="utf-8",
-            text=True,
-        )
-        result.check_returncode()
-        LOGGER.debug(f"Stdout: {result.stdout}")
-        LOGGER.debug(f"Stderr: {result.stderr}")
-        containers = json.loads(result.stdout)
+        stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
+        containers = json.loads(stdout)
 
         containers = [
             container for container in containers if container["Config"]["Labels"]["com.docker.compose.service"] == service_name
@@ -208,54 +221,35 @@ class OrchestratorContainer:
         return int(self.config.get("server", "bind-port", vars={"fallback": "8888"}))
 
     def _up(self) -> None:
+        # Pull container images
+        cmd = ["docker-compose", "--verbose", "pull"]
+        run_cmd(cmd=cmd, cwd=self.cwd)
+
         # Starting the lab
-        cmd = ["docker-compose", "up", "-d"]
-        LOGGER.info(f"Running command {cmd}")
-        result = subprocess.run(
-            args=cmd,
-            cwd=str(self.cwd),
-            encoding="utf-8",
-            text=True,
-            universal_newlines=True,
-        )
-        result.check_returncode()
-        LOGGER.debug(f"Stdout: {result.stdout}")
-        LOGGER.debug(f"Stderr: {result.stderr}")
+        cmd = ["docker-compose", "--verbose", "up", "-d"]
+        run_cmd(cmd=cmd, cwd=self.cwd)
 
         # Getting the containers ids
-        cmd = ["docker-compose", "ps", "-q"]
-        LOGGER.info(f"Running command {cmd}")
-        result = subprocess.run(
-            args=cmd,
-            cwd=str(self.cwd),
-            stdout=subprocess.PIPE,
-            encoding="utf-8",
-            text=True,
-            universal_newlines=True,
-        )
-        result.check_returncode()
-        LOGGER.debug(f"Stdout: {result.stdout}")
-        LOGGER.debug(f"Stderr: {result.stderr}")
-        self._containers = result.stdout.strip("\n").split("\n")
+        cmd = ["docker-compose", "--verbose", "ps", "-q"]
+        stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
+        self._containers = stdout.strip("\n").split("\n")
 
     def _down(self) -> None:
         # Stopping the lab
-        cmd = ["docker-compose", "down", "-v"]
-        LOGGER.info(f"Running command {cmd}")
-        result = subprocess.run(
-            args=cmd,
-            cwd=str(self.cwd),
-            encoding="utf-8",
-            text=True,
-            universal_newlines=True,
-        )
-        result.check_returncode()
-        LOGGER.debug(f"Stdout: {result.stdout}")
-        LOGGER.debug(f"Stderr: {result.stderr}")
+        cmd = ["docker-compose", "--verbose", "down", "-v"]
+        run_cmd(cmd=cmd, cwd=self.cwd)
 
     def __enter__(self) -> "OrchestratorContainer":
-        self._up()
-        return self
+        try:
+            self._up()
+            return self
+        except subprocess.CalledProcessError as e:
+            self.__exit__(
+                subprocess.CalledProcessError,
+                e,
+                None,
+            )
+            raise e
 
     def __exit__(
         self,
