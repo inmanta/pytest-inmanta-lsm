@@ -373,7 +373,7 @@ class RemoteOrchestrator:
 
         DEPRECATED: Use the diagnose endpoint instead
         """
-        LOGGER.warning(f"Usage of FailedResourceLogs is deprecated, use the diagnose endpoint instead")
+        LOGGER.warning("Usage of FailedResourceLogs is deprecated, use the diagnose endpoint instead")
         client = self.client
         environment = self.environment
 

@@ -24,7 +24,7 @@ class FailedResourcesLogs:
     """
 
     def __init__(self, client: SyncClient, environment_id: uuid.UUID):
-        LOGGER.warning(f"Usage of FailedResourceLogs is deprecated, use the diagnose endpoint instead")
+        LOGGER.warning("Usage of FailedResourceLogs is deprecated, use the diagnose endpoint instead")
         self._client = client
         self._environment_id = environment_id
 
