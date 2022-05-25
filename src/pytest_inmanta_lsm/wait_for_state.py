@@ -9,7 +9,7 @@
 import logging
 import time
 from pprint import pformat
-from typing import Any, Collection, List, Optional
+from typing import Any, Callable, Collection, List, Optional
 
 from pytest_inmanta_lsm import managed_service_instance as msi
 from pytest_inmanta_lsm.exceptions import BadStateError, TimeoutError
@@ -25,7 +25,7 @@ class State:
     def __str__(self):
         return f"{self.name} (version: {self.version})"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: "State") -> bool:
         if other is None:
             return False
         if self.name != other.name:
@@ -64,12 +64,12 @@ class WaitForState(object):
 
     def __init__(
         self,
-        name,
-        get_states_method,
-        compare_states_method=default_compare_states.__func__,
-        check_start_state_method=default_check_start_state.__func__,
-        check_bad_state_method=default_check_bad_state.__func__,
-        get_bad_state_error_method=default_get_bad_state_error.__func__,
+        name: str,
+        get_states_method: Callable[[int], List[State]],
+        compare_states_method: Callable[[State, List[str]], bool] = default_compare_states.__func__,
+        check_start_state_method: Callable[[State], bool] = default_check_start_state.__func__,
+        check_bad_state_method: Callable[[State, Collection[str]], bool] = default_check_bad_state.__func__,
+        get_bad_state_error_method: Callable[[str], Any] = default_get_bad_state_error.__func__,
     ):
         """
         :param name: to clarify the logging,
@@ -94,10 +94,10 @@ class WaitForState(object):
         self.__check_bad_state = check_bad_state_method
         self.__get_bad_state_error = get_bad_state_error_method
 
-    def __compose_error_msg_with_bad_state_error(self, error_msg: str, current_state: Any) -> str:
+    def __compose_error_msg_with_bad_state_error(self, error_msg: str, current_state: State) -> str:
         bad_state_error = self.__get_bad_state_error(current_state)
         if bad_state_error:
-            error_msg += f", error: {pformat(bad_state_error)}"
+            error_msg += f", error: {pformat(bad_state_error, indent=4, width=140)}"
 
         return error_msg
 

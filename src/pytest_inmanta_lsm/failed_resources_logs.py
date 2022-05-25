@@ -19,9 +19,12 @@ class FailedResourcesLogs:
     """
     Class to retrieve all logs from failed resources.
     No environment version needs to be specified, the latest (highest number) version will be used
+
+    DEPRECATED: Use the diagnose endpoint from the server instead
     """
 
     def __init__(self, client: SyncClient, environment_id: uuid.UUID):
+        LOGGER.warning(f"Usage of FailedResourceLogs is deprecated, use the diagnose endpoint instead")
         self._client = client
         self._environment_id = environment_id
 
