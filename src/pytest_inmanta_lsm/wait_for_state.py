@@ -59,7 +59,7 @@ class WaitForState(object):
         return current_state.name in bad_states
 
     @staticmethod
-    def default_get_bad_state_error(current_state: str) -> Any:
+    def default_get_bad_state_error(current_state: State) -> Any:
         return None
 
     def __init__(
@@ -69,7 +69,7 @@ class WaitForState(object):
         compare_states_method: Callable[[State, List[str]], bool] = default_compare_states.__func__,
         check_start_state_method: Callable[[State], bool] = default_check_start_state.__func__,
         check_bad_state_method: Callable[[State, Collection[str]], bool] = default_check_bad_state.__func__,
-        get_bad_state_error_method: Callable[[str], Any] = default_get_bad_state_error.__func__,
+        get_bad_state_error_method: Callable[[State], Any] = default_get_bad_state_error.__func__,
     ):
         """
         :param name: to clarify the logging,

@@ -11,6 +11,8 @@ from pprint import pformat
 from typing import Any, Collection, Dict, List, Optional, Union
 from uuid import UUID
 
+from inmanta_lsm.diagnose.model import FullDiagnosis
+
 from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
 from pytest_inmanta_lsm.exceptions import VersionExceededError, VersionMismatchError
 from pytest_inmanta_lsm.wait_for_state import State, WaitForState
@@ -348,7 +350,7 @@ class ManagedServiceInstance:
                 return False
             return current_state.version == start_version
 
-        def get_bad_state_error(current_state: State) -> Any:
+        def get_bad_state_error(current_state: State) -> FullDiagnosis:
             result = self.remote_orchestrator.client.lsm_service_log_list(
                 tid=self.remote_orchestrator.environment,
                 service_entity=self.service_entity_name,
@@ -360,7 +362,7 @@ class ManagedServiceInstance:
                 f"{json.dumps(result.result or {}, indent=4)}"
             )
 
-            return result.result
+            return FullDiagnosis(**result.result)
 
         wait_for_obj = WaitForState(
             "Instance lifecycle",
