@@ -351,7 +351,7 @@ class ManagedServiceInstance:
             return current_state.version == start_version
 
         def get_bad_state_error(current_state: State) -> FullDiagnosis:
-            result = self.remote_orchestrator.client.lsm_service_log_list(
+            result = self.remote_orchestrator.client.lsm_services_diagnose(
                 tid=self.remote_orchestrator.environment,
                 service_entity=self.service_entity_name,
                 service_id=self.instance_id,
