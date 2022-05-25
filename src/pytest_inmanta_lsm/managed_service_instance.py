@@ -362,7 +362,7 @@ class ManagedServiceInstance:
                 f"{json.dumps(result.result or {}, indent=4)}"
             )
 
-            return FullDiagnosis(**result.result)
+            return FullDiagnosis(**result.result["data"])
 
         wait_for_obj = WaitForState(
             "Instance lifecycle",
