@@ -1,4 +1,4 @@
-# v 1.7.0 (?)
+# v 1.7.0 (2022-06-08)
 Changes in this release:
 - Improve logging for containerized orchestrator setup.
 - Use the diagnose endpoint to generate the validation/deployment failure reports.
