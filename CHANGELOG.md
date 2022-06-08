@@ -1,3 +1,6 @@
+# v 1.8.0 (?)
+Changes in this release:
+
 # v 1.7.0 (2022-06-08)
 Changes in this release:
 - Improve logging for containerized orchestrator setup.
