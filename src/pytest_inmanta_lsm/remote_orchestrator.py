@@ -370,7 +370,10 @@ class RemoteOrchestrator:
     ) -> Optional[str]:
         """
         Get the compiler error for a validation failure for a specific service entity
+
+        DEPRECATED: Use the diagnose endpoint instead
         """
+        LOGGER.warning("Usage of FailedResourceLogs is deprecated, use the diagnose endpoint instead")
         client = self.client
         environment = self.environment
 
