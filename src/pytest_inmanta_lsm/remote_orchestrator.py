@@ -141,7 +141,7 @@ class RemoteOrchestrator:
             result = client.project_list()
             assert (
                 result.code == 200
-            ), f"Wrong reponse code while verifying project, got {result.code} (expected 200): \n{result.result}"
+            ), f"Wrong response code while verifying project, got {result.code} (expected 200): \n{result.result}"
             for project in result.result["data"]:
                 if project["name"] == project_name:
                     return project["id"]
@@ -149,7 +149,7 @@ class RemoteOrchestrator:
             result = client.project_create(name=project_name)
             assert (
                 result.code == 200
-            ), f"Wrong reponse code while creating project, got {result.code} (expected 200): \n{result.result}"
+            ), f"Wrong response code while creating project, got {result.code} (expected 200): \n{result.result}"
             return result.result["data"]["id"]
 
         result = client.create_environment(
@@ -279,7 +279,7 @@ class RemoteOrchestrator:
             if not self.container_env:
                 # use the server's environment variables for the installation
                 shell_script_inline = (
-                    "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
+                    "sudo systemd-run --pipe -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
                     "--wait %s" % shell_script_inline
                 )
 
@@ -383,7 +383,7 @@ class RemoteOrchestrator:
             service_entity=service_entity_name,
             service_id=service_instance_id,
         )
-        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
+        assert result.code == 200, f"Wrong response code while trying to get log list, got {result.code} (expected 200): \n"
         f"{pformat(result.get_result(), width=140)}"
 
         # get events that led to final state
@@ -398,7 +398,7 @@ class RemoteOrchestrator:
 
         # get the report
         result = client.get_report(compile_id)
-        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
+        assert result.code == 200, f"Wrong response code while trying to get log list, got {result.code} (expected 200): \n"
         f"{pformat(result.get_result(), width=140)}"
 
         # get stage reports

@@ -1,6 +1,8 @@
 # v 1.8.0 (?)
 Changes in this release:
 
+- Capture stdout and stderr of remotely executed commands by passing the `--pipe` option to systemd-run.
+
 # v 1.7.0 (2022-06-08)
 Changes in this release:
 - Improve logging for containerized orchestrator setup.
