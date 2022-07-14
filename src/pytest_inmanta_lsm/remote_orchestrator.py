@@ -161,6 +161,11 @@ class RemoteOrchestrator:
             result.code == 200
         ), f"Wrong response code while creating environment, got {result.code} (expected 200): \n{result.result}"
 
+    def use_sudo(self) -> str:
+        if self._ssh_user == "inmanta":
+            return ""
+        return "sudo "
+
     def sync_project(self) -> None:
         """Synchronize the project to the lab orchestrator"""
         project = self._project
@@ -186,13 +191,16 @@ class RemoteOrchestrator:
         remote_path = f"{self._ssh_user}@{self.host}:{server_path}"
         cache_path = f"{server_path[0:-1]}_cache"  # [0:-1] to get trailing slash out of the way!
 
+        # Disable sudo over ssh when the remote user has the correct permissions
+        use_sudo: str = self.use_sudo()
+
         LOGGER.debug("Move cache if it exists on orchestrator")
         subprocess.check_output(
             SSH_CMD
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo test -d {cache_path} && sudo mv {cache_path} {server_path} || true",
+                f"{use_sudo}test -d {cache_path} && {use_sudo}mv {cache_path} {server_path} || true",
             ],
             stderr=subprocess.PIPE,
         )
@@ -204,7 +212,7 @@ class RemoteOrchestrator:
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo mkdir -p {server_path}; sudo chown -R {self._ssh_user}:{self._ssh_user} {server_path}",
+                f"{use_sudo}mkdir -p {server_path}; {use_sudo}chown -R {self._ssh_user}:{self._ssh_user} {server_path}",
             ],
             stderr=subprocess.PIPE,
         )
@@ -253,7 +261,7 @@ class RemoteOrchestrator:
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo touch {server_path}/.git; sudo chown -R inmanta:inmanta {server_path}",
+                f"{use_sudo}touch {server_path}/.git; {use_sudo}chown -R inmanta:inmanta {server_path}",
             ],
             stderr=subprocess.PIPE,
         )
@@ -279,7 +287,7 @@ class RemoteOrchestrator:
             if not self.container_env:
                 # use the server's environment variables for the installation
                 shell_script_inline = (
-                    "sudo systemd-run --pipe -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
+                    f"{use_sudo}systemd-run --pipe -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
                     "--wait %s" % shell_script_inline
                 )
 
@@ -321,12 +329,16 @@ class RemoteOrchestrator:
     def cache_project(self) -> None:
         """Cache the project on the server so that a sync can be faster."""
         LOGGER.info(f"Caching project on server ({self._server_path}) to cache dir: {self._server_cache_path}")
+
+        # Disable sudo over ssh when the remote user has the correct permissions
+        use_sudo: str = self.use_sudo()
+
         subprocess.check_output(
             SSH_CMD
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo cp -a {self._server_path} {self._server_cache_path}",
+                f"{use_sudo}cp -a {self._server_path} {self._server_cache_path}",
             ],
             stderr=subprocess.PIPE,
         )
