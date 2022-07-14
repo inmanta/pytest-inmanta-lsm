@@ -1,4 +1,4 @@
-# v 1.8.0 (?)
+# v 1.8.0 (2022-07-14)
 Changes in this release:
 
 - Only use sudo over ssh when required.
