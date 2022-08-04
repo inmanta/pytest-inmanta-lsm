@@ -1,6 +1,8 @@
 # v 1.9.0 (?)
 Changes in this release:
 
+- We now automatically install all V2 modules found in de library path in editable mode on the remote orchestrator
+
 # v 1.8.0 (2022-07-14)
 Changes in this release:
 

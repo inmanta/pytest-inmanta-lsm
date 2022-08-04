@@ -30,6 +30,7 @@ setup(
             "resources/docker-compose.yml",
             "resources/my-env-file",
             "resources/my-server-conf.cfg",
+            "resources/setup_project.py",
             "py.typed",
         ]
     },
