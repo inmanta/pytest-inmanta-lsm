@@ -115,7 +115,7 @@ inm_lsm_env = StringTestParameter(
 
 # This is the legacy noclean and ssl option
 # TODO remove this in next major version bump
-class _LegacyBooleanTestParameter(BooleanTestParameter):
+class _LegacyBooleanTestParameter(StringTestParameter):
     def resolve(self, config: "Config") -> bool:
         """
         The legacy option for --lsm_noclean and --lsm_ssl requires some more treatment than the other
