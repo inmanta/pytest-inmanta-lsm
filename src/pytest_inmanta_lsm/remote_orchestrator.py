@@ -293,6 +293,7 @@ class RemoteOrchestrator:
 
         # iso5 requires explicit project installation
         if self.server_version >= Version("5.dev"):
+            LOGGER.debug(f"Server version is {self.server_version}, installing project manually")
             # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
             install_script_path = Path(server_path, destination_script.name)
             shell_script_inline: str = f"/opt/inmanta/bin/python < {install_script_path}"
@@ -308,7 +309,7 @@ class RemoteOrchestrator:
                 shell_script_inline = f"PROJECT_PATH={server_path} {shell_script_inline}"
 
             try:
-                subprocess.check_output(
+                output = subprocess.check_output(
                     SSH_CMD
                     + [
                         f"-p {self._ssh_port}",
@@ -316,7 +317,10 @@ class RemoteOrchestrator:
                         shell_script_inline,
                     ],
                     stderr=subprocess.PIPE,
+                    encoding="utf-8",
+                    text=True,
                 )
+                LOGGER.debug(output)
             except subprocess.CalledProcessError as e:
                 LOGGER.error("Process failed out: " + e.output.decode())
                 LOGGER.error("Process failed err: " + e.stderr.decode())
