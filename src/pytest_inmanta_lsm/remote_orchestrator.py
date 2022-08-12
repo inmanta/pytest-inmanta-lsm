@@ -322,8 +322,8 @@ class RemoteOrchestrator:
                 )
                 LOGGER.debug(output)
             except subprocess.CalledProcessError as e:
-                LOGGER.error("Process failed out: " + e.output.decode())
-                LOGGER.error("Process failed err: " + e.stderr.decode())
+                LOGGER.error("Process failed out: " + e.output)
+                LOGGER.error("Process failed err: " + e.stderr)
                 raise
 
         # Server cache create, set variables, so cache can be used
