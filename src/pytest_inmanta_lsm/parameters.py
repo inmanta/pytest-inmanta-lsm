@@ -16,6 +16,7 @@
     Contact: code@inmanta.com
 """
 import os
+import pytest
 from pathlib import Path
 
 from pytest_inmanta.test_parameter import (
@@ -146,6 +147,14 @@ inm_lsm_no_clean = BooleanTestParameter(
     default=False,
     group=param_group,
     legacy=inm_lsm_noclean_legacy,
+)
+
+inm_lsm_partial_compile = BooleanTestParameter(
+    argument="--lsm-partial-compile",
+    environment_variable="INMANTA_LSM_PARTIAL_COMPILE",
+    usage="Enable partial compiles on the remote orchestrator",
+    default=False,
+    group=param_group,
 )
 
 # This is the legacy lsm container env option

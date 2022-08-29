@@ -35,6 +35,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_env,
     inm_lsm_host,
     inm_lsm_no_clean,
+    inm_lsm_partial_compile,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
     inm_lsm_ssh_user,
@@ -157,6 +158,7 @@ def remote_orchestrator(
     remote_orchestrator_environment: str,
     remote_orchestrator_no_clean: bool,
     remote_orchestrator_host: Tuple[str, int],
+    remote_orchestrator_partial: bool,
 ) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
@@ -201,6 +203,7 @@ def remote_orchestrator(
         "autostart_agent_deploy_interval": 600,
         "autostart_agent_repair_splay_time": 600,
         "autostart_agent_repair_interval": 0,
+        "lsm_partial_compile": inm_lsm_partial_compile.resolve(request.config),
     }
     settings.update(remote_orchestrator_settings)
 
