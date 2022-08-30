@@ -11,8 +11,6 @@ env_vars:
     INMANTA_LSM_CONTAINER_IMAGE: code.inmanta.com:4567/solutions/containers/service-orchestrator:5-dev
     INMANTA_LSM_CONTAINER_LICENSE_FILE: /etc/inmanta/license/jenkins.inmanta.com.license
     INMANTA_LSM_CONTAINER_JWE_FILE: /etc/inmanta/license/jenkins.inmanta.com.jwe
-    # git repo is added in the pipeline (can't add here because it needs credentials)
-    INMANTA_MODULE_REPO: "package:https://artifacts.internal.inmanta.com/inmanta/dev/"
 directories_to_lint:
     - examples
     - src
