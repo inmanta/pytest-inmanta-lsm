@@ -65,7 +65,7 @@ def test_deployment_failure(testdir: Testdir):
 
     testdir.copy_example("test_service")
 
-    utils.add_version_constraint_to_project(testdir)
+    utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest_inprocess("tests/test_deployment_failure.py", "--lsm-ctr")
     result.assert_outcomes(passed=2)
@@ -76,7 +76,7 @@ def test_basic_example(testdir: Testdir):
 
     testdir.copy_example("quickstart")
 
-    utils.add_version_constraint_to_project(testdir)
+    utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest("tests/test_quickstart.py", "--lsm-ctr")
     result.assert_outcomes(passed=2)
