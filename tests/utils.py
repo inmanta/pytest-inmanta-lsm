@@ -13,10 +13,9 @@ import py
 import subprocess
 import sys
 import tempfile
-from collections import abc
 from inmanta import env
 from types import ModuleType
-from typing import Optional
+from typing import Optional, Iterator, Sequence
 
 
 def add_version_constraint_to_project(project_dir: py.path.local):
@@ -33,7 +32,7 @@ def add_version_constraint_to_project(project_dir: py.path.local):
 
 
 @contextlib.contextmanager
-def module_v2_venv(module_path: str) -> abc.Iterator[env.VirtualEnv]:
+def module_v2_venv(module_path: str) -> Iterator[env.VirtualEnv]:
     """
     Yields a Python environment with the given module installed in it.
     """
@@ -58,7 +57,7 @@ def module_v2_venv(module_path: str) -> abc.Iterator[env.VirtualEnv]:
 
 
 @contextlib.contextmanager
-def activate_venv(venv: env.VirtualEnv) -> abc.Iterator[env.VirtualEnv]:
+def activate_venv(venv: env.VirtualEnv) -> Iterator[env.VirtualEnv]:
     """
     Activates a given Python environment for the currently running process. To prevent
     """
@@ -110,7 +109,7 @@ def unload_modules_for_path(path: str) -> None:
         file: Optional[str] = getattr(module, "__file__", None)
         return file.startswith(prefix) if file is not None else False
 
-    loaded_modules: abc.Sequence[str] = [
+    loaded_modules: Sequence[str] = [
         mod_name for mod_name, mod in sys.modules.items() if module_in_prefix(mod, path)
     ]
     for mod_name in loaded_modules:
