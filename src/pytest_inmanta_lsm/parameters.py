@@ -16,7 +16,6 @@
     Contact: code@inmanta.com
 """
 import os
-import pytest
 from pathlib import Path
 
 from pytest_inmanta.test_parameter import (

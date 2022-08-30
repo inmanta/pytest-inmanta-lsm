@@ -5,16 +5,16 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+
+# Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
+
 import os
 import shutil
 import subprocess
 from pathlib import Path
 
-# Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
-import yaml
-from pytest import Testdir, fixture
-
 import utils
+from pytest import Testdir, fixture
 
 HOME = os.getenv("HOME", "")
 

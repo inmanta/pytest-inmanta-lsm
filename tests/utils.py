@@ -9,13 +9,16 @@
 import contextlib
 import importlib
 import os
-import py
 import subprocess
 import sys
 import tempfile
-from inmanta import env
+from importlib.abc import Loader
 from types import ModuleType
-from typing import Optional, Iterator, Sequence
+from typing import Iterator, Optional, Sequence, Tuple
+
+import py
+import yaml
+from inmanta import env
 
 
 def add_version_constraint_to_project(project_dir: py.path.local):
@@ -70,16 +73,14 @@ def activate_venv(venv: env.VirtualEnv) -> Iterator[env.VirtualEnv]:
         try:
             yield unique_env
         finally:
-            utils.unload_modules_for_path(unique_env.site_packages_dir)
+            unload_modules_for_path(unique_env.site_packages_dir)
 
 
 def venv_unset_python_path(venv: env.VirtualEnv) -> None:
     """
     Workaround for pypa/build#405: unset PYTHONPATH because it's not required in this case and it triggers a bug in build
     """
-    sitecustomize_existing: Optional[
-        Tuple[Optional[str], Loader]
-    ] = env.ActiveEnv.get_module_file("sitecustomize")
+    sitecustomize_existing: Optional[Tuple[Optional[str], Loader]] = env.ActiveEnv.get_module_file("sitecustomize")
     # inherit from existing sitecustomize.py
     sitecustomize_inherit: str
     if sitecustomize_existing is not None and sitecustomize_existing[0] is not None:
@@ -109,9 +110,7 @@ def unload_modules_for_path(path: str) -> None:
         file: Optional[str] = getattr(module, "__file__", None)
         return file.startswith(prefix) if file is not None else False
 
-    loaded_modules: Sequence[str] = [
-        mod_name for mod_name, mod in sys.modules.items() if module_in_prefix(mod, path)
-    ]
+    loaded_modules: Sequence[str] = [mod_name for mod_name, mod in sys.modules.items() if module_in_prefix(mod, path)]
     for mod_name in loaded_modules:
         del sys.modules[mod_name]
     importlib.invalidate_caches()
