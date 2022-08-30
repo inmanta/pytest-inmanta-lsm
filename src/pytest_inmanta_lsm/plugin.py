@@ -149,6 +149,11 @@ def remote_orchestrator_settings() -> Dict[str, Union[str, int, bool]]:
     return {}
 
 
+@pytest.fixture(scope="session")
+def remote_orchestrator_partial(request: pytest.FixtureRequest) -> Iterator[bool]:
+    yield inm_lsm_partial_compile.resolve(request.config)
+
+
 @pytest.fixture
 def remote_orchestrator(
     project: Project,
@@ -203,7 +208,7 @@ def remote_orchestrator(
         "autostart_agent_deploy_interval": 600,
         "autostart_agent_repair_splay_time": 600,
         "autostart_agent_repair_interval": 0,
-        "lsm_partial_compile": inm_lsm_partial_compile.resolve(request.config),
+        "lsm_partial_compile": remote_orchestrator_partial,
     }
     settings.update(remote_orchestrator_settings)
 
