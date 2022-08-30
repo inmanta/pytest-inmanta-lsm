@@ -17,6 +17,8 @@
 """
 
 
+# TODO: test partial fixture
+# TODO: test patial behavior
 def test_compile(project) -> None:
     project.compile(
         """
