@@ -15,3 +15,11 @@
 
     Contact: code@inmanta.com
 """
+
+
+def test_compile(project) -> None:
+    project.compile(
+        """
+        import test_partial
+        """
+    )
