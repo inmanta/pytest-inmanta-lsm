@@ -116,7 +116,6 @@ inm_lsm_env = StringTestParameter(
 # This is the legacy noclean and ssl option
 # TODO remove this in next major version bump
 class _LegacyBooleanTestParameter(BooleanTestParameter):
-
     @property
     def action(self) -> str:
         """
