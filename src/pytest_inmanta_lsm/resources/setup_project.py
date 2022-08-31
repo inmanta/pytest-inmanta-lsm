@@ -21,7 +21,7 @@ import pathlib
 import sys
 from typing import List
 
-from inmanta import env, module, moduletool
+from inmanta import env, module
 
 # The project_path has to be provided in env var
 project_path = pathlib.Path(os.environ["PROJECT_PATH"])
@@ -76,29 +76,10 @@ for dir in (project_path / "libs").iterdir():
     v2_modules.append(mod)
     LOGGER.info(f"Module {mod.name} is v2, we will attempt to install it")
 
-
-class MockBuilder(moduletool.V2ModuleBuilder):
-    """
-    This mock builder allows us to build the v2 modules python package correctly.
-    We can not install them using python as some required files (like setup.cfg)
-    would not be included in the target.
-    """
-
-    def build(self, output_directory: str) -> str:
-        self._ensure_plugins(output_directory)
-        self._move_data_files_into_namespace_package_dir(output_directory)
-        return output_directory
-
-
-# Building modules
-for mod in v2_modules:
-    LOGGER.info(f"Building module {mod.name}")
-    MockBuilder(mod.path).build(mod.path)
-
 # Install all v2 modules in editable mode
 if v2_modules:
     LOGGER.info(f"Installing modules from source: {[mod.name for mod in v2_modules]}")
-    project.virtualenv.install_from_source([env.LocalPackagePath(mod.path) for mod in v2_modules])
+    project.virtualenv.install_from_source([env.LocalPackagePath(mod.path, editable=True) for mod in v2_modules])
 
 # Install all other dependencies
 LOGGER.info("Installing other project dependencies")
