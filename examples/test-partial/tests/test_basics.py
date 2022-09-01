@@ -41,5 +41,8 @@ def test_service_instances(project, remote_orchestrator: RemoteOrchestrator, rem
     remote_orchestrator.export_service_entities()
 
     # verify the service is in the catalog
-    result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, service)
+    result = remote_orchestrator.client.lsm_service_catalog_get_entity(remote_orchestrator.environment, service)
     assert result.code == 200
+
+    # TODO
+    assert False

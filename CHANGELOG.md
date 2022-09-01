@@ -1,8 +1,10 @@
 # v 1.9.0 (?)
 Changes in this release:
 
+- Added `--lsm-partial-compile` option to enable partial compiles the remote orchestrator (for supported versions)
 - We now automatically install all V2 modules found in de library path in editable mode on the remote orchestrator
 - Fix legacy option usage for `lsm_noclean` and `lsm_ssl` (introduced in 1.6.0).
+- Don't delete unittest module on remote orchestrator when `--use-module-in-place` is used
 
 # v 1.8.0 (2022-07-14)
 Changes in this release:
