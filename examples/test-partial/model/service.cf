@@ -1,0 +1,18 @@
+import lsm
+import lsm::fsm
+import test_partial
+
+
+binding = lsm::ServiceEntityBinding(
+    service_entity="test_partial::Network",
+    lifecycle=lsm::fsm::simple,
+    service_entity_name="network",
+)
+
+for assignment in lsm::all(binding):
+    test_partial::Network(
+        entity_binding=binding,
+        instance_id=assignment["id"],
+        **assignment["attributes"],
+    )
+end

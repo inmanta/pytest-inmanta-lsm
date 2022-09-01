@@ -6,30 +6,48 @@ entity Network extends lsm::ServiceEntity:
     A network consisting of routers. Each network is modelled fully independent from others.
     """
     int id
+    int nb_routers = 5
 end
 Network.routers [0:] -- Router.network [1]
-
 index Network(id)
 
-implementation network_resource_set for Network:
-    # The Router resources for a network are all part of the same resource set
-    set = std::ResourceSet(name="network-{{ self.id }}")
-    for router in self.routers:
+implementation routers for Network:
+    for i in std::sequence(nb_routers):
+        router = Router(network=self, id=i)
+        self.owned_resources += router.resource
+        self.routers += router
         set.resources += router
     end
 end
 
 
-entity Router extends std::Resource:
+entity Router:
     int id
 end
+Router.resource [1] -- UnittestResourceStub
 index Router(network, id)
 
 implementation router for Router:
+    # resource owned by this router
+    self.resource = UnittestResourceStub(
+        name="router-{{ self.network.id }}-{{ self.id }}",
+        desired_value=self.resource.name,
+    )
     # Resource that doesn't belong to any resource set and is shared
-    std::AgentConfig(autostart=true, agentname="router_agent")
+    UnittestResourceStub(name="mysharedresource", desired_value="Hello World!")
 end
 
 
-implement Network using network_resource_set
+implement Network using parents, routers
 implement Router using router
+
+
+entity UnittestResourceStub:
+    # Can't import unittest here, test cases should refine instances into unittest::Resource
+    string name
+    string desired_value
+end
+
+index UnittestResourceStub(name)
+
+implement UnittestResourceStub using std::none

@@ -51,5 +51,19 @@ def test_partial_compile(testdir, testmodulev2_venv_active):
 
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
-    result = testdir.runpytest_inprocess("tests/test_partial.py")
-    result.assert_outcomes(passed=1)
+    result = testdir.runpytest_inprocess("tests/test_basics.py", "--lsm-partial-compile")
+    result.assert_outcomes(passed=3)
+
+
+def test_partial_disabled(testdir, testmodulev2_venv_active):
+    """
+    Test behavior of the --lsm-partial-compile option.
+    """
+
+    testdir.copy_example("test-partial")
+
+    utils.add_version_constraint_to_project(testdir.tmpdir)
+
+    result = testdir.runpytest_inprocess("tests/test_basics.py")
+    # one test asserts partial is enabled
+    result.assert_outcomes(passed=2, failed=1)
