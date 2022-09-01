@@ -51,7 +51,8 @@ def test_partial_compile(testdir, testmodulev2_venv_active):
 
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
-    result = testdir.runpytest_inprocess("tests/test_basics.py", "--lsm-partial-compile")
+    # TODO: remove --use-module-in-place or create ticket
+    result = testdir.runpytest_inprocess("tests/test_basics.py", "--lsm-partial-compile", "--use-module-in-place")
     result.assert_outcomes(passed=3)
 
 
@@ -64,6 +65,6 @@ def test_partial_disabled(testdir, testmodulev2_venv_active):
 
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
-    result = testdir.runpytest_inprocess("tests/test_basics.py")
+    result = testdir.runpytest_inprocess("tests/test_basics.py", "--use-module-in-place")
     # one test asserts partial is enabled
     result.assert_outcomes(passed=2, failed=1)

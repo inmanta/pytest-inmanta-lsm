@@ -7,6 +7,7 @@ entity Network extends lsm::ServiceEntity:
     """
     int id
     int nb_routers = 5
+    lsm::attribute_modifier nb_routers__modifier="rw+"
 end
 Network.routers [0:] -- Router.network [1]
 index Network(id)
@@ -14,9 +15,12 @@ index Network(id)
 implementation routers for Network:
     for i in std::sequence(nb_routers):
         router = Router(network=self, id=i)
-        self.owned_resources += router.resource
         self.routers += router
-        set.resources += router
+        # resources owned by this instance
+        self.owned_resources += router.resource
+        # all resources, including one that doesn't belong to any resource set and is shared
+        stub = UnittestResourceStub(name="mysharedresource")
+        self.resources += [router.resource, stub.resource]
     end
 end
 
@@ -24,17 +28,14 @@ end
 entity Router:
     int id
 end
-Router.resource [1] -- UnittestResourceStub
+Router.resource [1] -- std::Resource
 index Router(network, id)
 
 implementation router for Router:
-    # resource owned by this router
-    self.resource = UnittestResourceStub(
+    stub = UnittestResourceStub(
         name="router-{{ self.network.id }}-{{ self.id }}",
-        desired_value=self.resource.name,
     )
-    # Resource that doesn't belong to any resource set and is shared
-    UnittestResourceStub(name="mysharedresource", desired_value="Hello World!")
+    self.resource = stub.resource
 end
 
 
@@ -43,10 +44,10 @@ implement Router using router
 
 
 entity UnittestResourceStub:
-    # Can't import unittest here, test cases should refine instances into unittest::Resource
+    # Can't import unittest_lsm here, test cases should refine instances into unittest_lsm::Resource
     string name
-    string desired_value
 end
+UnittestResourceStub.resource [1] -- std::Resource
 
 index UnittestResourceStub(name)
 

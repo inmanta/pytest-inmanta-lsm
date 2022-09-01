@@ -7,6 +7,9 @@
 """
 
 import logging
+import os
+import shutil
+import textwrap
 import time
 from typing import Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
@@ -233,3 +236,67 @@ def remote_orchestrator(
 
     if not remote_orchestrator_no_clean:
         remote_orchestrator.clean()
+
+
+@pytest.fixture
+def unittest_lsm(project) -> Iterator[None]:
+    """
+    Adds a module named unittest_lsm to the project with a simple resource that always deploys successfully. The module is
+    compatible with the remote orchestrator fixtures.
+    """
+    name: str = "unittest_lsm"
+    project.create_module(
+        name,
+        initcf=textwrap.dedent(
+            """
+            entity Resource extends std::PurgeableResource:
+                string name
+                string agent = "internal"
+                bool send_event = true
+            end
+
+            index Resource(name)
+
+            implement Resource using std::none
+            """.strip("\n")
+        ),
+        initpy=textwrap.dedent(
+            '''
+            from inmanta import resources
+            from inmanta.agent import handler
+
+
+            @resources.resource("unittest_lsm::Resource", id_attribute="name", agent="agent")
+            class Resource(resources.PurgeableResource):
+                fields = ("name",)
+
+
+            @handler.provider("unittest_lsm::Resource", name="dummy")
+            class ResourceHandler(handler.CRUDHandler):
+                def read_resource(
+                    self, ctx: handler.HandlerContext, resource: resources.PurgeableResource
+                ) -> None:
+                    pass
+
+                def create_resource(
+                    self, ctx: handler.HandlerContext, resource: resources.PurgeableResource
+                ) -> None:
+                    ctx.set_created()
+
+                def delete_resource(
+                    self, ctx: handler.HandlerContext, resource: resources.PurgeableResource
+                ) -> None:
+                    ctx.set_purged()
+
+                def update_resource(
+                    self,
+                    ctx: handler.HandlerContext,
+                    changes: dict,
+                    resource: resources.PurgeableResource,
+                ) -> None:
+                    ctx.set_updated()
+            '''.strip("\n")
+        ),
+    )
+    yield
+    shutil.rmtree(os.path.join(project._test_project_dir, "libs", name))

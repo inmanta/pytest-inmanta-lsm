@@ -267,7 +267,7 @@ class RemoteOrchestrator:
             subprocess.check_output(
                 [
                     "rsync",
-                    # no --delete because project exists in a clean state and we don't want to delete the unittest module
+                    # no --delete because project is in a clean state and we don't want to override previously synced modules
                     "--exclude",
                     ".git",
                     "-e",
