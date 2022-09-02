@@ -3,7 +3,8 @@ Changes in this release:
 
 - Added `--lsm-partial-compile` option to enable partial compiles the remote orchestrator (for supported versions)
 - Added support for testing v2 modules: the module being tested, as well as v2 modules in the libs dir are synced to the
-    remote orchestrator and installed in editable mode.
+    remote orchestrator and installed in editable mode. Dependencies are installed from package sources configured through
+    the `INMANTA_MODULE_REPO` environment variable or the `--module-repo` option.
 - Fix legacy option usage for `lsm_noclean` and `lsm_ssl` (introduced in 1.6.0).
 - Sync all module sources to the remote orchestrator rather than only one
 
