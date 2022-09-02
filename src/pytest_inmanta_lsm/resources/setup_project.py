@@ -52,6 +52,7 @@ def env_vars(var: abc.Mapping[str, str]) -> abc.Iterator[None]:
     """
     Context manager to extend the current environment with one or more environment variables.
     """
+
     def set_env(set_var: abc.Mapping[str, Optional[str]]) -> None:
         for name, value in set_var.items():
             if value is not None:
@@ -99,7 +100,7 @@ for dir in (project_path / "libs").iterdir():
 if v2_modules:
     urls: abc.Sequence[str] = project.module_source.urls
     if not urls:
-        raise Exception(f"No package repos configured for project")
+        raise Exception("No package repos configured for project")
     # plain Python install so core does not apply project's sources -> we need to configure pip index ourselves
     with env_vars({"PIP_INDEX_URL": urls[0], "PIP_EXTRA_INDEX_URL": " ".join(urls[1:])}):
         LOGGER.info(f"Installing modules from source: {[mod.name for mod in v2_modules]}")

@@ -6,9 +6,11 @@
     :license: Inmanta EULA
 """
 import textwrap
+from collections import abc
+
+from inmanta.protocol.common import Result
 from pytest_inmanta_lsm.managed_service_instance import ManagedServiceInstance
 from pytest_inmanta_lsm.remote_orchestrator import RemoteOrchestrator
-from inmanta.protocol.common import Result
 
 
 def test_compile(project) -> None:
@@ -39,7 +41,9 @@ def test_service_instances(
             end
 
             implement test_partial::UnittestResourceStub using resource
-            """.strip("\n")
+            """.strip(
+                "\n"
+            )
         )
     )
     service: str = "network"
@@ -83,7 +87,4 @@ def test_service_instances(
     # first version is always a full compile
     assert result.result["versions"][-1]["partial_base"] is None
     # TODO: looks like there is an inconcsistency between lsm::all and put_partial
-    assert all(
-        (version["partial_base"] is None) != remote_orchestrator_partial
-        for version in result.result["versions"][:-1]
-    )
+    assert all((version["partial_base"] is None) != remote_orchestrator_partial for version in result.result["versions"][:-1])

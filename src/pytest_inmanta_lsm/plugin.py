@@ -15,11 +15,11 @@ from typing import Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
 
 import pytest
-import requests
 import pytest_inmanta.plugin
+import requests
 from inmanta import module
-from pytest_inmanta.plugin import Project
 from pytest_inmanta.parameters import inm_mod_in_place
+from pytest_inmanta.plugin import Project
 from pytest_inmanta.test_parameter import ParameterNotSetException
 
 from pytest_inmanta_lsm.orchestrator_container import (
@@ -173,15 +173,13 @@ def remote_orchestrator_project_shared(request: pytest.FixtureRequest, project_s
         path: str
         mod, path = pytest_inmanta.plugin.get_module()
         # check if a v2 module is installed (no need to do anything for v1 module)
-        installed: Optional[module.ModuleV2] = module.ModuleV2Source(
-            urls=[]
-        ).get_installed_module(None, mod.name)
+        installed: Optional[module.ModuleV2] = module.ModuleV2Source(urls=[]).get_installed_module(None, mod.name)
         if installed is not None:
             if not installed.is_editable() or not os.path.samefile(mod.path, installed.path):
                 LOGGER.warning(
                     "The module being tested is not installed in editable mode. To ensure the remote orchestrator uses the same"
-                    " code as the local project, please install the module with `inmanta module install -e .` before running the"
-                    " tests."
+                    " code as the local project, please install the module with `inmanta module install -e .` before running"
+                    " the tests."
                 )
             # can't rsync and install a non-editable Python package the same way as an editable one (no pyproject.toml/setup.py)
             # => always use the test dir, even if the module is installed in non-editable mode (the user has been warned)
@@ -299,10 +297,12 @@ def unittest_lsm(project) -> Iterator[None]:
             index Resource(name)
 
             implement Resource using std::none
-            """.strip("\n")
+            """.strip(
+                "\n"
+            )
         ),
         initpy=textwrap.dedent(
-            '''
+            """
             from inmanta import resources
             from inmanta.agent import handler
 
@@ -336,7 +336,9 @@ def unittest_lsm(project) -> Iterator[None]:
                     resource: resources.PurgeableResource,
                 ) -> None:
                     ctx.set_updated()
-            '''.strip("\n")
+            """.strip(
+                "\n"
+            )
         ),
     )
     yield
