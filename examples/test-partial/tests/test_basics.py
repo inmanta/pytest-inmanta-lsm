@@ -37,6 +37,7 @@ def test_service_instances(
             implementation resource for test_partial::UnittestResourceStub:
                 self.resource = unittest_lsm::Resource(name=self.name)
             end
+
             implement test_partial::UnittestResourceStub using resource
             """.strip("\n")
         )
@@ -52,10 +53,9 @@ def test_service_instances(
 
     instances: abc.Sequence[ManagedServiceInstance] = [remote_orchestrator.get_managed_instance(service) for i in range(10)]
     for i, instance in enumerate(instances):
-        # create (sort of) asynchronlously: only wait for start state (for first service wait for creating because otherwise a
-        # race between the first validation compile and the logic in lsm could result in the first few validation compiles to be
-        # full compiles, complicating test assertions
-        instance.create({"id": i, "nb_routers": 5}, wait_for_state="creating" if i == 0 else "start")
+        # create (sort of) asynchronlously: only wait for start state (for first service wait for up because otherwise a
+        # lsm needs at least one model version to be able to trigger a partial compile
+        instance.create({"id": i, "nb_routers": 5}, wait_for_state="up" if i == 0 else "start")
     for instance in instances:
         instance.wait_for_state(state="up")
 
@@ -82,6 +82,7 @@ def test_service_instances(
     result: Result = remote_orchestrator.client.list_versions(remote_orchestrator.environment)
     # first version is always a full compile
     assert result.result["versions"][-1]["partial_base"] is None
+    # TODO: looks like there is an inconcsistency between lsm::all and put_partial
     assert all(
         (version["partial_base"] is None) != remote_orchestrator_partial
         for version in result.result["versions"][:-1]
