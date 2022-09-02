@@ -9,6 +9,7 @@ import textwrap
 from collections import abc
 
 from inmanta.protocol.common import Result
+
 from pytest_inmanta_lsm.managed_service_instance import ManagedServiceInstance
 from pytest_inmanta_lsm.remote_orchestrator import RemoteOrchestrator
 
