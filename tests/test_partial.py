@@ -22,7 +22,7 @@ from inmanta import env
 
 
 @pytest.fixture(scope="session")
-def test_partial_env(pytestconfig) -> abc.Iterator[env.VirtualEnv]:
+def module_venv(pytestconfig) -> abc.Iterator[env.VirtualEnv]:
     """
     Yields a Python environment with test_partial installed in it.
     """
@@ -31,18 +31,18 @@ def test_partial_env(pytestconfig) -> abc.Iterator[env.VirtualEnv]:
 
 
 @pytest.fixture(scope="function")
-def testmodulev2_venv_active(
+def module_venv_active(
     deactive_venv: None,
-    test_partial_env: env.VirtualEnv,
+    module_venv: env.VirtualEnv,
 ) -> abc.Iterator[env.VirtualEnv]:
     """
     Activates a Python environment with test_partial installed in it for the currently running process.
     """
-    with utils.activate_venv(test_partial_env) as venv:
+    with utils.activate_venv(module_venv) as venv:
         yield venv
 
 
-def test_partial_compile(testdir, testmodulev2_venv_active):
+def test_partial_compile(testdir, module_venv_active):
     """
     Test behavior of the --lsm-partial-compile option.
     """
@@ -55,7 +55,7 @@ def test_partial_compile(testdir, testmodulev2_venv_active):
     result.assert_outcomes(passed=3)
 
 
-def test_partial_disabled(testdir, testmodulev2_venv_active):
+def test_partial_disabled(testdir, module_venv_active):
     """
     Test behavior of the --lsm-partial-compile option.
     """
