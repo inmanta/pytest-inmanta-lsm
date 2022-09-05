@@ -87,5 +87,4 @@ def test_service_instances(
     result: Result = remote_orchestrator.client.list_versions(remote_orchestrator.environment)
     # first version is always a full compile
     assert result.result["versions"][-1]["partial_base"] is None
-    # TODO: looks like there is an inconcsistency between lsm::all and put_partial
     assert all((version["partial_base"] is None) != remote_orchestrator_partial for version in result.result["versions"][:-1])
