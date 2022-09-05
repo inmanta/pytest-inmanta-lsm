@@ -62,7 +62,7 @@ def module_v2_venv(module_path: str) -> Iterator[env.VirtualEnv]:
 @contextlib.contextmanager
 def activate_venv(venv: env.VirtualEnv) -> Iterator[env.VirtualEnv]:
     """
-    Activates a given Python environment for the currently running process. To prevent
+    Activates a given Python environment for the currently running process.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a unique venv dir to prevent caching issues with inmanta_plugins' submodule_search_locations
