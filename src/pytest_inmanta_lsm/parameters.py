@@ -156,6 +156,14 @@ inm_lsm_no_clean = BooleanTestParameter(
     legacy=inm_lsm_noclean_legacy,
 )
 
+inm_lsm_partial_compile = BooleanTestParameter(
+    argument="--lsm-partial-compile",
+    environment_variable="INMANTA_LSM_PARTIAL_COMPILE",
+    usage="Enable partial compiles on the remote orchestrator",
+    default=False,
+    group=param_group,
+)
+
 # This is the legacy lsm container env option
 # TODO remove this in next major version bump
 inm_lsm_container_env_legacy = _LegacyBooleanTestParameter(

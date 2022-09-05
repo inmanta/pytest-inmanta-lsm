@@ -1,0 +1,62 @@
+"""
+    Pytest Inmanta LSM
+
+    :copyright: 2022 Inmanta
+    :contact: code@inmanta.com
+    :license: Inmanta EULA
+"""
+
+import lsm
+
+
+entity Network extends lsm::ServiceEntity:
+    """
+    A network consisting of routers. Each network is modelled fully independent from others.
+    """
+    int id
+    int nb_routers = 5
+    lsm::attribute_modifier nb_routers__modifier="rw+"
+end
+Network.routers [0:] -- Router.network [1]
+index Network(id)
+
+implementation routers for Network:
+    for i in std::sequence(nb_routers):
+        router = Router(network=self, id=i)
+        self.routers += router
+        # resources owned by this instance
+        self.owned_resources += router.resource
+        # all resources, including one that doesn't belong to any resource set and is shared
+        stub = UnittestResourceStub(name="mysharedresource")
+        self.resources += [router.resource, stub.resource]
+    end
+end
+
+
+entity Router:
+    int id
+end
+Router.resource [1] -- std::Resource
+index Router(network, id)
+
+implementation router for Router:
+    stub = UnittestResourceStub(
+        name="router-{{ self.network.id }}-{{ self.id }}",
+    )
+    self.resource = stub.resource
+end
+
+
+implement Network using parents, routers
+implement Router using router
+
+
+entity UnittestResourceStub:
+    # Can't import unittest_lsm here, test cases should refine instances into unittest_lsm::Resource
+    string name
+end
+UnittestResourceStub.resource [1] -- std::Resource
+
+index UnittestResourceStub(name)
+
+implement UnittestResourceStub using std::none
