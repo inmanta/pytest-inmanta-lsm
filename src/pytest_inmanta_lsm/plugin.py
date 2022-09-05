@@ -181,9 +181,13 @@ def remote_orchestrator_project_shared(request: pytest.FixtureRequest, project_s
                     " code as the local project, please install the module with `inmanta module install -e .` before running"
                     " the tests."
                 )
+            destination: str = os.path.join(project_shared._test_project_dir, "libs", mod.name)
+            assert not os.path.exists(
+                destination
+            ), "Invalid state: expected clean libs dir, this is most likely an issue with the implementation of this fixture"
             # can't rsync and install a non-editable Python package the same way as an editable one (no pyproject.toml/setup.py)
             # => always use the test dir, even if the module is installed in non-editable mode (the user has been warned)
-            shutil.copytree(mod.path, os.path.join(project_shared._test_project_dir, "libs", mod.name))
+            shutil.copytree(mod.path, destination)
     yield
 
 
