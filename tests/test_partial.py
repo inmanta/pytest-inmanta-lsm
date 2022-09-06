@@ -32,7 +32,7 @@ def module_venv(pytestconfig) -> abc.Iterator[env.VirtualEnv]:
 
 @pytest.fixture(scope="function")
 def module_venv_active(
-    deactive_venv: None,
+    deactive_venv: abc.Iterator[None],
     module_venv: env.VirtualEnv,
 ) -> abc.Iterator[env.VirtualEnv]:
     """
