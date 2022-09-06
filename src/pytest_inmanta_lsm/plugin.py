@@ -171,11 +171,20 @@ def remote_orchestrator_project_shared(request: pytest.FixtureRequest, project_s
     if hasattr(module, "ModuleV2") and not in_place:
         mod: module.Module
         path: str
-        mod, path = pytest_inmanta.plugin.get_module()
-        # check if a v2 module is installed (no need to do anything for v1 module)
+        mod, _ = pytest_inmanta.plugin.get_module()
+
+        # mod object is constructed from the source dir: it does not contain all installation metadata
         installed: Optional[module.ModuleV2] = module.ModuleV2Source(urls=[]).get_installed_module(None, mod.name)
-        if installed is not None:
-            if not installed.is_editable() or not os.path.samefile(mod.path, installed.path):
+        if isinstance(mod, module.ModuleV1):
+            # no need to do anything for v1 module except raise a warning in some edge scenarios
+            if installed is not None:
+                LOGGER.warning(
+                    "The module being tested is a v1 module but it is also installed as a v2 module. Local compiles will use"
+                    "the v2, but only the v1 will by synced to the server."
+                )
+        else:
+            # put v2 module in libs dir so it will be rsynced to the server
+            if not installed.is_editable() or not os.path.samefile(installed.path, mod.path):
                 LOGGER.warning(
                     "The module being tested is not installed in editable mode. To ensure the remote orchestrator uses the same"
                     " code as the local project, please install the module with `inmanta module install -e .` before running"
