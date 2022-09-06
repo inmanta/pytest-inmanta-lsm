@@ -22,7 +22,7 @@ def set_cwd(testdir):
     pytest_inmanta.plugin.CURDIR = os.getcwd()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="function", autouse=True)
 def deactive_venv():
     old_os_path = os.environ.get("PATH", "")
     old_prefix = sys.prefix
