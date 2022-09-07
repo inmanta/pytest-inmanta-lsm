@@ -1,4 +1,4 @@
-# v 1.9.0 (?)
+# v 1.9.0 (2022-09-07)
 Changes in this release:
 
 - Added `--lsm-partial-compile` option to enable partial compiles on the remote orchestrator (for supported versions)
