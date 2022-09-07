@@ -142,8 +142,8 @@ class ManagedServiceInstance:
         timeout: int = DEFAULT_TIMEOUT,
     ) -> None:
         """
-        Update the service instance with the given `attributes_updates` and wait for it to go into `wait_for_state` or one
-        of `wait_for_states` and have version `version` or one of versions `versions` if those are provided
+        Update the service instance with the given `attribute_updates` and wait for it to go into `wait_for_state` or one
+        of `wait_for_states` and have version `new_version` or one of versions `new_versions` if those are provided
 
         :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is not set, otherwise
             None
@@ -294,7 +294,8 @@ class ManagedServiceInstance:
     ) -> None:
         """
         Wait for the service instance to go into `state` or one of `states` and
-        have version `version` or one of versions `versions` if those are provided
+        have version `version` or one of versions `versions` if those are provided. There is no risk of skipping over short
+        states.
 
         :param state: Poll until the service instance reaches this state, defaults to None
         :param states: Poll until the service instance reaches one of those states, defaults to None

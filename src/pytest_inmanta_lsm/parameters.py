@@ -1,5 +1,5 @@
 """
-    Copyright 2022 Inmanta
+    :Copyright: 2022 Inmanta
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -116,6 +116,14 @@ inm_lsm_env = StringTestParameter(
 # This is the legacy noclean and ssl option
 # TODO remove this in next major version bump
 class _LegacyBooleanTestParameter(BooleanTestParameter):
+    @property
+    def action(self) -> str:
+        """
+        Overwrite the default boolean test parameter action to instead store a string.  This matches
+        the former behavior.
+        """
+        return "store"
+
     def resolve(self, config: "Config") -> bool:
         """
         The legacy option for --lsm_noclean and --lsm_ssl requires some more treatment than the other
@@ -146,6 +154,14 @@ inm_lsm_no_clean = BooleanTestParameter(
     default=False,
     group=param_group,
     legacy=inm_lsm_noclean_legacy,
+)
+
+inm_lsm_partial_compile = BooleanTestParameter(
+    argument="--lsm-partial-compile",
+    environment_variable="INMANTA_LSM_PARTIAL_COMPILE",
+    usage="Enable partial compiles on the remote orchestrator",
+    default=False,
+    group=param_group,
 )
 
 # This is the legacy lsm container env option
