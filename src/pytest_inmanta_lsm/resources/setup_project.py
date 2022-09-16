@@ -57,6 +57,8 @@ def env_vars(var: abc.Mapping[str, str]) -> abc.Iterator[None]:
         for name, value in set_var.items():
             if value is not None:
                 os.environ[name] = value
+            elif name in os.environ:
+                del os.environ[name]
 
     old_env: abc.Mapping = {name: os.environ.get(name, None) for name in var}
     set_env(var)
