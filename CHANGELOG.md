@@ -1,3 +1,9 @@
+# v 1.9.1 (2022-09-16)
+Changes in this release:
+
+- Correctly reset pip environment variables after v2 modules installation on remote orchestrator
+
+
 # v 1.9.0 (2022-09-07)
 Changes in this release:
 
