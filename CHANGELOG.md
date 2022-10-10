@@ -1,6 +1,8 @@
 # v 1.10.0 (?)
 Changes in this release:
 
+- Re-enable printing of diagnose output on failure states
+
 # v 1.9.1 (2022-09-16)
 Changes in this release:
 

@@ -351,7 +351,7 @@ class ManagedServiceInstance:
                 return False
             return current_state.version == start_version
 
-        def get_bad_state_error(current_state: State) -> FullDiagnosis:
+        def get_bad_state_error(current_state: State) -> Dict[str, Any]:
             result = self.remote_orchestrator.client.lsm_services_diagnose(
                 tid=self.remote_orchestrator.environment,
                 service_entity=self.service_entity_name,
@@ -363,7 +363,7 @@ class ManagedServiceInstance:
                 f"{json.dumps(result.result or {}, indent=4)}"
             )
 
-            return FullDiagnosis(**result.result["data"])
+            return result.result["data"]
 
         wait_for_obj = WaitForState(
             "Instance lifecycle",
