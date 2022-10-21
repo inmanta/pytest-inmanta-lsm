@@ -4,6 +4,8 @@
     :copyright: 2020 Inmanta
     :contact: code@inmanta.com
     :license: Inmanta EULA
+
+    More information regarding how this test suite works, can be found in the README.md file.
 """
 
 import os
