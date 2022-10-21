@@ -1,6 +1,8 @@
 # v 1.10.0 (?)
 Changes in this release:
 
+- Add documentation regarding the structure of the test suite.
+
 # v 1.9.1 (2022-09-16)
 Changes in this release:
 

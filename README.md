@@ -15,8 +15,7 @@ It requires an LSM enabled orchestrator, with no ssl or authentication enabled, 
 
 ## Usage
 
-This plugin is built around the remote_orchestrator fixture. 
-It offers features to 
+This plugin is built around the remote_orchestrator fixture.
 
 A typical testcase using this plugin looks as follows:
 ```python
@@ -150,6 +149,13 @@ pytest-inmanta-lsm:
 
 ## Running tests
 
+### How the test suite is structured
+
+The test suite consists of two parts:
+
+* The tests defined in `tests/test_containerized_orchestrator.py` file always run against a container started by the test suite itself.
+* All other tests run against the orchestrator specified by the options passed to the pytest command.
+
 ### Pre-requisites
  Testing (and using) pytest-inmanta-lsm requires:
 - an available orchestrator to test against
@@ -168,12 +174,12 @@ export INMANTA_LSM_USER=<user>
 ```
 
 3. set the repo for inmanta to pull LSM from
- 
+
  ```bash
 export INMANTA_MODULE_REPO=https://USER:LICENSE_TOKEN@modules.inmanta.com/git/inmanta-service-orchestrator/5/{}.git
 ```
 4. run the tests
- 
+
  ```bash
     pytest tests
 ```
