@@ -104,7 +104,13 @@ if v2_modules:
     if not urls:
         raise Exception("No package repos configured for project")
     # plain Python install so core does not apply project's sources -> we need to configure pip index ourselves
-    with env_vars({"PIP_INDEX_URL": urls[0], "PIP_EXTRA_INDEX_URL": " ".join(urls[1:])}):
+    with env_vars(
+        {
+            "PIP_INDEX_URL": urls[0],
+            "PIP_PRE": "0" if project.install_mode == module.InstallMode.release else "1",
+            "PIP_EXTRA_INDEX_URL": " ".join(urls[1:]),
+        }
+    ):
         LOGGER.info(f"Installing modules from source: {[mod.name for mod in v2_modules]}")
         project.virtualenv.install_from_source([env.LocalPackagePath(mod.path, editable=True) for mod in v2_modules])
 
