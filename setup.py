@@ -53,7 +53,7 @@ setup(
     },
     include_package_data=True,
     install_requires=[
-        "pytest-inmanta~=2.3",
+        "pytest-inmanta~=2.5.dev",
         "inmanta-lsm",
     ],
     classifiers=[
