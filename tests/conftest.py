@@ -32,6 +32,7 @@ def reset_pytest_inmanta_state():
     pytest_inmanta.plugin.ProjectLoader.reset()
 
 
+@pytest.fixture(scope="function", autouse=True)
 def deactive_venv():
     old_os_path = os.environ.get("PATH", "")
     old_prefix = sys.prefix
