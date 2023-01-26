@@ -6,12 +6,12 @@
 import copy
 import datetime
 import functools
-import json
 import typing
 import uuid
 
 import inmanta.config
 import inmanta.protocol.common
+import inmanta.util
 import inmanta_lsm.const
 import inmanta_lsm.model
 import pytest
@@ -129,7 +129,11 @@ class LsmProject:
         return inmanta.protocol.common.Result(
             code=200,
             result={
-                "data": [json.loads(srv.json()) for srv in self.services.values() if srv.service_entity == service_entity],
+                "data": [
+                    inmanta.util.api_boundary_json_encoder(srv)
+                    for srv in self.services.values()
+                    if srv.service_entity == service_entity
+                ],
             },
         )
 
