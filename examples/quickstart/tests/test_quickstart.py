@@ -109,4 +109,8 @@ def test_model(lsm_project: lsm_project.LsmProject) -> None:
 
     lsm_project.add_service(service)
 
+    # Do a first compile, everything should go fine
+    lsm_project.compile("import quickstart", service_id=service.id)
+
+    # Do a second compile, everything should go fine
     lsm_project.compile("import quickstart", service_id=service.id)
