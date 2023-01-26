@@ -5,6 +5,7 @@
 """
 import copy
 import datetime
+import functools
 import json
 import typing
 import uuid
@@ -25,18 +26,6 @@ INMANTA_LSM_MODULE_NOT_LOADED = (
 )
 
 
-def reset() -> None:
-    try:
-        # Import lsm module in function scope for usage with v1 modules
-        import inmanta_plugins.lsm
-    except ImportError as e:
-        raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
-
-    # Reset the global cache as it used to be, but keep the client
-    inmanta_plugins.lsm.global_cache._instances_per_binding = {}
-    inmanta_plugins.lsm.global_cache._current_state_cache = {}
-
-
 class LsmProject:
     def __init__(
         self,
@@ -51,21 +40,67 @@ class LsmProject:
         self.monkeypatch = monkeypatch
         self.partial_compile = partial_compile
 
+        # We monkeypatch the client and the global cache now so that the project.compile
+        # method can still be used normally, to perform "global" compiles (not specific to
+        # a service)
+        # The monkeypatching we do later in the `compile` method is only there to specify to
+        # lsm which service has "triggered" the compilation.
+        self.monkeypatch_client()
+        self.monkeypatch_lsm_global_cache_reset()
+
+    @property
+    def environment(self) -> str:
+        return str(inmanta.config.Config.get("config", "environment"))
+
+    def monkeypatch_lsm_global_cache_reset(self) -> None:
+        """
+        This helper method monkeypatches the reset method of the global_cache of the lsm module.
+        We make sure to pass to save the original reset method implementation so that it can be
+        called by the monkeypatched method.
+
+        This method should only be called once, in the constructor.  If it is called multiple times,
+        the reset method will be monkeypatched multiple times.  It should not hurt, but it is useless.
+        """
         try:
             # Import lsm module in function scope for usage with v1 modules
             import inmanta_plugins.lsm
         except ImportError as e:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
 
-        monkeypatch.setattr(inmanta_plugins.lsm.global_cache, "reset", reset)
+        # Monkeypatch the global cache reset function to be sure that every time it
+        # is called we also monkey patch the client
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache,
+            "reset",
+            functools.partial(
+                self.lsm_global_cache_reset,
+                inmanta_plugins.lsm.global_cache.reset,
+            ),
+        )
 
+    def monkeypatch_client(self) -> None:
+        """
+        This helper method monkeypatches the inmanta client object used by the lsm global cache, to
+        make sure that all calls to the lsm api are instead handled locally.  For now we only need to
+        patch two calls:
+        - lsm_services_list: This way we will return as being part of the lsm inventory the services
+            that have been added to this instance of the LsmProject object.
+        - lsm_services_update_attributes: This way we can, during allocation, update the values of the
+            services we have in our local/mocked inventory.
+        """
+        try:
+            # Import lsm module in function scope for usage with v1 modules
+            import inmanta_plugins.lsm
+        except ImportError as e:
+            raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
+
+        # Then we monkeypatch the client
         self.monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_list",
             self.lsm_services_list,
             raising=False,
         )
-
         self.monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_update_attributes",
@@ -73,9 +108,17 @@ class LsmProject:
             raising=False,
         )
 
-    @property
-    def environment(self) -> str:
-        return str(inmanta.config.Config.get("config", "environment"))
+    def lsm_global_cache_reset(self, original_global_cache_reset_method: typing.Callable[[], None]) -> None:
+        """
+        This is a placeholder for the lsm global_cache reset method.  First it calls the original method,
+        to ensure that we keep its behavior, whatever it is.  Then it re-monkeypatches the client, as it has
+        been re-created in the reset call.
+        """
+        # First we call the original reset method, letting it do its reset thing
+        original_global_cache_reset_method()
+
+        # Monkeypatch the client because it was just re-created by the reset function
+        self.monkeypatch_client()
 
     def lsm_services_list(self, tid: uuid.UUID, service_entity: str) -> inmanta.protocol.common.Result:
         """
