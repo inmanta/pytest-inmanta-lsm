@@ -6,6 +6,7 @@
 import copy
 import datetime
 import functools
+import json
 import typing
 import uuid
 
@@ -126,11 +127,20 @@ class LsmProject:
         all the instances of a service.
         """
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
+        # The serialization we do here is equivalent to what is done by the inmanta server
+        # here:
+        #   https://github.com/inmanta/inmanta-core/blob/deb2798d91c0bdf8d6ecc63ad54f562494c55cb2/
+        #   src/inmanta/protocol/common.py#L948
+        # then here:
+        #   https://github.com/inmanta/inmanta-core/blob/deb2798d91c0bdf8d6ecc63ad54f562494c55cb2/
+        #   src/inmanta/protocol/rest/server.py#L101
+        # And then deserialized in the client.
         return inmanta.protocol.common.Result(
             code=200,
             result={
                 "data": [
-                    inmanta.util.api_boundary_json_encoder(srv)
+                    json.loads(json.dumps(srv, default=inmanta.util.api_boundary_json_encoder))
                     for srv in self.services.values()
                     if srv.service_entity == service_entity
                 ],
