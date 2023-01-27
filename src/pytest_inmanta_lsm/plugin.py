@@ -11,6 +11,7 @@ import os
 import shutil
 import textwrap
 import time
+import uuid
 from typing import Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
 
@@ -22,6 +23,7 @@ from pytest_inmanta.parameters import inm_mod_in_place
 from pytest_inmanta.plugin import Project
 from pytest_inmanta.test_parameter import ParameterNotSetException
 
+from pytest_inmanta_lsm import lsm_project
 from pytest_inmanta_lsm.orchestrator_container import (
     DoNotCleanOrchestratorContainer,
     OrchestratorContainer,
@@ -61,6 +63,20 @@ except ImportError:
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+@pytest.fixture(name="lsm_project")
+def lsm_project_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+    project: pytest_inmanta.plugin.Project,
+    remote_orchestrator_partial: bool,
+) -> "lsm_project.LsmProject":
+    return lsm_project.LsmProject(
+        uuid.uuid4(),
+        project,
+        monkeypatch,
+        partial_compile=remote_orchestrator_partial,
+    )
 
 
 @pytest.fixture(scope="session")

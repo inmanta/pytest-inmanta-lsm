@@ -3,6 +3,7 @@ Changes in this release:
 
 - Add documentation regarding the structure of the test suite.
 - Install dev version of v2 module dependencies on remote orchestrator when install mode allows for it
+- Import helpers for lsm mocked tests.
 
 # v 1.9.1 (2022-09-16)
 Changes in this release:
