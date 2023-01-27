@@ -9,6 +9,7 @@ import functools
 import json
 import typing
 import uuid
+import warnings
 
 import inmanta.config
 import inmanta.protocol.common
@@ -215,7 +216,8 @@ class LsmProject:
             except AttributeError:
                 # This attribute only exists for iso5+, iso4 doesn't support partial compile.
                 # We then simply don't set the value.
-                pass
+                if self.partial_compile:
+                    warnings.warn("Partial compile is enabled but it is not supported, it will be ignored.")
 
             if validation:
                 # If we have a validation compile, we need to set an additional env var
