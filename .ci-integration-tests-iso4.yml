@@ -1,14 +1,24 @@
+# We want to verify that the pytest-inmanta-lsm pytest plugin works correctly when the tests run against a remote
+# orchestrator installed from RPM and when the remote orchestrator is an inmanta docker container. As such, the
+# configuration mentioned below runs all the tests except the `tests/test_containerized_orchestrator.py` tests against
+# an orchestrator installed from RPM. More information regarding the structure of the test suite can be found in the
+# README.md.
 pipeline_template: ci/inmanta-tools/Jenkinsfile-integration-tests
 repo_name: pytest-inmanta-lsm
 lock:
+    # This machine is used by the subset of tests that do not run against a docker container.
     label: pytest-inmanta-lsm-iso4-dev
     variable: INMANTA_LSM_HOST
     quantity: 1
 additional_constraints:
     - inmanta-lsm~=1.9.2.dev
 env_vars:
+    # This option is ignored when the tests run against a docker container.
     INMANTA_LSM_SSH_USER: rocky
     INMANTA_LSM_MODULE_CONSTRAINTS: "lsm~=2.12.0"
+    # The INMANTA_LSM_CONTAINER environment variable is not set here. The test suite sets the
+    # --lsm-ctr option for the subset of tests that need to run against a docker container.
+    # More information regarding the structure of the test suite can be found in the README.md
     INMANTA_LSM_CONTAINER_IMAGE: code.inmanta.com:4567/solutions/containers/service-orchestrator:4-dev
     INMANTA_LSM_CONTAINER_LICENSE_FILE: /etc/inmanta/license/jenkins.inmanta.com.license
     INMANTA_LSM_CONTAINER_JWE_FILE: /etc/inmanta/license/jenkins.inmanta.com.jwe

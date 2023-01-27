@@ -5,6 +5,12 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+import datetime
+import uuid
+
+import inmanta_lsm.model
+
+from pytest_inmanta_lsm import lsm_project
 
 SERVICE_NAME = "vlan-assignment"
 
@@ -80,3 +86,31 @@ def test_transient_state(project, remote_orchestrator):
 
     # break it down
     service_instance.delete()
+
+
+def test_model(lsm_project: lsm_project.LsmProject) -> None:
+    service = inmanta_lsm.model.ServiceInstance(
+        id=uuid.uuid4(),
+        environment=lsm_project.environment,
+        service_entity="vlan-assignment",
+        version=1,
+        config={},
+        state="start",
+        candidate_attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
+        active_attributes=None,
+        rollback_attributes=None,
+        created_at=datetime.datetime.now(),
+        last_updated=datetime.datetime.now(),
+        callback=[],
+        deleted=False,
+        deployment_progress=None,
+        service_identity_attribute_value=None,
+    )
+
+    lsm_project.add_service(service)
+
+    # Do a first compile, everything should go fine
+    lsm_project.compile("import quickstart", service_id=service.id)
+
+    # Do a second compile, everything should go fine
+    lsm_project.compile("import quickstart", service_id=service.id)

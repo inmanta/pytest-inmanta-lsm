@@ -1,2 +1,2 @@
 inmanta-lsm
-pytest-inmanta==2.3.3
+pytest-inmanta==2.5.0
