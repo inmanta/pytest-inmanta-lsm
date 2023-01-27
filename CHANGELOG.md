@@ -1,5 +1,7 @@
-# v 1.11.0 (?)
+# v 1.10.1 (?)
 Changes in this release:
+
+- Fix lsm mocked tests support for iso4.
 
 # v 1.10.0 (2023-01-27)
 Changes in this release:
