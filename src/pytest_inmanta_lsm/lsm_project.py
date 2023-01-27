@@ -209,7 +209,13 @@ class LsmProject:
         with self.monkeypatch.context() as m:
             m.setenv(inmanta_lsm.const.ENV_INSTANCE_ID, str(service_id))
             m.setenv(inmanta_lsm.const.ENV_INSTANCE_VERSION, str(service.version))
-            m.setenv(inmanta_lsm.const.ENV_PARTIAL_COMPILE, str(self.partial_compile))
+
+            try:
+                m.setenv(inmanta_lsm.const.ENV_PARTIAL_COMPILE, str(self.partial_compile))
+            except AttributeError:
+                # This attribute only exists for iso5+, iso4 doesn't support partial compile.
+                # We then simply don't set the value.
+                pass
 
             if validation:
                 # If we have a validation compile, we need to set an additional env var
