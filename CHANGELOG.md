@@ -1,4 +1,4 @@
-# v 1.10.0 (?)
+# v 1.10.0 (2023-01-27)
 Changes in this release:
 
 - Add documentation regarding the structure of the test suite.
