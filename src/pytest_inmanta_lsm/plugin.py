@@ -7,15 +7,25 @@
 """
 
 import logging
+import os
+import shutil
+import textwrap
 import time
+import uuid
 from typing import Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
 
+import pkg_resources
 import pytest
+import pytest_inmanta.plugin
 import requests
+from inmanta import module
+from packaging import version
+from pytest_inmanta.parameters import inm_mod_in_place
 from pytest_inmanta.plugin import Project
 from pytest_inmanta.test_parameter import ParameterNotSetException
 
+from pytest_inmanta_lsm import lsm_project
 from pytest_inmanta_lsm.orchestrator_container import (
     DoNotCleanOrchestratorContainer,
     OrchestratorContainer,
@@ -35,6 +45,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_env,
     inm_lsm_host,
     inm_lsm_no_clean,
+    inm_lsm_partial_compile,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
     inm_lsm_ssh_user,
@@ -54,6 +65,27 @@ except ImportError:
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+@pytest.fixture(name="lsm_project")
+def lsm_project_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+    project: pytest_inmanta.plugin.Project,
+    remote_orchestrator_partial: bool,
+) -> "lsm_project.LsmProject":
+    core_version = version.Version(pkg_resources.get_distribution("inmanta-core").version)
+    if core_version < version.Version("6"):
+        # Before inmanta-core==6.0.0, the compile resets the inmanta plugins between each compile, which makes
+        # the monkeypatching of plugins impossible.  This makes this fixture irrelevant in such case.
+        # https://github.com/inmanta/inmanta-core/blob/fd44f3a765e4865cc7179d825fe345fe0540897a/src/inmanta/module.py#L1525
+        pytest.skip(f"The lsm_project fixture is not usable with this version of inmanta-core: {core_version} (< 6)")
+
+    return lsm_project.LsmProject(
+        uuid.uuid4(),
+        project,
+        monkeypatch,
+        partial_compile=remote_orchestrator_partial,
+    )
 
 
 @pytest.fixture(scope="session")
@@ -123,7 +155,8 @@ def remote_orchestrator_host(
 
     for _ in range(0, 10):
         try:
-            response = requests.get(f"http://{host}:{port}/api/v1/serverstatus", timeout=1)
+            http = "https" if inm_lsm_ssl.resolve(request.config) else "http"
+            response = requests.get(f"{http}://{host}:{port}/api/v1/serverstatus", timeout=1, verify=False)
             response.raise_for_status()
         except Exception as exc:
             LOGGER.warning(str(exc))
@@ -147,15 +180,70 @@ def remote_orchestrator_settings() -> Dict[str, Union[str, int, bool]]:
     return {}
 
 
+@pytest.fixture(scope="session")
+def remote_orchestrator_partial(request: pytest.FixtureRequest) -> Iterator[bool]:
+    yield inm_lsm_partial_compile.resolve(request.config)
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_project_shared(request: pytest.FixtureRequest, project_shared: Project) -> Iterator[None]:
+    """
+    Shared project to be used by the remote orchestrator. Ensures the module being tested is synced to the remote orchestrator
+    even if it is a v2 module.
+    """
+    in_place = inm_mod_in_place.resolve(request.config)
+    # no need to do anything if this version of inmanta does not support v2 modules or if in_place already adds it to the path
+    if hasattr(module, "ModuleV2") and not in_place:
+        mod: module.Module
+        path: str
+        mod, _ = pytest_inmanta.plugin.get_module()
+
+        # mod object is constructed from the source dir: it does not contain all installation metadata
+        installed: Optional[module.ModuleV2] = module.ModuleV2Source(urls=[]).get_installed_module(None, mod.name)
+        if isinstance(mod, module.ModuleV1):
+            # no need to do anything for v1 module except raise a warning in some edge scenarios
+            if installed is not None:
+                LOGGER.warning(
+                    "The module being tested is a v1 module but it is also installed as a v2 module. Local compiles will use"
+                    "the v2, but only the v1 will by synced to the server."
+                )
+        else:
+            # put v2 module in libs dir so it will be rsynced to the server
+            if not installed.is_editable() or not os.path.samefile(installed.path, mod.path):
+                LOGGER.warning(
+                    "The module being tested is not installed in editable mode. To ensure the remote orchestrator uses the same"
+                    " code as the local project, please install the module with `inmanta module install -e .` before running"
+                    " the tests."
+                )
+            destination: str = os.path.join(project_shared._test_project_dir, "libs", mod.name)
+            assert not os.path.exists(
+                destination
+            ), "Invalid state: expected clean libs dir, this is most likely an issue with the implementation of this fixture"
+            # can't rsync and install a non-editable Python package the same way as an editable one (no pyproject.toml/setup.py)
+            # => always use the test dir, even if the module is installed in non-editable mode (the user has been warned)
+            shutil.copytree(mod.path, destination)
+    yield
+
+
+@pytest.fixture
+def remote_orchestrator_project(remote_orchestrator_project_shared: None, project: Project) -> Iterator[Project]:
+    """
+    Project to be used by the remote orchestrator. Yields the same object as the plain project fixture but ensures the
+    module being tested is synced to the remote orchestrator even if it is a v2 module.
+    """
+    yield project
+
+
 @pytest.fixture
 def remote_orchestrator(
-    project: Project,
     request: pytest.FixtureRequest,
+    remote_orchestrator_project: Project,
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
     remote_orchestrator_container: Optional[OrchestratorContainer],
     remote_orchestrator_environment: str,
     remote_orchestrator_no_clean: bool,
     remote_orchestrator_host: Tuple[str, int],
+    remote_orchestrator_partial: bool,
 ) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
@@ -200,6 +288,7 @@ def remote_orchestrator(
         "autostart_agent_deploy_interval": 600,
         "autostart_agent_repair_splay_time": 600,
         "autostart_agent_repair_interval": 0,
+        "lsm_partial_compile": remote_orchestrator_partial,
     }
     settings.update(remote_orchestrator_settings)
 
@@ -208,7 +297,7 @@ def remote_orchestrator(
         ssh_user=ssh_user,
         ssh_port=ssh_port,
         environment=UUID(remote_orchestrator_environment),
-        project=project,
+        project=remote_orchestrator_project,
         settings=settings,
         noclean=remote_orchestrator_no_clean,
         ssl=ssl,
@@ -224,3 +313,71 @@ def remote_orchestrator(
 
     if not remote_orchestrator_no_clean:
         remote_orchestrator.clean()
+
+
+@pytest.fixture
+def unittest_lsm(project) -> Iterator[None]:
+    """
+    Adds a module named unittest_lsm to the project with a simple resource that always deploys successfully. The module is
+    compatible with the remote orchestrator fixtures.
+    """
+    name: str = "unittest_lsm"
+    project.create_module(
+        name,
+        initcf=textwrap.dedent(
+            """
+            entity Resource extends std::PurgeableResource:
+                string name
+                string agent = "internal"
+                bool send_event = true
+            end
+
+            index Resource(name)
+
+            implement Resource using std::none
+            """.strip(
+                "\n"
+            )
+        ),
+        initpy=textwrap.dedent(
+            """
+            from inmanta import resources
+            from inmanta.agent import handler
+
+
+            @resources.resource("unittest_lsm::Resource", id_attribute="name", agent="agent")
+            class Resource(resources.PurgeableResource):
+                fields = ("name",)
+
+
+            @handler.provider("unittest_lsm::Resource", name="dummy")
+            class ResourceHandler(handler.CRUDHandler):
+                def read_resource(
+                    self, ctx: handler.HandlerContext, resource: resources.PurgeableResource
+                ) -> None:
+                    pass
+
+                def create_resource(
+                    self, ctx: handler.HandlerContext, resource: resources.PurgeableResource
+                ) -> None:
+                    ctx.set_created()
+
+                def delete_resource(
+                    self, ctx: handler.HandlerContext, resource: resources.PurgeableResource
+                ) -> None:
+                    ctx.set_purged()
+
+                def update_resource(
+                    self,
+                    ctx: handler.HandlerContext,
+                    changes: dict,
+                    resource: resources.PurgeableResource,
+                ) -> None:
+                    ctx.set_updated()
+            """.strip(
+                "\n"
+            )
+        ),
+    )
+    yield
+    shutil.rmtree(os.path.join(project._test_project_dir, "libs", name))

@@ -5,15 +5,16 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
-
+import json
 import logging
 from pprint import pformat
 from typing import Any, Collection, Dict, List, Optional, Union
 from uuid import UUID
 
+from inmanta_lsm.diagnose.model import FullDiagnosis
+
 from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
 from pytest_inmanta_lsm.exceptions import VersionExceededError, VersionMismatchError
-from pytest_inmanta_lsm.failed_resources_logs import FailedResourcesLogs
 from pytest_inmanta_lsm.wait_for_state import State, WaitForState
 
 LOGGER = logging.getLogger(__name__)
@@ -141,8 +142,8 @@ class ManagedServiceInstance:
         timeout: int = DEFAULT_TIMEOUT,
     ) -> None:
         """
-        Update the service instance with the given `attributes_updates` and wait for it to go into `wait_for_state` or one
-        of `wait_for_states` and have version `version` or one of versions `versions` if those are provided
+        Update the service instance with the given `attribute_updates` and wait for it to go into `wait_for_state` or one
+        of `wait_for_states` and have version `new_version` or one of versions `new_versions` if those are provided
 
         :param wait_for_state: wait for this state to be reached, defaults to `"up"` if wait_for_states is not set, otherwise
             None
@@ -293,7 +294,8 @@ class ManagedServiceInstance:
     ) -> None:
         """
         Wait for the service instance to go into `state` or one of `states` and
-        have version `version` or one of versions `versions` if those are provided
+        have version `version` or one of versions `versions` if those are provided. There is no risk of skipping over short
+        states.
 
         :param state: Poll until the service instance reaches this state, defaults to None
         :param states: Poll until the service instance reaches one of those states, defaults to None
@@ -349,22 +351,19 @@ class ManagedServiceInstance:
                 return False
             return current_state.version == start_version
 
-        def get_bad_state_error(current_state) -> Any:
-            validation_failure_msg = self.remote_orchestrator.get_validation_failure_message(
-                service_entity_name=self.service_entity_name,
-                service_instance_id=self.instance_id,
+        def get_bad_state_error(current_state: State) -> FullDiagnosis:
+            result = self.remote_orchestrator.client.lsm_services_diagnose(
+                tid=self.remote_orchestrator.environment,
+                service_entity=self.service_entity_name,
+                service_id=self.instance_id,
+                version=current_state.version,
             )
-            if validation_failure_msg:
-                return validation_failure_msg
-
-            LOGGER.info("No validation failure message, getting failed resource logs")
-
-            # No validation failure message, so getting failed resource logs
-            failed_resource_logs = FailedResourcesLogs(
-                self.remote_orchestrator.client,
-                self.remote_orchestrator.environment,
+            assert result.code == 200, (
+                f"Wrong response code while trying to get the service diagnostic, got {result.code} (expected 200):\n"
+                f"{json.dumps(result.result or {}, indent=4)}"
             )
-            return failed_resource_logs.get()
+
+            return FullDiagnosis(**result.result["data"])
 
         wait_for_obj = WaitForState(
             "Instance lifecycle",

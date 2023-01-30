@@ -8,8 +8,8 @@
 
 import logging
 import os
-import shlex
 import subprocess
+from pathlib import Path
 from pprint import pformat
 from typing import Dict, Optional, Union
 from uuid import UUID
@@ -105,6 +105,7 @@ class RemoteOrchestrator:
         self._server_cache_path: Optional[str] = None
 
         self._ensure_environment()
+        self._server_version = self._get_server_version()
 
     @property
     def environment(self) -> UUID:
@@ -120,6 +121,25 @@ class RemoteOrchestrator:
     @property
     def host(self) -> str:
         return self._host
+
+    @property
+    def server_version(self) -> Version:
+        """
+        Returns the version of the remote orchestrator
+        """
+        return self._server_version
+
+    def _get_server_version(self) -> Version:
+        """
+        Get the version of the remote orchestrator
+        """
+        server_status: Result = self.client.get_server_status()
+        if server_status.code != 200:
+            raise Exception(f"Failed to get server status for {self._host}")
+        try:
+            return Version(server_status.result["data"]["version"])
+        except (KeyError, TypeError):
+            raise Exception(f"Unexpected response for server status API call: {server_status.result}")
 
     def export_service_entities(self) -> None:
         """Initialize the remote orchestrator with the service model and check if all preconditions hold"""
@@ -141,7 +161,7 @@ class RemoteOrchestrator:
             result = client.project_list()
             assert (
                 result.code == 200
-            ), f"Wrong reponse code while verifying project, got {result.code} (expected 200): \n{result.result}"
+            ), f"Wrong response code while verifying project, got {result.code} (expected 200): \n{result.result}"
             for project in result.result["data"]:
                 if project["name"] == project_name:
                     return project["id"]
@@ -149,7 +169,7 @@ class RemoteOrchestrator:
             result = client.project_create(name=project_name)
             assert (
                 result.code == 200
-            ), f"Wrong reponse code while creating project, got {result.code} (expected 200): \n{result.result}"
+            ), f"Wrong response code while creating project, got {result.code} (expected 200): \n{result.result}"
             return result.result["data"]["id"]
 
         result = client.create_environment(
@@ -161,9 +181,19 @@ class RemoteOrchestrator:
             result.code == 200
         ), f"Wrong response code while creating environment, got {result.code} (expected 200): \n{result.result}"
 
+    def use_sudo(self) -> str:
+        if self._ssh_user == "inmanta":
+            return ""
+        return "sudo "
+
     def sync_project(self) -> None:
         """Synchronize the project to the lab orchestrator"""
         project = self._project
+
+        source_script = Path(__file__).parent / "resources/setup_project.py"
+        destination_script = Path(project._test_project_dir, ".inm_lsm_setup_project.py")
+        LOGGER.debug(f"Copying module V2 install script ({source_script}) in project folder {destination_script}")
+        destination_script.write_text(source_script.read_text())
 
         LOGGER.info("Sending service model to the lab orchestrator")
         # load the project yaml
@@ -186,13 +216,16 @@ class RemoteOrchestrator:
         remote_path = f"{self._ssh_user}@{self.host}:{server_path}"
         cache_path = f"{server_path[0:-1]}_cache"  # [0:-1] to get trailing slash out of the way!
 
+        # Disable sudo over ssh when the remote user has the correct permissions
+        use_sudo: str = self.use_sudo()
+
         LOGGER.debug("Move cache if it exists on orchestrator")
         subprocess.check_output(
             SSH_CMD
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo test -d {cache_path} && sudo mv {cache_path} {server_path} || true",
+                f"{use_sudo}test -d {cache_path} && {use_sudo}mv {cache_path} {server_path} || true",
             ],
             stderr=subprocess.PIPE,
         )
@@ -204,7 +237,7 @@ class RemoteOrchestrator:
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo mkdir -p {server_path}; sudo chown -R {self._ssh_user}:{self._ssh_user} {server_path}",
+                f"{use_sudo}mkdir -p {server_path}; {use_sudo}chown -R {self._ssh_user}:{self._ssh_user} {server_path}",
             ],
             stderr=subprocess.PIPE,
         )
@@ -234,7 +267,7 @@ class RemoteOrchestrator:
             subprocess.check_output(
                 [
                     "rsync",
-                    "--delete",
+                    # no --delete because project is in a clean state and we don't want to override previously synced modules
                     "--exclude",
                     ".git",
                     "-e",
@@ -253,38 +286,30 @@ class RemoteOrchestrator:
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo touch {server_path}/.git; sudo chown -R inmanta:inmanta {server_path}",
+                f"{use_sudo}touch {server_path}/.git; {use_sudo}chown -R inmanta:inmanta {server_path}",
             ],
             stderr=subprocess.PIPE,
         )
 
-        server_status: Result = self.client.get_server_status()
-        if server_status.code != 200:
-            raise Exception(f"Failed to get server status for {self._host}")
-        server_version: Version
-        try:
-            server_version = Version(server_status.result["data"]["version"])
-        except (KeyError, TypeError):
-            raise Exception("Unexpected response for server status API call")
         # iso5 requires explicit project installation
-        if server_version >= Version("5.dev"):
-            venv_path: str = os.path.join(server_path, ".env")
+        if self.server_version >= Version("5.dev"):
+            LOGGER.debug(f"Server version is {self.server_version}, installing project manually")
             # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
-            python_script_inline: str = (
-                "from inmanta.module import Project;"
-                f"project = Project('{server_path}', venv_path='{venv_path}');"
-                "project.install_modules();"
-            )
-            shell_script_inline: str = "/opt/inmanta/bin/python -c %s" % shlex.quote(python_script_inline)
+            install_script_path = Path(server_path, destination_script.name)
+            shell_script_inline: str = f"/opt/inmanta/bin/python < {install_script_path}"
             if not self.container_env:
                 # use the server's environment variables for the installation
                 shell_script_inline = (
-                    "sudo systemd-run -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
+                    f"{use_sudo}systemd-run --pipe -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
+                    f"-p Environment=PROJECT_PATH={server_path} "
                     "--wait %s" % shell_script_inline
                 )
+            else:
+                # Add the project path as env var at the beginning of the cmd line
+                shell_script_inline = f"PROJECT_PATH={server_path} {shell_script_inline}"
 
             try:
-                subprocess.check_output(
+                output = subprocess.check_output(
                     SSH_CMD
                     + [
                         f"-p {self._ssh_port}",
@@ -292,10 +317,13 @@ class RemoteOrchestrator:
                         shell_script_inline,
                     ],
                     stderr=subprocess.PIPE,
+                    encoding="utf-8",
+                    text=True,
                 )
+                LOGGER.debug(output)
             except subprocess.CalledProcessError as e:
-                LOGGER.error("Process failed out: " + e.output.decode())
-                LOGGER.error("Process failed err: " + e.stderr.decode())
+                LOGGER.error("Process failed out: " + e.output)
+                LOGGER.error("Process failed err: " + e.stderr)
                 raise
 
         # Server cache create, set variables, so cache can be used
@@ -321,12 +349,16 @@ class RemoteOrchestrator:
     def cache_project(self) -> None:
         """Cache the project on the server so that a sync can be faster."""
         LOGGER.info(f"Caching project on server ({self._server_path}) to cache dir: {self._server_cache_path}")
+
+        # Disable sudo over ssh when the remote user has the correct permissions
+        use_sudo: str = self.use_sudo()
+
         subprocess.check_output(
             SSH_CMD
             + [
                 f"-p {self._ssh_port}",
                 f"{self._ssh_user}@{self.host}",
-                f"sudo cp -a {self._server_path} {self._server_cache_path}",
+                f"{use_sudo}cp -a {self._server_path} {self._server_cache_path}",
             ],
             stderr=subprocess.PIPE,
         )
@@ -370,7 +402,10 @@ class RemoteOrchestrator:
     ) -> Optional[str]:
         """
         Get the compiler error for a validation failure for a specific service entity
+
+        DEPRECATED: Use the diagnose endpoint instead
         """
+        LOGGER.warning("Usage of FailedResourceLogs is deprecated, use the diagnose endpoint instead")
         client = self.client
         environment = self.environment
 
@@ -380,7 +415,7 @@ class RemoteOrchestrator:
             service_entity=service_entity_name,
             service_id=service_instance_id,
         )
-        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
+        assert result.code == 200, f"Wrong response code while trying to get log list, got {result.code} (expected 200): \n"
         f"{pformat(result.get_result(), width=140)}"
 
         # get events that led to final state
@@ -395,7 +430,7 @@ class RemoteOrchestrator:
 
         # get the report
         result = client.get_report(compile_id)
-        assert result.code == 200, f"Wrong reponse code while trying to get log list, got {result.code} (expected 200): \n"
+        assert result.code == 200, f"Wrong response code while trying to get log list, got {result.code} (expected 200): \n"
         f"{pformat(result.get_result(), width=140)}"
 
         # get stage reports

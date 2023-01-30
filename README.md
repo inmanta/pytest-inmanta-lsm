@@ -15,8 +15,9 @@ It requires an LSM enabled orchestrator, with no ssl or authentication enabled, 
 
 ## Usage
 
-This plugin is built around the remote_orchestrator fixture. 
-It offers features to 
+### First case: using a remote orchestrator
+
+This plugin is built around the remote_orchestrator fixture.
 
 A typical testcase using this plugin looks as follows:
 ```python
@@ -63,6 +64,44 @@ def test_full_cycle(project, remote_orchestrator):
     service_instance.delete()
 
 ```
+
+### Second case: mocking the lsm api
+
+This toolbox comes with one more fixture: `lsm_project`.  This fixture allows to run compile using the lsm model locally.  It has as advantage that:
+ - You get a more fined grained control about what you want to see in your compile (choose the value of attributes, state, version, etc of your service).
+ - If you only care about testing one specific case it is much faster than going through the full lifecycle on the remote orchestrator.
+ - You don't need a running remote orchestrator, so you won't need to synchronize the full project anywhere.
+
+A simple usage would be as follow:
+```python
+def test_model(lsm_project: lsm_project.LsmProject) -> None:
+    # Create a service object, you can modify it as you wish, depending on what you are trying to test
+    service = inmanta_lsm.model.ServiceInstance(
+        id=uuid.uuid4(),
+        environment=lsm_project.environment,
+        service_entity="vlan-assignment",
+        version=1,
+        config={},
+        state="start",
+        candidate_attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
+        active_attributes=None,
+        rollback_attributes=None,
+        created_at=datetime.datetime.now(),
+        last_updated=datetime.datetime.now(),
+        callback=[],
+        deleted=False,
+        deployment_progress=None,
+        service_identity_attribute_value=None,
+    )
+
+    # Add the service to the mocked server.  From now on it will be taken into account
+    # for EACH compile
+    lsm_project.add_service(service)
+
+    # Run a compile, with central focus the service we just created
+    lsm_project.compile("import quickstart", service_id=service.id)
+```
+
 ## Options and environment variables
 
 The following options are available, each with a corresponding environment variable.
@@ -150,6 +189,13 @@ pytest-inmanta-lsm:
 
 ## Running tests
 
+### How the test suite is structured
+
+The test suite consists of two parts:
+
+* The tests defined in `tests/test_containerized_orchestrator.py` file always run against a container started by the test suite itself.
+* All other tests run against the orchestrator specified by the options passed to the pytest command.
+
 ### Pre-requisites
  Testing (and using) pytest-inmanta-lsm requires:
 - an available orchestrator to test against
@@ -168,12 +214,12 @@ export INMANTA_LSM_USER=<user>
 ```
 
 3. set the repo for inmanta to pull LSM from
- 
+
  ```bash
 export INMANTA_MODULE_REPO=https://USER:LICENSE_TOKEN@modules.inmanta.com/git/inmanta-service-orchestrator/5/{}.git
 ```
 4. run the tests
- 
+
  ```bash
     pytest tests
 ```

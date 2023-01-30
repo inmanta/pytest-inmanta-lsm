@@ -1,3 +1,46 @@
+# v 1.10.1 (2023-01-30)
+Changes in this release:
+
+- Fix lsm mocked tests support for iso4.
+
+# v 1.10.0 (2023-01-27)
+Changes in this release:
+
+- Add documentation regarding the structure of the test suite.
+- Install dev version of v2 module dependencies on remote orchestrator when install mode allows for it
+- Import helpers for lsm mocked tests.
+
+# v 1.9.1 (2022-09-16)
+Changes in this release:
+
+- Correctly reset pip environment variables after v2 modules installation on remote orchestrator
+
+
+# v 1.9.0 (2022-09-07)
+Changes in this release:
+
+- Added `--lsm-partial-compile` option to enable partial compiles on the remote orchestrator (for supported versions)
+- Added support for testing v2 modules: the module being tested, as well as v2 modules in the libs dir are synced to the
+    remote orchestrator and installed in editable mode. Dependencies are installed from package sources configured through
+    the `INMANTA_MODULE_REPO` environment variable or the `--module-repo` option.
+- Fix legacy option usage for `lsm_noclean` and `lsm_ssl` (introduced in 1.6.0).
+- Sync all module sources to the remote orchestrator rather than only one
+
+# v 1.8.0 (2022-07-14)
+Changes in this release:
+
+- Only use sudo over ssh when required.
+- Capture stdout and stderr of remotely executed commands by passing the `--pipe` option to systemd-run.
+
+# v 1.7.0 (2022-06-08)
+Changes in this release:
+- Improve logging for containerized orchestrator setup.
+- Use the diagnose endpoint to generate the validation/deployment failure reports.
+
+# v 1.6.1 (2022-05-18)
+Changes in this release:
+- Rework orchestrator in container deployment
+
 # v 1.6.0 (2022-05-16)
 Changes in this release:
 - Add timeout parameter to managed service

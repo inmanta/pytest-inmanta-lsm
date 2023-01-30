@@ -6,21 +6,11 @@
     :license: Inmanta EULA
 """
 
-
-import os
-
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
-import yaml
 
-
-def add_version_constraint_to_project(testdir):
-    constraints = os.environ.get("INMANTA_LSM_MODULE_CONSTRAINTS", "")
-    if constraints:
-        with open(testdir.tmpdir / "module.yml", "r") as fh:
-            module_config = yaml.safe_load(fh)
-            module_config["requires"] = constraints.split(";")
-        with open(testdir.tmpdir / "module.yml", "w") as fh:
-            yaml.dump(module_config, fh)
+import utils
+import versions
+from packaging import version
 
 
 def test_deployment_failure(testdir):
@@ -28,7 +18,7 @@ def test_deployment_failure(testdir):
 
     testdir.copy_example("test_service")
 
-    add_version_constraint_to_project(testdir)
+    utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest_inprocess("tests/test_deployment_failure.py")
     result.assert_outcomes(passed=2)
@@ -39,7 +29,11 @@ def test_basic_example(testdir):
 
     testdir.copy_example("quickstart")
 
-    add_version_constraint_to_project(testdir)
+    utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest("tests/test_quickstart.py")
-    result.assert_outcomes(passed=2)
+
+    if versions.INMANTA_CORE_VERSION < version.Version("6"):
+        result.assert_outcomes(passed=2, skipped=1)
+    else:
+        result.assert_outcomes(passed=3)
