@@ -15,10 +15,12 @@ import uuid
 from typing import Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
 
+import pkg_resources
 import pytest
 import pytest_inmanta.plugin
 import requests
 from inmanta import module
+from packaging import version
 from pytest_inmanta.parameters import inm_mod_in_place
 from pytest_inmanta.plugin import Project
 from pytest_inmanta.test_parameter import ParameterNotSetException
@@ -71,6 +73,13 @@ def lsm_project_fixture(
     project: pytest_inmanta.plugin.Project,
     remote_orchestrator_partial: bool,
 ) -> "lsm_project.LsmProject":
+    core_version = version.Version(pkg_resources.get_distribution("inmanta-core").version)
+    if core_version < version.Version("6"):
+        # Before inmanta-core==6.0.0, the compile resets the inmanta plugins between each compile, which makes
+        # the monkeypatching of plugins impossible.  This makes this fixture irrelevant in such case.
+        # https://github.com/inmanta/inmanta-core/blob/fd44f3a765e4865cc7179d825fe345fe0540897a/src/inmanta/module.py#L1525
+        pytest.skip(f"The lsm_project fixture is not usable with this version of inmanta-core: {core_version} (< 6)")
+
     return lsm_project.LsmProject(
         uuid.uuid4(),
         project,

@@ -14,6 +14,8 @@ import subprocess
 from pathlib import Path
 
 import utils
+import versions
+from packaging import version
 from pytest import Testdir, fixture
 
 HOME = os.getenv("HOME", "")
@@ -79,4 +81,8 @@ def test_basic_example(testdir: Testdir):
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest("tests/test_quickstart.py", "--lsm-ctr")
-    result.assert_outcomes(passed=3)
+
+    if versions.INMANTA_CORE_VERSION < version.Version("6"):
+        result.assert_outcomes(passed=2, skipped=1)
+    else:
+        result.assert_outcomes(passed=3)
