@@ -48,6 +48,7 @@ class ManagedServiceInstance:
         remote_orchestrator: "r_orchestrator.RemoteOrchestrator",
         service_entity_name: str,
         service_id: Optional[UUID] = None,
+        lookback_depth: int = 1,
     ) -> None:
         """
         :param remote_orchestrator: remote_orchestrator to create the service instance  on
@@ -57,6 +58,7 @@ class ManagedServiceInstance:
         self.remote_orchestrator = remote_orchestrator
         self.service_entity_name = service_entity_name
         self._instance_id = service_id
+        self._lookback = lookback_depth
 
     @property
     def instance_id(self) -> UUID:
@@ -357,6 +359,8 @@ class ManagedServiceInstance:
                 service_entity=self.service_entity_name,
                 service_id=self.instance_id,
                 version=current_state.version,
+                rejection_lookbehind=self._lookback - 1,
+                failure_lookbehind=self._lookback,
             )
             assert result.code == 200, (
                 f"Wrong response code while trying to get the service diagnostic, got {result.code} (expected 200):\n"
