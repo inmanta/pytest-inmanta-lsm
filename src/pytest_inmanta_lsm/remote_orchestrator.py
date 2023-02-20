@@ -444,6 +444,9 @@ class RemoteOrchestrator:
         return None
 
     def get_managed_instance(
-        self, service_entity_name: str, service_id: Optional[UUID] = None
+        self,
+        service_entity_name: str,
+        service_id: Optional[UUID] = None,
+        lookback: int = 1,
     ) -> "managed_service_instance.ManagedServiceInstance":
-        return managed_service_instance.ManagedServiceInstance(self, service_entity_name, service_id)
+        return managed_service_instance.ManagedServiceInstance(self, service_entity_name, service_id, lookback_depth=lookback)

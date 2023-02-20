@@ -1,3 +1,7 @@
+# v 1.11.0 (2023-02-20)
+Changes in this release:
+- Make it possible to look back further into the history when reporting on failure
+
 # v 1.10.1 (2023-01-30)
 Changes in this release:
 
