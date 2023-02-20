@@ -54,6 +54,7 @@ class ManagedServiceInstance:
         :param remote_orchestrator: remote_orchestrator to create the service instance  on
         :param service_entity_name: name of the service entity
         :param service_id: manually choose the id of the service instance
+        :param lookback_depth: the amount of states to search for failures if we detect a bad state
         """
         self.remote_orchestrator = remote_orchestrator
         self.service_entity_name = service_entity_name
