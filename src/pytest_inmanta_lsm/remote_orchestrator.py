@@ -57,6 +57,9 @@ class RemoteOrchestrator:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
 
+        Parameters `environment_name` and `project_name` are used only when new environment is created. If environment with
+        given UUID (`environment`) exists in the orchestrator, these parameters are ignored.
+
         :param host: the host to connect to, the orchestrator should be on port 8888, ssh on port 22
         :param ssh_user: the username to log on to the machine, should have sudo rights
         :param ssh_port: the port to use to log on to the machine
