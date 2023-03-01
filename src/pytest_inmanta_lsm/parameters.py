@@ -102,6 +102,25 @@ inm_lsm_env = StringTestParameter(
     legacy=inm_lsm_env_legacy,
 )
 
+inm_lsm_project_name = StringTestParameter(
+    argument="--lsm-project-name",
+    environment_variable="INMANTA_LSM_PROJECT_NAME",
+    usage=(
+        "Project name to be used for this environment. "
+        "Used only when new environment is created, otherwise this parameter is ignored."
+    ),
+    default="pytest-inmanta-lsm",
+    group=param_group,
+)
+
+inm_lsm_env_name = StringTestParameter(
+    argument="--lsm-environment-name",
+    environment_variable="INMANTA_LSM_ENVIRONMENT_NAME",
+    usage="Environment name. Used only when new environment is created, otherwise this parameter is ignored",
+    default="pytest-inmanta-lsm",
+    group=param_group,
+)
+
 
 # This is the legacy noclean and ssl option
 # TODO remove this in next major version bump

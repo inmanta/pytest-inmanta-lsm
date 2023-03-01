@@ -43,9 +43,11 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_ctr_license,
     inm_lsm_ctr_pub_key,
     inm_lsm_env,
+    inm_lsm_env_name,
     inm_lsm_host,
     inm_lsm_no_clean,
     inm_lsm_partial_compile,
+    inm_lsm_project_name,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
     inm_lsm_ssh_user,
@@ -122,6 +124,16 @@ def remote_orchestrator_container(
 @pytest.fixture(scope="session")
 def remote_orchestrator_environment(request: pytest.FixtureRequest) -> str:
     return inm_lsm_env.resolve(request.config)
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_environment_name(request: pytest.FixtureRequest) -> str:
+    return inm_lsm_env_name.resolve(request.config)
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_project_name(request: pytest.FixtureRequest) -> str:
+    return inm_lsm_project_name.resolve(request.config)
 
 
 @pytest.fixture(scope="session")
@@ -244,6 +256,8 @@ def remote_orchestrator(
     remote_orchestrator_no_clean: bool,
     remote_orchestrator_host: Tuple[str, int],
     remote_orchestrator_partial: bool,
+    remote_orchestrator_project_name: str,
+    remote_orchestrator_environment_name: str,
 ) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
@@ -305,6 +319,8 @@ def remote_orchestrator(
         ca_cert=ca_cert,
         container_env=container_env,
         port=port,
+        project_name=remote_orchestrator_project_name,
+        environment_name=remote_orchestrator_environment_name,
     )
     remote_orchestrator.clean()
 

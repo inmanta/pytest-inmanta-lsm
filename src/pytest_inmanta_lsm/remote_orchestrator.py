@@ -51,9 +51,14 @@ class RemoteOrchestrator:
         container_env: bool = False,
         *,
         port: int,
+        environment_name: str = "pytest-inmanta-lsm",
+        project_name: str = "pytest-inmanta-lsm",
     ) -> None:
         """
         Utility object to manage a remote orchestrator and integrate with pytest-inmanta
+
+        Parameters `environment_name` and `project_name` are used only when new environment is created. If environment with
+        given UUID (`environment`) exists in the orchestrator, these parameters are ignored.
 
         :param host: the host to connect to, the orchestrator should be on port 8888, ssh on port 22
         :param ssh_user: the username to log on to the machine, should have sudo rights
@@ -68,6 +73,8 @@ class RemoteOrchestrator:
         :param ca_cert: Certificate used for authentication
         :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
         :param port: The port the server is listening to
+        :param environment_name: Name of the environment in web console
+        :param project_name: Name of the project in web console
         """
         self._env = environment
         self._host = host
@@ -80,6 +87,8 @@ class RemoteOrchestrator:
         self._token = token
         self._ca_cert = ca_cert
         self.container_env = container_env
+        self.environment_name = environment_name
+        self.project_name = project_name
 
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self._env))
@@ -173,8 +182,8 @@ class RemoteOrchestrator:
             return result.result["data"]["id"]
 
         result = client.create_environment(
-            project_id=ensure_project("pytest-inmanta-lsm"),
-            name="pytest-inmanta-lsm",
+            project_id=ensure_project(self.project_name),
+            name=self.environment_name,
             environment_id=self._env,
         )
         assert (
