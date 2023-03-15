@@ -207,7 +207,6 @@ def remote_orchestrator_project_shared(request: pytest.FixtureRequest, project_s
     # no need to do anything if this version of inmanta does not support v2 modules or if in_place already adds it to the path
     if hasattr(module, "ModuleV2") and not in_place:
         mod: module.Module
-        path: str
         mod, _ = pytest_inmanta.plugin.get_module()
 
         # mod object is constructed from the source dir: it does not contain all installation metadata
