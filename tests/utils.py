@@ -22,7 +22,6 @@ import py
 import yaml
 from inmanta import env
 
-LOGGER = logging.getLogger(__name__)
 
 def add_version_constraint_to_project(project_dir: py.path.local):
     constraints = os.environ.get("INMANTA_LSM_MODULE_CONSTRAINTS", "")
@@ -32,15 +31,6 @@ def add_version_constraint_to_project(project_dir: py.path.local):
             module_config["requires"] = constraints.split(";")
         with open(project_dir / "module.yml", "w") as fh:
             yaml.dump(module_config, fh)
-    if constraints and os.path.exists(project_dir / "setup.cfg"):
-        config = configparser.ConfigParser()
-        config.read(project_dir / "setup.cfg")
-        install_requires = config["options"]["install_requires"]
-        print(install_requires)
-        LOGGER.warning("hohoho: "+str(install_requires))
-        LOGGER.warning("hohoho: "+str(constraints.split(";")))
-
-
 
 
 # ported from pytest-inmanta
