@@ -15,6 +15,7 @@ additional_constraints:
 env_vars:
     # This option is ignored when the tests run against a docker container.
     INMANTA_LSM_SSH_USER: rocky
+    INMANTA_LSM_MODULE_CONSTRAINTS: "lsm>=2.19"
     # The INMANTA_LSM_CONTAINER environment variable is not set here. The test suite sets the
     # --lsm-ctr option for the subset of tests that need to run against a docker container.
     # More information regarding the structure of the test suite can be found in the README.md
