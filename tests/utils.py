@@ -6,10 +6,8 @@
     :license: Inmanta EULA
 """
 
-import configparser
 import contextlib
 import importlib
-import logging
 import os
 import subprocess
 import sys
