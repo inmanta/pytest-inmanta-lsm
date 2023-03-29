@@ -6,6 +6,7 @@
     :license: Inmanta EULA
 """
 
+import configparser
 import contextlib
 import importlib
 import os
@@ -29,6 +30,12 @@ def add_version_constraint_to_project(project_dir: py.path.local):
             module_config["requires"] = constraints.split(";")
         with open(project_dir / "module.yml", "w") as fh:
             yaml.dump(module_config, fh)
+    if constraints and os.exists(project_dir / "setup.cfg"):
+        config = configparser.ConfigParser()
+        config.read(project_dir / "setup.cfg")
+        install_requires = config["install_requires"]
+        print(install_requires)
+
 
 
 # ported from pytest-inmanta
