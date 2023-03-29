@@ -9,6 +9,7 @@
 import configparser
 import contextlib
 import importlib
+import logging
 import os
 import subprocess
 import sys
@@ -21,6 +22,7 @@ import py
 import yaml
 from inmanta import env
 
+LOGGER = logging.getLogger(__name__)
 
 def add_version_constraint_to_project(project_dir: py.path.local):
     constraints = os.environ.get("INMANTA_LSM_MODULE_CONSTRAINTS", "")
@@ -35,6 +37,8 @@ def add_version_constraint_to_project(project_dir: py.path.local):
         config.read(project_dir / "setup.cfg")
         install_requires = config["options"]
         print(install_requires)
+        LOGGER.warning("hohoho: "+str(install_requires))
+
 
 
 
