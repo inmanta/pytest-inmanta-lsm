@@ -33,7 +33,7 @@ def add_version_constraint_to_project(project_dir: py.path.local):
     if constraints and os.path.exists(project_dir / "setup.cfg"):
         config = configparser.ConfigParser()
         config.read(project_dir / "setup.cfg")
-        install_requires = config["install_requires"]
+        install_requires = config["options"]
         print(install_requires)
 
 
