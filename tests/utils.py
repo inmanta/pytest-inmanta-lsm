@@ -24,13 +24,13 @@ from inmanta import env
 
 def add_version_constraint_to_project(project_dir: py.path.local):
     constraints = os.environ.get("INMANTA_LSM_MODULE_CONSTRAINTS", "")
-    if constraints and os.exists(project_dir / "module.yml"):
+    if constraints and os.path.exists(project_dir / "module.yml"):
         with open(project_dir / "module.yml", "r") as fh:
             module_config = yaml.safe_load(fh)
             module_config["requires"] = constraints.split(";")
         with open(project_dir / "module.yml", "w") as fh:
             yaml.dump(module_config, fh)
-    if constraints and os.exists(project_dir / "setup.cfg"):
+    if constraints and os.path.exists(project_dir / "setup.cfg"):
         config = configparser.ConfigParser()
         config.read(project_dir / "setup.cfg")
         install_requires = config["install_requires"]
