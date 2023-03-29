@@ -38,6 +38,7 @@ def add_version_constraint_to_project(project_dir: py.path.local):
         install_requires = config["options"]["install_requires"]
         print(install_requires)
         LOGGER.warning("hohoho: "+str(install_requires))
+        LOGGER.warning("hohoho: "+str(constraints.split(";")))
 
 
 
