@@ -105,8 +105,8 @@ class LsmProject:
         )
         self.monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
-            "lsm_services_update_attributes",
-            self.lsm_services_update_attributes,
+            "lsm_services_update_attributes_v2",
+            self.lsm_services_update_attributes_v2,
             raising=False,
         )
 
@@ -175,6 +175,43 @@ class LsmProject:
             service.candidate_attributes = copy.deepcopy(service.active_attributes)
 
         service.candidate_attributes.update(attributes)
+        service.last_updated = datetime.datetime.now()
+
+        return inmanta.protocol.common.Result(code=200, result={})
+
+    def lsm_services_update_attributes_v2(
+        self,
+        tid: uuid.UUID,
+        service_entity: str,
+        service_id: uuid.UUID,
+        current_version: int,
+        patch_id: str,
+        edit: typing.List[inmanta_lsm.model.PatchCallEdit],
+        comment: typing.Optional[str] = None,
+    ) -> inmanta.protocol.common.Result:
+        """
+        This is a mock for the lsm api, this method is called during allocation to update
+        the attributes of a service.
+        """
+        # Making some basic checks
+        service = self.services[str(service_id)]
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+        assert service.service_entity == service_entity, f"{service.service_entity} != {service_entity}"
+        assert service.version == current_version, f"{service.version} != {current_version}"
+
+        # The attributes parameter only represents the attributes that should be changed.
+        # * When no candidate attributes were set, the new candidate attributes will be equal to the active
+        #   attributes with the attribute updates applied.
+        # * When candidate attributes were set, the update will be applied to the existing candidate
+        #   attributes.
+        if service.candidate_attributes is None:
+            service.candidate_attributes = copy.deepcopy(service.active_attributes)
+
+        attrs = {}
+        for patch in edit:
+            attrs[patch.target] = patch.value
+
+        service.candidate_attributes.update(attrs)
         service.last_updated = datetime.datetime.now()
 
         return inmanta.protocol.common.Result(code=200, result={})
