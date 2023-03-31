@@ -18,6 +18,8 @@ import inmanta_lsm.const
 import inmanta_lsm.model
 import pytest
 import pytest_inmanta.plugin
+from inmanta_lsm.dict_path import DictPath
+from inmanta_plugins.lsm.allocation_v2 import dict_path
 
 # Error message to display when the lsm module is not reachable
 INMANTA_LSM_MODULE_NOT_LOADED = (
@@ -215,11 +217,16 @@ class LsmProject:
         if service.candidate_attributes is None:
             service.candidate_attributes = copy.deepcopy(service.active_attributes)
 
-        attrs = {}
-        for patch in edit:
-            attrs[patch.target] = patch.value
+        # Edit logic derived from:
+        # https://github.com/inmanta/inmanta-lsm/blob/39e9319381ce6cfc9fd22549e2b5a9cc7128ded2/src/inmanta_lsm/model.py#L2794
+        for current_edit in edit:
+            dict_path_obj: DictPath = dict_path.to_path(current_edit.target)
 
-        service.candidate_attributes.update(attrs)
+            if current_edit.operation == inmanta_lsm.model.EditOperation.replace.value:
+                dict_path_obj.set_element(service.candidate_attributes, current_edit.value)
+            else:
+                assert False, "Only EditOperation.replace is supported in mock mode"
+
         service.last_updated = datetime.datetime.now()
 
         return inmanta.protocol.common.Result(code=200, result={})
