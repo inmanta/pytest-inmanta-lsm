@@ -103,6 +103,14 @@ class LsmProject:
             self.lsm_services_list,
             raising=False,
         )
+
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_services_update_attributes",
+            self.lsm_services_update_attributes,
+            raising=False,
+        )
+
         self.monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_update_attributes_v2",
@@ -191,7 +199,7 @@ class LsmProject:
     ) -> inmanta.protocol.common.Result:
         """
         This is a mock for the lsm api, this method is called during allocation to update
-        the attributes of a service.
+        the attributes of a V2 service.
         """
         # Making some basic checks
         service = self.services[str(service_id)]
