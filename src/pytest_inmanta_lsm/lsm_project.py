@@ -18,6 +18,7 @@ import inmanta_lsm.const
 import inmanta_lsm.model
 import pytest
 import pytest_inmanta.plugin
+from inmanta_lsm.dict_path import DictPath, to_path
 
 # Error message to display when the lsm module is not reachable
 INMANTA_LSM_MODULE_NOT_LOADED = (
@@ -103,10 +104,18 @@ class LsmProject:
             self.lsm_services_list,
             raising=False,
         )
+
         self.monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_update_attributes",
             self.lsm_services_update_attributes,
+            raising=False,
+        )
+
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_services_update_attributes_v2",
+            self.lsm_services_update_attributes_v2,
             raising=False,
         )
 
@@ -175,6 +184,49 @@ class LsmProject:
             service.candidate_attributes = copy.deepcopy(service.active_attributes)
 
         service.candidate_attributes.update(attributes)
+        service.last_updated = datetime.datetime.now()
+
+        return inmanta.protocol.common.Result(code=200, result={})
+
+    def lsm_services_update_attributes_v2(
+        self,
+        tid: uuid.UUID,
+        service_entity: str,
+        service_id: uuid.UUID,
+        current_version: int,
+        patch_id: str,
+        edit: typing.List["inmanta_lsm.model.PatchCallEdit"],
+        comment: typing.Optional[str] = None,
+    ) -> inmanta.protocol.common.Result:
+        """
+        This is a mock for the lsm api, this method is called during allocation to update
+        the attributes of a V2 service.
+        """
+        # Making some basic checks
+        service = self.services[str(service_id)]
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+        assert service.service_entity == service_entity, f"{service.service_entity} != {service_entity}"
+        assert service.version == current_version, f"{service.version} != {current_version}"
+
+        # The attributes parameter only represents the attributes that should be changed.
+        # * When no candidate attributes were set, the new candidate attributes will be equal to the active
+        #   attributes with the attribute updates applied.
+        # * When candidate attributes were set, the update will be applied to the existing candidate
+        #   attributes.
+        if service.candidate_attributes is None:
+            service.candidate_attributes = copy.deepcopy(service.active_attributes)
+
+        # Edit logic derived from:
+        # https://github.com/inmanta/inmanta-lsm/blob/39e9319381ce6cfc9fd22549e2b5a9cc7128ded2/src/inmanta_lsm/model.py#L2794
+
+        for current_edit in edit:
+            dict_path_obj: DictPath = to_path(current_edit.target)
+
+            if current_edit.operation == inmanta_lsm.model.EditOperation.replace.value:
+                dict_path_obj.set_element(service.candidate_attributes, current_edit.value)
+            else:
+                assert False, "Only EditOperation.replace is supported in mock mode"
+
         service.last_updated = datetime.datetime.now()
 
         return inmanta.protocol.common.Result(code=200, result={})
