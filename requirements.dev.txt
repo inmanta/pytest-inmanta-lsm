@@ -1,3 +1,3 @@
-inmanta-dev-dependencies==2.58.0
+inmanta-dev-dependencies==2.65.0
 types-PyYAML
 types-requests

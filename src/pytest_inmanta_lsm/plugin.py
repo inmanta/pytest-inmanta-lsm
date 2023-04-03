@@ -43,9 +43,11 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_ctr_license,
     inm_lsm_ctr_pub_key,
     inm_lsm_env,
+    inm_lsm_env_name,
     inm_lsm_host,
     inm_lsm_no_clean,
     inm_lsm_partial_compile,
+    inm_lsm_project_name,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
     inm_lsm_ssh_user,
@@ -125,6 +127,16 @@ def remote_orchestrator_environment(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture(scope="session")
+def remote_orchestrator_environment_name(request: pytest.FixtureRequest) -> str:
+    return inm_lsm_env_name.resolve(request.config)
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_project_name(request: pytest.FixtureRequest) -> str:
+    return inm_lsm_project_name.resolve(request.config)
+
+
+@pytest.fixture(scope="session")
 def remote_orchestrator_no_clean(request: pytest.FixtureRequest) -> bool:
     """
     Check if the user specified that the orchestrator shouldn't be cleaned up after a failure.
@@ -195,7 +207,6 @@ def remote_orchestrator_project_shared(request: pytest.FixtureRequest, project_s
     # no need to do anything if this version of inmanta does not support v2 modules or if in_place already adds it to the path
     if hasattr(module, "ModuleV2") and not in_place:
         mod: module.Module
-        path: str
         mod, _ = pytest_inmanta.plugin.get_module()
 
         # mod object is constructed from the source dir: it does not contain all installation metadata
@@ -244,6 +255,8 @@ def remote_orchestrator(
     remote_orchestrator_no_clean: bool,
     remote_orchestrator_host: Tuple[str, int],
     remote_orchestrator_partial: bool,
+    remote_orchestrator_project_name: str,
+    remote_orchestrator_environment_name: str,
 ) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
@@ -305,6 +318,8 @@ def remote_orchestrator(
         ca_cert=ca_cert,
         container_env=container_env,
         port=port,
+        project_name=remote_orchestrator_project_name,
+        environment_name=remote_orchestrator_environment_name,
     )
     remote_orchestrator.clean()
 
