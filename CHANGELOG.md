@@ -1,4 +1,4 @@
-# v 1.12.0 (?)
+# v 1.12.0 (2023-04-03)
 Changes in this release:
 - Add option to specify project and environment names
 - Extend LsmProject to mock ServiceEntityBindingV2
