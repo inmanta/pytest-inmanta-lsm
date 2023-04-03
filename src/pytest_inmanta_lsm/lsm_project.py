@@ -195,7 +195,7 @@ class LsmProject:
         service_id: uuid.UUID,
         current_version: int,
         patch_id: str,
-        edit: typing.List[inmanta_lsm.model.PatchCallEdit],
+        edit: typing.List["inmanta_lsm.model.PatchCallEdit"],
         comment: typing.Optional[str] = None,
     ) -> inmanta.protocol.common.Result:
         """
