@@ -67,7 +67,7 @@ def module_v2_venv(module_path: str) -> Iterator[env.VirtualEnv]:
                 "-X",
                 "module",
                 "install",
-                str(module_path),
+                module_path,
             ],
         )
         yield venv
