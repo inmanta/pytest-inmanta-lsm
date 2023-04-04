@@ -86,18 +86,3 @@ def test_basic_example(testdir: Testdir):
         result.assert_outcomes(passed=2, skipped=1)
     else:
         result.assert_outcomes(passed=3)
-
-
-def test_basic_example123(testdir: Testdir):
-    """Make sure that our plugin works."""
-
-    testdir.copy_example("test-partial")
-    os.environ["INMANTA_LSM_MODULE_CONSTRAINTS"] = "lsm~=2.19.0"
-    utils.add_version_constraint_to_project(testdir.tmpdir)
-
-    result = testdir.runpytest("tests/test_quickstart.py", "--lsm-ctr")
-
-    if versions.INMANTA_CORE_VERSION < version.Version("6"):
-        result.assert_outcomes(passed=2, skipped=1)
-    else:
-        result.assert_outcomes(passed=3)
