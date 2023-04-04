@@ -48,7 +48,6 @@ def test_partial_compile(testdir, module_venv_active):
     """
 
     testdir.copy_example("test-partial")
-
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest_inprocess("tests/test_basics.py", "--lsm-partial-compile")
