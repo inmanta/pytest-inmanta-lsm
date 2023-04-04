@@ -34,13 +34,11 @@ def add_version_constraint_to_project(project_dir: py.path.local):
         else:  # v2 module
             parser = ConfigParser()
             parser.read(str(project_dir / "setup.cfg"))
-            existing_requires = parser.get("options", "install_requires", fallback="").strip()
+            existing_requires: str = parser.get("options", "install_requires", fallback="").strip()
             if existing_requires:
                 existing_requires = existing_requires + "\n"
             constraints_list = [f"inmanta-module-{c}" for c in constraints.split(";")]
             parser.set("options", "install_requires", "\n" + existing_requires + "\n".join(constraints_list))
-            with open(project_dir / "setup.cfg", "w") as fh:
-                parser.write(fh)
             with open(project_dir / "setup.cfg", "w") as fh:
                 parser.write(fh)
 
