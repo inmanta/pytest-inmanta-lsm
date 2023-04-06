@@ -242,15 +242,15 @@ class RemoteOrchestrator:
         """
         if shell:
             assert len(args) == 1, "When running command in a shell, only one arg should be provided"
-            cmd = args[1]
+            cmd = args[0]
         else:
             # Join the command, safely escape all spaces
             cmd = shlex.join(args)
 
         # If required, add env var prefix to the command
         if env is not None:
-            env_prefix = " ".join(f"{k}={shlex.quote(v)}" for k, v in env.items())
-            cmd = env_prefix + cmd
+            env_prefix = [f"{k}={shlex.quote(v)}" for k, v in env.items()]
+            cmd = " ".join(env_prefix + [cmd])
 
         if cwd is not None:
             # Pretend that the command is a shell, and add a cd ... prefix to it
@@ -347,6 +347,7 @@ class RemoteOrchestrator:
         cmd = [
             "rsync",
             "--exclude=.git",
+            *[f"--exclude={exc}" for exc in excludes],
             "--delete",
             "-e",
             " ".join(SSH_CMD + [f"-p {self.ssh_port}"]),
@@ -390,11 +391,7 @@ class RemoteOrchestrator:
         # All the files to exclude when syncing the project, either because
         # we will sync them separately later, or because their content doesn't
         # have anything to do on the remote orchestrator
-        excludes = [
-            ".env",
-            "env",
-            ".git",
-        ]
+        excludes = [".env", "env"]
 
         # Exclude modules dirs, as we will sync them separately later
         for modules_dir_path in modules_dir_paths:
