@@ -56,7 +56,7 @@ class RemoteOrchestratorSettings(collections.abc.MutableMapping[str, object]):
         return result.result["value"]
 
     def __setitem__(self, __key: str, __value: object) -> None:
-        result = self.client.get_setting(self.environment, __key, __value)
+        result = self.client.set_setting(self.environment, __key, __value)
         assert result.code == 200, str(result.result)
 
     def __delitem__(self, __key: str) -> None:
