@@ -367,7 +367,7 @@ class RemoteOrchestrator:
             raise e
 
         # Make sure that the ownership on the remote folder is set correctly
-        self.run_command(["sudo", "chown", "-R", f"{user}:{user}", str(remote_folder)])
+        self.run_command(["sudo", "chown", "-R", f"{user}:{user}", str(remote_folder)], user=self.ssh_user)
 
     def sync_project_folder(self) -> None:
         """
