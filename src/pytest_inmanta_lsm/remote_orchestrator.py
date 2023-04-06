@@ -417,33 +417,32 @@ class RemoteOrchestrator:
         """
         LOGGER.debug("Caching the project's libs folder")
         libs_path = self.remote_project_path / "libs"
-        libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_libs_cache")
+        project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
 
         # Make sure the directory we want to sync from exists
         self.run_command(["mkdir", "-p", str(libs_path)])
 
         # Make sure the directory we want to sync to exists
-        self.run_command(["mkdir", "-p", str(libs_cache_path)])
+        self.run_command(["mkdir", "-p", str(project_cache_path)])
 
         # Use rsync to update the libs folder cache
-        self.run_command(["rsync", "-r", "--delete", str(libs_path), str(libs_cache_path)])
+        self.run_command(["rsync", "-r", "--delete", str(libs_path), str(project_cache_path)])
 
     def restore_libs_folder(self) -> None:
         """
         Update the project libs folder with what can be found in the cache.
         """
         LOGGER.debug("Restoring the project's libs folder")
-        libs_path = self.remote_project_path / "libs"
-        libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_libs_cache")
+        libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache") / "libs"
 
         # Make sure the directory we want to sync from exists
-        self.run_command(["mkdir", "-p", str(libs_path)])
+        self.run_command(["mkdir", "-p", str(self.remote_project_path)])
 
         # Make sure the directory we want to sync to exists
         self.run_command(["mkdir", "-p", str(libs_cache_path)])
 
         # Use rsync to update the libs folder
-        self.run_command(["rsync", "-r", "--delete", str(libs_cache_path), str(libs_path)])
+        self.run_command(["rsync", "-r", "--delete", str(libs_cache_path), str(self.remote_project_path)])
 
     def install_project(self) -> None:
         """
