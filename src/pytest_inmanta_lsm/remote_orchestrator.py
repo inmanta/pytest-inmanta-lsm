@@ -341,6 +341,9 @@ class RemoteOrchestrator:
             self.run_command(["sudo", "mv", str(temporary_remote_folder), str(remote_folder)], user=self.ssh_user)
             return
 
+        # Make sure target dir exists
+        self.run_command(["mkdir", "-p", str(remote_folder)])
+
         cmd = [
             "rsync",
             "--exclude=.git",
