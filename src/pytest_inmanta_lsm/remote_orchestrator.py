@@ -319,7 +319,7 @@ class RemoteOrchestrator:
             temporary_remote_folder = pathlib.Path(f"/tmp/{self.environment}/tmp-{remote_folder.name}")
             self.run_command(["mkdir", "-p", str(remote_folder)], user=user)
             self.run_command(["mkdir", "-p", str(temporary_remote_folder.parent)], user=self.ssh_user)
-            self.run_command(["rm", "-rf", str(temporary_remote_folder)], user=self.ssh_user)
+            self.run_command(["sudo", "rm", "-rf", str(temporary_remote_folder)], user=self.ssh_user)
             self.run_command(["sudo", "mv", str(remote_folder), str(temporary_remote_folder)], user=self.ssh_user)
             self.run_command(
                 args=["sudo", "chown", "-R", f"{self.ssh_user}:{self.ssh_user}", str(temporary_remote_folder)],
