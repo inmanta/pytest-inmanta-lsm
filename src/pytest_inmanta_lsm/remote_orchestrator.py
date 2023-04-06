@@ -47,6 +47,13 @@ class RemoteOrchestratorSettings(collections.abc.MutableMapping[str, object]):
         self.client = client
         self.environment = environment
 
+    def __contains__(self, __key: object) -> bool:
+        try:
+            self[__key]
+            return True
+        except KeyError:
+            return False
+
     def __getitem__(self, __key: str) -> object:
         result = self.client.get_setting(self.environment, __key)
         if result.code == 404:

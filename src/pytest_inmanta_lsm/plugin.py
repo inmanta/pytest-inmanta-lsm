@@ -323,17 +323,10 @@ def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, 
 
 @pytest.fixture
 def remote_orchestrator(
-    request: pytest.FixtureRequest,
     remote_orchestrator_shared: RemoteOrchestrator,
     remote_orchestrator_project: Project,
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
-    remote_orchestrator_container: Optional[OrchestratorContainer],
-    remote_orchestrator_environment: str,
-    remote_orchestrator_no_clean: bool,
-    remote_orchestrator_host: Tuple[str, int],
     remote_orchestrator_partial: bool,
-    remote_orchestrator_project_name: str,
-    remote_orchestrator_environment_name: str,
 ) -> RemoteOrchestrator:
     # Attach test project to the remote orchestrator object
     remote_orchestrator_shared.attach_project(remote_orchestrator_project)
@@ -354,7 +347,8 @@ def remote_orchestrator(
 
     # Update the settings on the orchestrator
     for k, v in settings.items():
-        remote_orchestrator_shared.settings[k] = v
+        if k in remote_orchestrator_shared.settings:
+            remote_orchestrator_shared.settings[k] = v
 
     return remote_orchestrator_shared
 
