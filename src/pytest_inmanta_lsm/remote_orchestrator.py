@@ -220,7 +220,7 @@ class RemoteOrchestrator:
         *,
         shell: bool = False,
         cwd: typing.Optional[str] = None,
-        env: typing.Optional[typing.Mapping[str, str]],
+        env: typing.Optional[typing.Mapping[str, str]] = None,
         user: str = "inmanta",
     ) -> str:
         """
