@@ -417,10 +417,10 @@ class RemoteOrchestrator:
         libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_libs_cache")
 
         # Make sure the directory we want to sync from exists
-        self.run_command(["mkdir", "-p", libs_path])
+        self.run_command(["mkdir", "-p", str(libs_path)])
 
         # Make sure the directory we want to sync to exists
-        self.run_command(["mkdir", "-p", libs_cache_path])
+        self.run_command(["mkdir", "-p", str(libs_cache_path)])
 
         # Use rsync to update the libs folder cache
         self.run_command(["rsync", "-r", "--delete", str(libs_path), str(libs_cache_path)])
@@ -434,10 +434,10 @@ class RemoteOrchestrator:
         libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_libs_cache")
 
         # Make sure the directory we want to sync from exists
-        self.run_command(["mkdir", "-p", libs_path])
+        self.run_command(["mkdir", "-p", str(libs_path)])
 
         # Make sure the directory we want to sync to exists
-        self.run_command(["mkdir", "-p", libs_cache_path])
+        self.run_command(["mkdir", "-p", str(libs_cache_path)])
 
         # Use rsync to update the libs folder
         self.run_command(["rsync", "-r", "--delete", str(libs_cache_path), str(libs_path)])
