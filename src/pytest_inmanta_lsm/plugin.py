@@ -315,6 +315,9 @@ def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, 
     Project to be used by the remote orchestrator. Yields the same object as the plain project fixture but ensures the
     module being tested is synced to the remote orchestrator even if it is a v2 module.
     """
+    # Reload the config after the project fixture has run
+    remote_orchestrator_shared.setup_config()
+
     yield project
 
 
@@ -332,7 +335,6 @@ def remote_orchestrator(
     remote_orchestrator_project_name: str,
     remote_orchestrator_environment_name: str,
 ) -> RemoteOrchestrator:
-
     # Attach test project to the remote orchestrator object
     remote_orchestrator_shared.attach_project(remote_orchestrator_project)
 

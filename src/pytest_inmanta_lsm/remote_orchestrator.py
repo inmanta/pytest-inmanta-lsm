@@ -125,7 +125,7 @@ class RemoteOrchestrator:
         self.environment_name = environment_name
         self.project_name = project_name
 
-        self._setup_config()
+        self.setup_config()
         self.client = SyncClient("client")
         self._ensure_environment()
         self.server_version = self._get_server_version()
@@ -149,7 +149,7 @@ class RemoteOrchestrator:
 
         return self._project
 
-    def _setup_config(self) -> None:
+    def setup_config(self) -> None:
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self.environment))
 
