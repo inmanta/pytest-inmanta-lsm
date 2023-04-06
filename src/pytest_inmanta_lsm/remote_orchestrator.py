@@ -469,9 +469,11 @@ class RemoteOrchestrator:
         # the env file that the server is using
         result = self.run_command(
             args=[
+                "sudo",
                 "systemd-run",
-                "--user",
                 "--pipe",
+                "-p",
+                "User=inmanta",
                 "-p",
                 "EnvironmentFile=/etc/sysconfig/inmanta-server",
                 "-p",
@@ -480,6 +482,7 @@ class RemoteOrchestrator:
                 "/opt/inmanta/bin/python",
                 str(install_script_path),
             ],
+            user=self.ssh_user,
         )
         LOGGER.debug("Installation logs: %s", result)
 
