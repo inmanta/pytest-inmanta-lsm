@@ -330,7 +330,7 @@ class RemoteOrchestrator:
             self.run_command(["rm", "-rf", str(temporary_remote_folder)], user=self.ssh_user)
             self.run_command(["sudo", "mv", str(remote_folder), str(temporary_remote_folder)], user=self.ssh_user)
             self.run_command(
-                ["sudo", "chown", "-R", f"{self.ssh_user}:{self.ssh_user}", str(remote_folder)], user=self.ssh_user
+                ["sudo", "chown", "-R", f"{self.ssh_user}:{self.ssh_user}", str(temporary_remote_folder)], user=self.ssh_user
             )
 
             # Do the sync with the temporary folder
