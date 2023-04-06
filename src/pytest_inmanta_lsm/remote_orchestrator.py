@@ -291,16 +291,6 @@ class RemoteOrchestrator:
         Clear the project folder on the orchestrator.
         """
         LOGGER.debug("Cleaning the project on the remote orchestrator")
-        try:
-            self.run_command(["test", "-d", str(self.remote_project_path)])
-        except subprocess.CalledProcessError as e:
-            # test returns exit code 1 if the folder doesn't exist
-            if e.returncode == 1:
-                # Nothing to do
-                return
-            raise e
-
-        # The folder exists, we need to remove it
         self.run_command(["rm", "-rf", str(self.remote_project_path)])
 
     def sync_local_folder(
@@ -458,7 +448,7 @@ class RemoteOrchestrator:
             # Nothing to do
             return
 
-        LOGGER.debug(f"Server version is {self.server_version}, installing project manually")
+        LOGGER.debug("Server version is %s, installing project manually", str(self.server_version))
         # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
         install_script_path = self.remote_project_path / ".inm_lsm_setup_project.py"
 
@@ -467,16 +457,17 @@ class RemoteOrchestrator:
             # Environment variables are loaded by the ssh
             # We run it in a shell, to make sure that the process has access to the environment
             # variables that the server uses
-            self.run_command(
+            result = self.run_command(
                 args=[f"/opt/inmanta/bin/python {install_script_path}"],
                 shell=True,
                 env={"PROJECT_PATH": str(self.remote_project_path)},
             )
+            LOGGER.debug("Installation logs: %s", result)
             return
 
         # Non-container environment, we run it as a systemd-run uni, to be able to load
         # the env file that the server is using
-        self.run_command(
+        result = self.run_command(
             args=[
                 "systemd-run",
                 "--user",
@@ -490,6 +481,7 @@ class RemoteOrchestrator:
                 str(install_script_path),
             ],
         )
+        LOGGER.debug("Installation logs: %s", result)
 
     def sync_project(self) -> None:
         """Synchronize the project to the lab orchestrator"""
