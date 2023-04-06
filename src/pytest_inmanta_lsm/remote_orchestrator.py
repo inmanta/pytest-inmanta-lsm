@@ -380,7 +380,7 @@ class RemoteOrchestrator:
         )
 
         local_project = inmanta.module.Project(self.project._test_project_dir)
-        local_project_path = pathlib.Path(local_project.path)
+        local_project_path = pathlib.Path(self.project._test_project_dir)
         modules_dir_paths: list[pathlib.Path] = [
             local_project_path / module_dir for module_dir in local_project.metadata.modulepath
         ]
