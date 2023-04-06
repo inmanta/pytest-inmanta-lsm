@@ -5,6 +5,7 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+import collections.abc
 import logging
 import pathlib
 import shlex
@@ -12,7 +13,6 @@ import subprocess
 import typing
 from pathlib import Path
 from pprint import pformat
-from typing import Dict, Optional, Union
 from uuid import UUID
 
 import inmanta.module
@@ -36,18 +36,52 @@ SSH_CMD = [
 ]
 
 
+class RemoteOrchestratorSettings(collections.abc.MutableMapping[str, object]):
+    """
+    Wrapper for the orchestrator settings api.  The wrapper implements the interface
+    of a mutable mapping and behaves as such.  When you access a key, it is read from
+    the orchestrator, when you update a value, it is written to the orchestrator.
+    """
+
+    def __init__(self, client: SyncClient, environment: UUID) -> None:
+        self.client = client
+        self.environment = environment
+
+    def __getitem__(self, __key: str) -> object:
+        result = self.client.get_setting(self.environment, __key)
+        if result.code == 404:
+            raise KeyError(__key)
+
+        assert result.code == 200, str(result.result)
+        return result.result["value"]
+
+    def __setitem__(self, __key: str, __value: object) -> None:
+        result = self.client.get_setting(self.environment, __key, __value)
+        assert result.code == 200, str(result.result)
+
+    def __delitem__(self, __key: str) -> None:
+        result = self.client.delete_setting(self.environment, __key)
+        if result.code == 404:
+            raise KeyError(__key)
+
+        assert result.code == 200, str(result.result)
+
+    def __iter__(self) -> typing.Iterator[str]:
+        result = self.client.list_settings(self.environment)
+        assert result.code == 200, str(result.result)
+        return iter(result.result["settings"])
+
+
 class RemoteOrchestrator:
     def __init__(
         self,
         host: str,
         ssh_user: str,
         environment: UUID,
-        project: Project,
-        settings: Dict[str, Union[bool, str, int]],
         noclean: bool,
         ssh_port: str = "22",
-        token: Optional[str] = None,
-        ca_cert: Optional[str] = None,
+        token: typing.Optional[str] = None,
+        ca_cert: typing.Optional[str] = None,
         ssl: bool = False,
         container_env: bool = False,
         *,
@@ -65,8 +99,6 @@ class RemoteOrchestrator:
         :param ssh_user: the username to log on to the machine, should have sudo rights
         :param ssh_port: the port to use to log on to the machine
         :param environment: uuid of the environment to use, is created if it doesn't exists
-        :param project: project fixture of pytest-inmanta
-        :param settings: The inmanta environment settings that should be set on the remote orchestrator
         :param noclean: Option to indicate that after the run clean should not run. This exposes the attribute to other
                         fixtures.
         :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
@@ -82,7 +114,6 @@ class RemoteOrchestrator:
         self.port = port
         self.ssh_user = ssh_user
         self.ssh_port = ssh_port
-        self.settings = settings
         self.noclean = noclean
         self.ssl = ssl
         self.token = token
@@ -91,37 +122,77 @@ class RemoteOrchestrator:
         self.environment_name = environment_name
         self.project_name = project_name
 
-        inmanta_config.Config.load_config()
-        inmanta_config.Config.set("config", "environment", str(self.environment))
-
-        for section in ["compiler_rest_transport", "client_rest_transport"]:
-            inmanta_config.Config.set(section, "host", host)
-            inmanta_config.Config.set(section, "port", str(port))
-
-            # Config for SSL and authentication:
-            if ssl:
-                inmanta_config.Config.set(section, "ssl", str(ssl))
-                if ca_cert:
-                    inmanta_config.Config.set(section, "ssl_ca_cert_file", ca_cert)
-            if token:
-                inmanta_config.Config.set(section, "token", token)
-
-        self.project = project
-
+        self._setup_config()
         self.client = SyncClient("client")
-
-        # cache the environment before a cleanup is done. This allows the sync to go faster.
-        self._server_path: Optional[str] = None
-        self._server_cache_path: Optional[str] = None
-
         self._ensure_environment()
         self.server_version = self._get_server_version()
+
+        self._project: typing.Optional[Project] = None
 
         # The path on the remote orchestrator where the project will be synced
         self.remote_project_path = pathlib.Path(
             "/var/lib/inmanta/server/environments/",
             str(self.environment),
         )
+
+    @property
+    def settings(self) -> RemoteOrchestratorSettings:
+        return RemoteOrchestratorSettings(self.client, self.environment)
+
+    @property
+    def project(self) -> Project:
+        if self._project is None:
+            raise RuntimeError("Local project has not been assigned to this remote orchestrator")
+
+        return self._project
+
+    def _setup_config(self) -> None:
+        inmanta_config.Config.load_config()
+        inmanta_config.Config.set("config", "environment", str(self.environment))
+
+        for section in ["compiler_rest_transport", "client_rest_transport"]:
+            inmanta_config.Config.set(section, "host", self.host)
+            inmanta_config.Config.set(section, "port", str(self.port))
+
+            # Config for SSL and authentication:
+            if self.ssl:
+                inmanta_config.Config.set(section, "ssl", str(self.ssl))
+                if self.ca_cert:
+                    inmanta_config.Config.set(section, "ssl_ca_cert_file", self.ca_cert)
+            if self.token:
+                inmanta_config.Config.set(section, "token", self.token)
+
+    def _ensure_environment(self) -> None:
+        """Make sure the environment exists"""
+        result = self.client.get_environment(self.environment)
+        if result.code == 200:
+            # environment exists
+            return
+
+        # environment does not exists, find project
+        def ensure_project(project_name: str) -> str:
+            result = self.client.project_list()
+            assert (
+                result.code == 200
+            ), f"Wrong response code while verifying project, got {result.code} (expected 200): \n{result.result}"
+            for project in result.result["data"]:
+                if project["name"] == project_name:
+                    return project["id"]
+
+            result = self.client.project_create(name=project_name)
+            assert (
+                result.code == 200
+            ), f"Wrong response code while creating project, got {result.code} (expected 200): \n{result.result}"
+            return result.result["data"]["id"]
+
+        result = self.client.create_environment(
+            project_id=ensure_project(self.project_name),
+            name=self.environment_name,
+            environment_id=self.environment,
+        )
+        assert (
+            result.code == 200
+        ), f"Wrong response code while creating environment, got {result.code} (expected 200): \n{result.result}"
 
     def _get_server_version(self) -> Version:
         """
@@ -134,6 +205,9 @@ class RemoteOrchestrator:
             return Version(server_status.result["data"]["version"])
         except (KeyError, TypeError):
             raise Exception(f"Unexpected response for server status API call: {server_status.result}")
+
+    def attach_project(self, project: Project) -> None:
+        self._project = project
 
     def export_service_entities(self) -> None:
         """Initialize the remote orchestrator with the service model and check if all preconditions hold"""
@@ -207,38 +281,6 @@ class RemoteOrchestrator:
             LOGGER.error("Failed to execute command: %s", cmd)
             LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
             raise e
-
-    def _ensure_environment(self) -> None:
-        """Make sure the environment exists"""
-        result = self.client.get_environment(self.environment)
-        if result.code == 200:
-            # environment exists
-            return
-
-        # environment does not exists, find project
-        def ensure_project(project_name: str) -> str:
-            result = self.client.project_list()
-            assert (
-                result.code == 200
-            ), f"Wrong response code while verifying project, got {result.code} (expected 200): \n{result.result}"
-            for project in result.result["data"]:
-                if project["name"] == project_name:
-                    return project["id"]
-
-            result = self.client.project_create(name=project_name)
-            assert (
-                result.code == 200
-            ), f"Wrong response code while creating project, got {result.code} (expected 200): \n{result.result}"
-            return result.result["data"]["id"]
-
-        result = self.client.create_environment(
-            project_id=ensure_project(self.project_name),
-            name=self.environment_name,
-            environment_id=self.environment,
-        )
-        assert (
-            result.code == 200
-        ), f"Wrong response code while creating environment, got {result.code} (expected 200): \n{result.result}"
 
     def clear_project_folder(self) -> None:
         """
@@ -486,7 +528,7 @@ class RemoteOrchestrator:
         self,
         service_entity_name: str,
         service_instance_id: UUID,
-    ) -> Optional[str]:
+    ) -> typing.Optional[str]:
         """
         Get the compiler error for a validation failure for a specific service entity
 
@@ -531,7 +573,7 @@ class RemoteOrchestrator:
     def get_managed_instance(
         self,
         service_entity_name: str,
-        service_id: Optional[UUID] = None,
+        service_id: typing.Optional[UUID] = None,
         lookback: int = 1,
     ) -> "managed_service_instance.ManagedServiceInstance":
         return managed_service_instance.ManagedServiceInstance(self, service_entity_name, service_id, lookback_depth=lookback)
