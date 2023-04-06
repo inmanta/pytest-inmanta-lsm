@@ -71,6 +71,9 @@ class RemoteOrchestratorSettings(collections.abc.MutableMapping[str, object]):
         assert result.code == 200, str(result.result)
         return iter(result.result["settings"])
 
+    def __len__(self) -> int:
+        return len(list(iter(self)))
+
 
 class RemoteOrchestrator:
     def __init__(
