@@ -326,7 +326,7 @@ class RemoteOrchestrator:
             # Syncing the folder would not give us the correct permission on the folder
             # So we sync the folder in a temporary location, then move it
             temporary_remote_folder = pathlib.Path(f"/tmp/{self.environment}/tmp-{remote_folder.name}")
-            self.run_command(["mkdir", "-p", temporary_remote_folder.parent], user=self.ssh_user)
+            self.run_command(["mkdir", "-p", str(temporary_remote_folder.parent)], user=self.ssh_user)
             self.run_command(["rm", "-rf", str(temporary_remote_folder)], user=self.ssh_user)
             self.run_command(["sudo", "mv", str(remote_folder), str(temporary_remote_folder)], user=self.ssh_user)
             self.run_command(
