@@ -306,6 +306,7 @@ def remote_orchestrator_shared(
     # If --lsm-no-clean is used, leave the orchestrator as it is, with all its
     # file, otherwise cleanup the project
     if not remote_orchestrator_no_clean:
+        remote_orchestrator.client.clear_environment(remote_orchestrator.environment)
         remote_orchestrator.clear_project_folder()
 
 
@@ -330,6 +331,9 @@ def remote_orchestrator(
 ) -> RemoteOrchestrator:
     # Attach test project to the remote orchestrator object
     remote_orchestrator_shared.attach_project(remote_orchestrator_project)
+
+    # Clean environment
+    remote_orchestrator_shared.client.clear_environment(remote_orchestrator_shared.environment)
 
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
