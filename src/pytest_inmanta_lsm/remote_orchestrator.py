@@ -375,7 +375,7 @@ class RemoteOrchestrator:
         local_project = inmanta.module.Project(self.project._test_project_dir)
         local_project_path = pathlib.Path(local_project.path)
         modules_dir_paths: list[pathlib.Path] = [
-            local_project_path / module_dir for module_dir in local_project.metadata.modulepath_to_list
+            local_project_path / module_dir for module_dir in local_project.metadata.modulepath
         ]
 
         # All the files to exclude when syncing the project, either because
