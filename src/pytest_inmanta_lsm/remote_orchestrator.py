@@ -360,7 +360,7 @@ class RemoteOrchestrator:
 
         LOGGER.debug("Running rsync toward remote orchestrator: %s", str(cmd))
         try:
-            subprocess.check_output(args=cmd, stderr=subprocess.PIPE)
+            subprocess.check_output(args=cmd, stderr=subprocess.PIPE, universal_newlines=True)
         except subprocess.CalledProcessError as e:
             LOGGER.error("Failed to rsync: %s", str(cmd))
             LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
