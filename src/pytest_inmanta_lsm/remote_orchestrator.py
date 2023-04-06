@@ -273,7 +273,8 @@ class RemoteOrchestrator:
             return subprocess.check_output(
                 SSH_CMD
                 + [
-                    f"-p {self.ssh_port}",
+                    "-p",
+                    str(self.ssh_port),
                     f"{self.ssh_user}@{self.host}",
                     cmd,
                 ],
@@ -346,9 +347,7 @@ class RemoteOrchestrator:
             "--exclude=.git",
             "--delete",
             "-e",
-            *SSH_CMD,
-            "-p",
-            str(self.ssh_port),
+            " ".join(SSH_CMD + [f"-p {self.ssh_port}"]),
             "-rl",
             str(local_folder),
             f"{self.ssh_user}@{self.host}:{remote_folder}",
@@ -359,7 +358,13 @@ class RemoteOrchestrator:
         else:
             cmd.insert(1, f"--filter=:- {gitignore}")
 
-        subprocess.check_output(args=cmd, stderr=subprocess.PIPE)
+        LOGGER.debug("Running rsync toward remote orchestrator: %s", str(cmd))
+        try:
+            subprocess.check_output(args=cmd, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            LOGGER.error("Failed to rsync: %s", str(cmd))
+            LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
+            raise e
 
         # Make sure that the ownership on the remote folder is set correctly
         self.run_command(["sudo", "chown", "-R", f"{user}:{user}", str(remote_folder)])
