@@ -5,17 +5,17 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
-
 import logging
-import os
+import pathlib
+import shlex
 import subprocess
+import typing
 from pathlib import Path
 from pprint import pformat
 from typing import Dict, Optional, Union
 from uuid import UUID
 
-import yaml
-import pathlib
+import inmanta.module
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from inmanta.protocol.endpoints import SyncClient
@@ -140,31 +140,73 @@ class RemoteOrchestrator:
         self.project._exporter.run_export_plugin("service_entities_exporter")
         self.sync_project()
 
-    def check_output(self, *args: object, **kwargs: object) -> str:
+    def run_command(
+        self,
+        args: typing.Sequence[str],
+        *,
+        shell: bool = False,
+        cwd: typing.Optional[str] = None,
+        env: typing.Optional[typing.Mapping[str, str]],
+        user: str = "inmanta",
+    ) -> str:
         """
-        Helper method to execute a command on the remote orchestrator host.  It implements the same
-        interface as `subprocess.check_output` and will delegate all the logic to it, only wrapping
-        the command in an ssh session.
-        """
-        if len(args) > 0:
-            cmd = args[0]
-            args = tuple(args[1:])
-        elif "args" in kwargs:
-            cmd = kwargs["args"]
-            del kwargs["args"]
-        else:
-            raise TypeError("Missing one positional argument: 'args'")
+        Helper method to execute a command on the remote orchestrator host as the specified user.
+        This methods tries to mimic the interface of subprocess.check_output as closely as it can
+        but taking some liberties regarding the typing or parameters.  This should be kept in mind
+        for future expansion.
 
-        return subprocess.check_output(
-            SSH_CMD
-            + [
-                f"-p {self.ssh_port}",
-                f"{self.ssh_user}@{self.host}",
-                " ".join(arg.replace(" ", "\\ ") for arg in cmd),
-            ],
-            *args,
-            **kwargs,
-        )
+        :param args: A sequence of string, which should be executed as a single command, on the
+            remote orchestrator.  If shell is True, the sequence should contain exactly one element.
+        :param shell: Whether to execute the argument in a shell (bash).
+        :param cwd: The directory on the remote orchestrator in which the command should be executed.
+        :param env: A mapping of environment variables that should be available to the process
+            running on the remote orchestrator.
+        :param user: The user that should be running the process on the remote orchestrator.
+        """
+        if shell:
+            assert len(args) == 1, "When running command in a shell, only one arg should be provided"
+            cmd = args[1]
+        else:
+            # Join the command, safely escape all spaces
+            cmd = shlex.join(args)
+
+        # If required, add env var prefix to the command
+        if env is not None:
+            env_prefix = " ".join(f"{k}={shlex.quote(v)}" for k, v in env.items())
+            cmd = env_prefix + cmd
+
+        if cwd is not None:
+            # Pretend that the command is a shell, and add a cd ... prefix to it
+            shell = True
+            cwd_prefix = shlex.join(["cd", cwd]) + ";"
+            cmd = cwd_prefix + cmd
+
+        if shell:
+            # The command we received should be run in a shell
+            cmd = shlex.join(["bash", "-c", cmd])
+
+        # If we need to change user, prefix the command with a sudo
+        if self.ssh_user != user or shell:
+            # Make sure the user is a safe value to use
+            user = shlex.quote(user)
+            cmd = f"sudo --login --user={user} -- {cmd}"
+
+        LOGGER.debug("Running command on remote orchestrator: %s", cmd)
+        try:
+            return subprocess.check_output(
+                SSH_CMD
+                + [
+                    f"-p {self.ssh_port}",
+                    f"{self.ssh_user}@{self.host}",
+                    cmd,
+                ],
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+            )
+        except subprocess.CalledProcessError as e:
+            LOGGER.error("Failed to execute command: %s", cmd)
+            LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
+            raise e
 
     def _ensure_environment(self) -> None:
         """Make sure the environment exists"""
@@ -204,78 +246,125 @@ class RemoteOrchestrator:
         """
         LOGGER.debug("Cleaning the project on the remote orchestrator")
         try:
-            self.check_output(
-                args=["test", "-d", str(self.remote_project_path)],
-                stderr=subprocess.PIPE,
-            )
+            self.run_command(["test", "-d", str(self.remote_project_path)])
         except subprocess.CalledProcessError as e:
             # test returns exit code 1 if the folder doesn't exist
             if e.returncode == 1:
                 # Nothing to do
                 return
-            raise
+            raise e
 
         # The folder exists, we need to remove it
-        self.check_output(
-            args=["rm", "-rf", str(self.remote_project_path)],
-            stderr=subprocess.PIPE,
-        )
+        self.run_command(["rm", "-rf", str(self.remote_project_path)])
+
+    def sync_local_folder(
+        self,
+        local_folder: pathlib.Path,
+        remote_folder: pathlib.Path,
+        *,
+        excludes: typing.Sequence[str],
+        user: str = "inmanta",
+    ) -> None:
+        """
+        Sync a local folder with a remote orchestrator folder, exclude the provided sub folder
+        as well as anything that would be ignored by git (if a .gitignore file is found in the
+        folder) and make sure that the remote folder is owned by the specified user.
+
+        :param local_folder: The folder on this machine that should be sent to the remote
+            orchestrator.
+        :param remote_folder: The folder on the remote orchestrator that should contain our
+            local folder content after the sync.
+        :param excludes: A list of exclude values to provide to rsync.
+        :param user: The user that should own the file on the remote orchestrator.
+        """
+        if self.ssh_user != user:
+            # Syncing the folder would not give us the correct permission on the folder
+            # So we sync the folder in a temporary location, then move it
+            temporary_remote_folder = pathlib.Path(f"/tmp/{self.environment}/tmp-{remote_folder.name}")
+            self.run_command(["mkdir", "-p", temporary_remote_folder.parent], user=self.ssh_user)
+            self.run_command(["rm", "-rf", str(temporary_remote_folder)], user=self.ssh_user)
+            self.run_command(["sudo", "mv", str(remote_folder), str(temporary_remote_folder)], user=self.ssh_user)
+            self.run_command(
+                ["sudo", "chown", "-R", f"{self.ssh_user}:{self.ssh_user}", str(remote_folder)], user=self.ssh_user
+            )
+
+            # Do the sync with the temporary folder
+            self.sync_local_folder(local_folder, temporary_remote_folder, excludes=excludes, user=self.ssh_user)
+
+            # Move the temporary folder back into its original location
+            self.run_command(["sudo", "chown", "-R", f"{user}:{user}", str(temporary_remote_folder)], user=self.ssh_user)
+            self.run_command(["sudo", "mv", str(temporary_remote_folder), str(remote_folder)], user=self.ssh_user)
+            return
+
+        cmd = [
+            "rsync",
+            "--exclude=.git",
+            "--delete",
+            "-e",
+            " ".join(SSH_CMD) + f"-p {self.ssh_port}",
+            "-rl",
+            str(local_folder),
+            f"{self.ssh_user}@{self.host}:{remote_folder}",
+        ]
+        gitignore = local_folder / ".gitignore"
+        if not gitignore.exists():
+            LOGGER.warning("%s does not have a .gitignore file, it will be synced entirely", str(local_folder))
+        else:
+            cmd.insert(1, f"--filter=:- {gitignore}")
+
+        subprocess.check_output(args=cmd, stderr=subprocess.PIPE)
+
+        # Make sure that the ownership on the remote folder is set correctly
+        self.run_command(["sudo", "chown", "-R", f"{user}:{user}", str(remote_folder)])
 
     def sync_project_folder(self) -> None:
+        """
+        Sync the project in the given folder with the remote orchestrator.
+        """
         LOGGER.debug(
             "Sync local project folder at %s with remote orchestrator (%s)",
             self.project._test_project_dir,
             str(self.remote_project_path),
         )
 
-        local_project_path = pathlib.Path(self.project._test_project_dir)
+        local_project = inmanta.module.Project(self.project._test_project_dir)
+        local_project_path = pathlib.Path(local_project.path)
+        modules_dir_paths: list[pathlib.Path] = [
+            local_project_path / module_dir for module_dir in local_project.metadata.modulepath_to_list
+        ]
 
-        # Sync project folder using rsync, exclude the libs folder
-        subprocess.check_output(
-            [
-                "rsync",
-                "--delete",
-                "--exclude",
-                ".env",
-                "--exclude",
-                ".git",
-                "--exclude",
-                "env",
-                "--exclude",
-                "libs",
-                "-e",
-                " ".join(SSH_CMD) + f"-p {self.ssh_port}",
-                "-rl",
-                str(local_project_path),
-                str(self.remote_project_path),
-            ],
-            stderr=subprocess.PIPE,
-        )
+        # All the files to exclude when syncing the project, either because
+        # we will sync them separately later, or because their content doesn't
+        # have anything to do on the remote orchestrator
+        excludes = [
+            ".env",
+            "env",
+            ".git",
+        ]
 
-        for module in local_project_path.glob("libs/*"):
-            if not module.is_dir():
-                LOGGER.warning("%s is not a directory, it will be skipped", str(module))
+        # Exclude modules dirs, as we will sync them separately later
+        for modules_dir_path in modules_dir_paths:
+            if local_project_path not in modules_dir_path.parents:
+                # This folder wouldn't have been synced anyway
                 continue
 
-            cmd = [
-                "rsync",
-                "--exclude=.git",
-                "--delete",
-                "-e",
-                " ".join(SSH_CMD) + f"-p {self.ssh_port}",
-                "-rl",
-                str(module),
-                str(self.remote_project_path / "libs"),
-            ]
-            gitignore = module / ".gitignore"
-            if not gitignore.exists():
-                LOGGER.warning("%s does not have a .gitignore file, it will be synced entirely", str(module))
-            else:
-                cmd.insert(1, f"--filter=:- {gitignore}")
-            
-            # Sync the module
-            subprocess.check_output(cmd=cmd, stderr=subprocess.PIPE)
+            excludes.append(str(modules_dir_path.relative_to(local_project_path)))
 
+        # Sync the project folder
+        self.sync_local_folder(local_project_path, self.remote_project_path, excludes=excludes)
+
+        # Fake that the project is a git repo
+        self.run_command(["mkdir", "-p", str(self.remote_project_path / ".git")])
+
+        # Sync all the modules from all the module paths
+        for modules_dir_path in modules_dir_paths:
+            for module in modules_dir_path.glob("*"):
+                if not module.is_dir():
+                    LOGGER.warning("%s is not a directory, it will be skipped", str(module))
+                    continue
+
+                remote_module_path = self.remote_project_path / "libs" / module.name
+                self.sync_local_folder(module, remote_module_path, excludes=[])
 
     def cache_libs_folder(self) -> None:
         """
@@ -283,25 +372,16 @@ class RemoteOrchestrator:
         """
         LOGGER.debug("Caching the project's libs folder")
         libs_path = self.remote_project_path / "libs"
-        libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + f"_libs_cache")
+        libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_libs_cache")
 
         # Make sure the directory we want to sync from exists
-        self.check_output(
-            args=["mkdir", "-p", libs_path],
-            stderr=subprocess.PIPE,
-        )
+        self.run_command(["mkdir", "-p", libs_path])
 
         # Make sure the directory we want to sync to exists
-        self.check_output(
-            args=["mkdir", "-p", libs_cache_path],
-            stderr=subprocess.PIPE,
-        )
+        self.run_command(["mkdir", "-p", libs_cache_path])
 
         # Use rsync to update the libs folder cache
-        self.check_output(
-            args=["rsync", "-r", "--delete", str(libs_path), str(libs_cache_path)],
-            stderr=subprocess.PIPE,
-        )
+        self.run_command(["rsync", "-r", "--delete", str(libs_path), str(libs_cache_path)])
 
     def restore_libs_folder(self) -> None:
         """
@@ -309,209 +389,68 @@ class RemoteOrchestrator:
         """
         LOGGER.debug("Restoring the project's libs folder")
         libs_path = self.remote_project_path / "libs"
-        libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + f"_libs_cache")
+        libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_libs_cache")
 
         # Make sure the directory we want to sync from exists
-        self.check_output(
-            args=["mkdir", "-p", libs_path],
-            stderr=subprocess.PIPE,
-        )
+        self.run_command(["mkdir", "-p", libs_path])
 
         # Make sure the directory we want to sync to exists
-        self.check_output(
-            args=["mkdir", "-p", libs_cache_path],
-            stderr=subprocess.PIPE,
-        )
+        self.run_command(["mkdir", "-p", libs_cache_path])
 
         # Use rsync to update the libs folder
-        self.check_output(
-            args=["rsync", "-r", "--delete", str(libs_cache_path), str(libs_path)],
-            stderr=subprocess.PIPE,
-        )
+        self.run_command(["rsync", "-r", "--delete", str(libs_cache_path), str(libs_path)])
 
-    def use_sudo(self) -> str:
-        if self.ssh_user == "inmanta":
-            return ""
-        return "sudo "
+    def install_project(self) -> None:
+        """
+        Install, if required, the project that has been sent to the remote orchestrator.
+        """
+        if self.server_version < Version("5.dev"):
+            # Nothing to do
+            return
+
+        LOGGER.debug(f"Server version is {self.server_version}, installing project manually")
+        # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
+        install_script_path = self.remote_project_path / ".inm_lsm_setup_project.py"
+
+        if self.container_env:
+            # If this is a container env, simply run the script as the inmanta user suffice
+            # Environment variables are loaded by the ssh
+            # We run it in a shell, to make sure that the process has access to the environment
+            # variables that the server uses
+            self.run_command(
+                args=[f"/opt/inmanta/bin/python {install_script_path}"],
+                shell=True,
+                env={"PROJECT_PATH": str(self.remote_project_path)},
+            )
+            return
+
+        # Non-container environment, we run it as a systemd-run uni, to be able to load
+        # the env file that the server is using
+        self.run_command(
+            args=[
+                "systemd-run",
+                "--user",
+                "--pipe",
+                "-p",
+                "EnvironmentFile=/etc/sysconfig/inmanta-server",
+                "-p",
+                f"Environment=PROJECT_PATH={self.remote_project_path}",
+                "--wait",
+                "/opt/inmanta/bin/python",
+                str(install_script_path),
+            ],
+        )
 
     def sync_project(self) -> None:
         """Synchronize the project to the lab orchestrator"""
-        project = self._project
-
-        source_script = Path(__file__).parent / "resources/setup_project.py"
-        destination_script = Path(project._test_project_dir, ".inm_lsm_setup_project.py")
+        source_script = pathlib.Path(__file__).parent / "resources/setup_project.py"
+        destination_script = Path(self.project._test_project_dir, ".inm_lsm_setup_project.py")
         LOGGER.debug(f"Copying module V2 install script ({source_script}) in project folder {destination_script}")
         destination_script.write_text(source_script.read_text())
 
         LOGGER.info("Sending service model to the lab orchestrator")
-        # load the project yaml
-        with open(os.path.join(project._test_project_dir, "project.yml"), "r") as fd:
-            project_data = yaml.safe_load(fd)
-
-        modules_path = project_data.get("modulepath", [])
-        if isinstance(modules_path, str):
-            LOGGER.warning(
-                "modulepath in project.yaml was a string and not and array! Got %s",
-                modules_path,
-            )
-            modules_path = [modules_path]
-
-        # find out which dirs to sync
-        modules_path = [path for path in modules_path if path != "libs"]
-
-        # check if there is a cache and move it to the env location
-        server_path = f"/var/lib/inmanta/server/environments/{self._env}/"
-        remote_path = f"{self._ssh_user}@{self.host}:{server_path}"
-        cache_path = f"{server_path[0:-1]}_cache"  # [0:-1] to get trailing slash out of the way!
-
-        # Disable sudo over ssh when the remote user has the correct permissions
-        use_sudo: str = self.use_sudo()
-
-        LOGGER.debug("Move cache if it exists on orchestrator")
-        self.check_output([])
-
-        subprocess.check_output(
-            SSH_CMD
-            + [
-                f"-p {self._ssh_port}",
-                f"{self._ssh_user}@{self.host}",
-                f"{use_sudo}test -d {cache_path} && {use_sudo}mv {cache_path} {server_path} || true",
-            ],
-            stderr=subprocess.PIPE,
-        )
-
-        # make sure the remote dir is writeable for us
-        LOGGER.debug("Make sure environment directory on orchestrator exists")
-        subprocess.check_output(
-            SSH_CMD
-            + [
-                f"-p {self._ssh_port}",
-                f"{self._ssh_user}@{self.host}",
-                f"{use_sudo}mkdir -p {server_path}; {use_sudo}chown -R {self._ssh_user}:{self._ssh_user} {server_path}",
-            ],
-            stderr=subprocess.PIPE,
-        )
-
-        # sync the project
-        LOGGER.debug("Sync project directory to the orchestrator %s", project._test_project_dir)
-        subprocess.check_output(
-            [
-                "rsync",
-                "--delete",
-                "--exclude",
-                ".env",
-                "--exclude",
-                "env",
-                "-e",
-                " ".join(SSH_CMD + [f"-p {self._ssh_port}"]),
-                "-rl",
-                f"{project._test_project_dir}/",
-                remote_path,
-            ],
-            stderr=subprocess.PIPE,
-        )
-
-        # copy all the modules into the project in reverse order
-        LOGGER.debug("Syncing module paths %s to orchestrator", modules_path)
-        for path in modules_path:
-            subprocess.check_output(
-                [
-                    "rsync",
-                    # no --delete because project is in a clean state and we don't want to override previously synced modules
-                    "--exclude",
-                    ".git",
-                    "-e",
-                    " ".join(SSH_CMD + [f"-p {self._ssh_port}"]),
-                    "-rl",
-                    f"{path}/",
-                    f"{remote_path}libs/",
-                ],
-                stderr=subprocess.PIPE,
-            )
-
-        # now make the orchestrator own them again and fake a git repo
-        LOGGER.debug("Fix permissions on orchestrator")
-        subprocess.check_output(
-            SSH_CMD
-            + [
-                f"-p {self._ssh_port}",
-                f"{self._ssh_user}@{self.host}",
-                f"{use_sudo}touch {server_path}/.git; {use_sudo}chown -R inmanta:inmanta {server_path}",
-            ],
-            stderr=subprocess.PIPE,
-        )
-
-        # iso5 requires explicit project installation
-        if self.server_version >= Version("5.dev"):
-            LOGGER.debug(f"Server version is {self.server_version}, installing project manually")
-            # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
-            install_script_path = Path(server_path, destination_script.name)
-            shell_script_inline: str = f"/opt/inmanta/bin/python < {install_script_path}"
-            if not self.container_env:
-                # use the server's environment variables for the installation
-                shell_script_inline = (
-                    f"{use_sudo}systemd-run --pipe -p User=inmanta -p EnvironmentFile=/etc/sysconfig/inmanta-server "
-                    f"-p Environment=PROJECT_PATH={server_path} "
-                    "--wait %s" % shell_script_inline
-                )
-            else:
-                # Add the project path as env var at the beginning of the cmd line
-                shell_script_inline = f"PROJECT_PATH={server_path} {shell_script_inline}"
-
-            try:
-                output = subprocess.check_output(
-                    SSH_CMD
-                    + [
-                        f"-p {self._ssh_port}",
-                        f"{self._ssh_user}@{self.host}",
-                        shell_script_inline,
-                    ],
-                    stderr=subprocess.PIPE,
-                    encoding="utf-8",
-                    text=True,
-                )
-                LOGGER.debug(output)
-            except subprocess.CalledProcessError as e:
-                LOGGER.error("Process failed out: " + e.output)
-                LOGGER.error("Process failed err: " + e.stderr)
-                raise
-
-        # Server cache create, set variables, so cache can be used
-        self._server_path = server_path
-        self._server_cache_path = cache_path
-
-    def pre_clean(self) -> None:
-        if self._server_cache_path is not None:
-            LOGGER.info("Caching synced project")
-            self.cache_project()
-        else:
-            LOGGER.debug("No cache set, so nothing to cache in pre_clean")
-
-    def clean(self) -> None:
-        LOGGER.info("Clear environment: stopping agents, delete_cascade contents and remove project_dir")
-        self.client.clear_environment(self._env)
-        LOGGER.debug("Cleared environment")
-
-        LOGGER.info("Resetting orchestrator")
-        for key, value in self._settings.items():
-            self.client.set_setting(self._env, key, value)
-
-    def cache_project(self) -> None:
-        """Cache the project on the server so that a sync can be faster."""
-        LOGGER.info(f"Caching project on server ({self._server_path}) to cache dir: {self._server_cache_path}")
-
-        # Disable sudo over ssh when the remote user has the correct permissions
-        use_sudo: str = self.use_sudo()
-
-        subprocess.check_output(
-            SSH_CMD
-            + [
-                f"-p {self._ssh_port}",
-                f"{self._ssh_user}@{self.host}",
-                f"{use_sudo}cp -a {self._server_path} {self._server_cache_path}",
-            ],
-            stderr=subprocess.PIPE,
-        )
+        self.sync_project_folder()
+        self.install_project()
 
     def wait_until_deployment_finishes(
         self,
@@ -525,11 +464,9 @@ class RemoteOrchestrator:
         :param desired_state: Expected state of each resource when the deployment is ready
         :raise AssertionError: In case of wrong state or timeout expiration
         """
-        client = self.client
-        environment = self.environment
 
         def is_deployment_finished() -> bool:
-            response = client.get_version(environment, version)
+            response = self.client.get_version(self.environment, version)
             LOGGER.info(
                 "Deployed %s of %s resources",
                 response.result["model"]["done"],
@@ -538,7 +475,7 @@ class RemoteOrchestrator:
             return response.result["model"]["total"] - response.result["model"]["done"] <= 0
 
         retry_limited(is_deployment_finished, timeout)
-        result = client.get_version(environment, version)
+        result = self.client.get_version(self.environment, version)
         for resource in result.result["resources"]:
             LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
             assert (
@@ -556,12 +493,10 @@ class RemoteOrchestrator:
         DEPRECATED: Use the diagnose endpoint instead
         """
         LOGGER.warning("Usage of FailedResourceLogs is deprecated, use the diagnose endpoint instead")
-        client = self.client
-        environment = self.environment
 
         # get service log
-        result = client.lsm_service_log_list(
-            tid=environment,
+        result = self.client.lsm_service_log_list(
+            tid=self.environment,
             service_entity=service_entity_name,
             service_id=service_instance_id,
         )
@@ -579,7 +514,7 @@ class RemoteOrchestrator:
             return None
 
         # get the report
-        result = client.get_report(compile_id)
+        result = self.client.get_report(compile_id)
         assert result.code == 200, f"Wrong response code while trying to get log list, got {result.code} (expected 200): \n"
         f"{pformat(result.get_result(), width=140)}"
 
