@@ -41,6 +41,19 @@ class RemoteOrchestratorSettings(collections.abc.MutableMapping[str, object]):
     Wrapper for the orchestrator settings api.  The wrapper implements the interface
     of a mutable mapping and behaves as such.  When you access a key, it is read from
     the orchestrator, when you update a value, it is written to the orchestrator.
+
+    It is not meant to be performant, but simply convenient.
+
+    Usage examples:
+
+    ..code-block:: python
+
+        # 1. Check if partial compile is enabled:
+        enabled = remote_orchestrator.settings["lsm_partial_compile"]
+
+        # 2. Make sure that partial compile is enabled
+        remote_orchestrator.settings["lsm_partial_compile"] = True
+
     """
 
     def __init__(self, client: SyncClient, environment: UUID) -> None:
@@ -145,9 +158,8 @@ class RemoteOrchestrator:
             str(self.environment),
         )
 
-    @property
-    def settings(self) -> RemoteOrchestratorSettings:
-        return RemoteOrchestratorSettings(self.client, self.environment)
+        # Create an attach a settings helper object
+        self.settings = RemoteOrchestratorSettings(self.client, self.environment)
 
     @property
     def project(self) -> Project:
@@ -217,6 +229,16 @@ class RemoteOrchestrator:
             raise Exception(f"Unexpected response for server status API call: {server_status.result}")
 
     def attach_project(self, project: Project) -> None:
+        """
+        The project object from the `pytest_inmanta.plugin.project` is required to be provided to
+        the remote orchestrator for it to work correctly.  This is only known when we enter
+        a function scoped fixture, while this object is constructed at the session scope.
+
+        So every time we enter a new function scope, the project should be attached again,
+        using this method.
+
+        :parma project: The project object coming from pytest_inmanta's project fixture
+        """
         self._project = project
 
     def export_service_entities(self) -> None:
@@ -325,20 +347,25 @@ class RemoteOrchestrator:
             # So we sync the folder in a temporary location, then move it
             temporary_remote_folder = pathlib.Path(f"/tmp/{self.environment}/tmp-{remote_folder.name}")
             self.run_command(["mkdir", "-p", str(remote_folder)], user=user)
-            self.run_command(["mkdir", "-p", str(temporary_remote_folder.parent)], user=self.ssh_user)
-            self.run_command(["sudo", "rm", "-rf", str(temporary_remote_folder)], user=self.ssh_user)
-            self.run_command(["sudo", "mv", str(remote_folder), str(temporary_remote_folder)], user=self.ssh_user)
-            self.run_command(
-                args=["sudo", "chown", "-R", f"{self.ssh_user}:{self.ssh_user}", str(temporary_remote_folder)],
-                user=self.ssh_user,
+
+            # Package a few commands together in a script to speed things up
+            src_folder = shlex.quote(str(remote_folder))
+            tmp_folder = shlex.quote(str(temporary_remote_folder))
+            tmp_folder_parent = shlex.quote(str(temporary_remote_folder.parent))
+            move_folder_to_tmp = (
+                f"mkdir -p {tmp_folder_parent} && "
+                f"sudo mv -rf {tmp_folder} && "
+                f"sudo mv {src_folder} {tmp_folder} && "
+                f"sudo chown -R {self.ssh_user}:{self.ssh_user} {tmp_folder}"
             )
+            self.run_command([move_folder_to_tmp], shell=True, user=self.ssh_user)
 
             # Do the sync with the temporary folder
             self.sync_local_folder(local_folder, temporary_remote_folder, excludes=excludes, user=self.ssh_user)
 
             # Move the temporary folder back into its original location
-            self.run_command(["sudo", "chown", "-R", f"{user}:{user}", str(temporary_remote_folder)], user=self.ssh_user)
-            self.run_command(["sudo", "mv", str(temporary_remote_folder), str(remote_folder)], user=self.ssh_user)
+            move_tmp_to_folder = f"sudo chown -R {user}:{user} {tmp_folder} && sudo mv {tmp_folder} {src_folder}"
+            self.run_command([move_tmp_to_folder], shell=True, user=self.ssh_user)
             return
 
         # Make sure target dir exists
@@ -368,9 +395,6 @@ class RemoteOrchestrator:
             LOGGER.error("Failed to rsync: %s", str(cmd))
             LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
             raise e
-
-        # Make sure that the ownership on the remote folder is set correctly
-        self.run_command(["sudo", "chown", "-R", f"{user}:{user}", str(remote_folder)], user=self.ssh_user)
 
     def sync_project_folder(self) -> None:
         """
@@ -422,33 +446,38 @@ class RemoteOrchestrator:
         Creates a cache directory with the content of the project's libs folder.
         """
         LOGGER.debug("Caching the project's libs folder")
-        libs_path = self.remote_project_path / "libs"
-        project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
+        libs_path = shlex.quote(str(self.remote_project_path / "libs"))
+        project_cache_path = shlex.quote(str(self.remote_project_path.with_name(self.remote_project_path.name + "_cache")))
 
         # Make sure the directory we want to sync from exists
-        self.run_command(["mkdir", "-p", str(libs_path)])
-
         # Make sure the directory we want to sync to exists
-        self.run_command(["mkdir", "-p", str(project_cache_path)])
-
         # Use rsync to update the libs folder cache
-        self.run_command(["rsync", "-r", "--delete", str(libs_path), str(project_cache_path)])
+        cache_libs = (
+            f"mkdir -p {libs_path} && "
+            f"mkdir -p {project_cache_path} && "
+            f"rsync -r --delete {libs_path} {project_cache_path}"
+        )
+        self.run_command([cache_libs], shell=True)
 
     def restore_libs_folder(self) -> None:
         """
         Update the project libs folder with what can be found in the cache.
         """
         LOGGER.debug("Restoring the project's libs folder")
-        libs_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache") / "libs"
+        project_path = shlex.quote(str(self.remote_project_path))
+        libs_cache_path = shlex.quote(
+            str(self.remote_project_path.with_name(self.remote_project_path.name + "_cache") / "libs")
+        )
 
         # Make sure the directory we want to sync from exists
-        self.run_command(["mkdir", "-p", str(self.remote_project_path)])
-
         # Make sure the directory we want to sync to exists
-        self.run_command(["mkdir", "-p", str(libs_cache_path)])
-
         # Use rsync to update the libs folder
-        self.run_command(["rsync", "-r", "--delete", str(libs_cache_path), str(self.remote_project_path)])
+        restore_libs = (
+            f"mkdir -p {project_path} && "
+            f"mkdir -p {libs_cache_path} && "
+            f"rsync -r --delete {libs_cache_path} {project_path}"
+        )
+        self.run_command([restore_libs], shell=True)
 
     def install_project(self) -> None:
         """
