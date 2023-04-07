@@ -354,7 +354,7 @@ class RemoteOrchestrator:
             tmp_folder_parent = shlex.quote(str(temporary_remote_folder.parent))
             move_folder_to_tmp = (
                 f"mkdir -p {tmp_folder_parent} && "
-                f"sudo mv -rf {tmp_folder} && "
+                f"sudo rm -rf {tmp_folder} && "
                 f"sudo mv {src_folder} {tmp_folder} && "
                 f"sudo chown -R {self.ssh_user}:{self.ssh_user} {tmp_folder}"
             )
