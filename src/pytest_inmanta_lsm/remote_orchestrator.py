@@ -445,17 +445,24 @@ class RemoteOrchestrator:
                 remote_module_path = self.remote_project_path / "libs" / module.name
                 self.sync_local_folder(module, remote_module_path, excludes=[])
 
-                # Pretend our module is version controlled to avoid warnings
-                self.run_command(["mkdir", "-p", str(remote_module_path / ".git")])
-
                 modules.add(module.name)
 
-        # Delete all modules which are on the remote libs folder but we didn't sync
-        grep_extra = ["grep", "-v"] + [x for module in modules for x in ["-e", module]]
-        grep_extra_cmd = shlex.join(grep_extra)
-
         libs_path = str(self.remote_project_path / "libs")
-        clear_extra = f"rm -rf $(ls . | {grep_extra_cmd} | xargs)"
+
+        if len(modules) > 0:
+            # Make sure all the modules we synced appear to be version controlled
+            mkdir_module = ["mkdir"] + [x for module in modules for x in ["-p", module + "/.git"]]
+            self.run_command(mkdir_module, cwd=libs_path)
+
+        if len(modules) > 0:
+            # Delete all modules which are on the remote libs folder but we didn't sync
+            grep_extra = ["grep", "-v"] + [x for module in modules for x in ["-e", module]]
+            grep_extra_cmd = shlex.join(grep_extra)
+            clear_extra = f"rm -rf $(ls . | {grep_extra_cmd} | xargs)"
+        else:
+            # Delete all modules
+            clear_extra = "rm -rf *"
+
         self.run_command([clear_extra], shell=True, cwd=libs_path)
 
     def cache_libs_folder(self) -> None:
@@ -469,9 +476,7 @@ class RemoteOrchestrator:
         # Make sure the directory we want to sync from exists
         # Make sure the directory we want to sync to exists
         # Use rsync to update the libs folder cache
-        cache_libs = (
-            f"mkdir -p {libs_path} && " f"mkdir -p {libs_cache_path} && " f"rsync -r --delete {libs_path}/ {libs_cache_path}/"
-        )
+        cache_libs = f"mkdir -p {libs_path} {libs_cache_path} && rsync -r --delete {libs_path}/ {libs_cache_path}/"
         self.run_command([cache_libs], shell=True)
 
     def restore_libs_folder(self) -> None:
@@ -485,12 +490,10 @@ class RemoteOrchestrator:
         # Make sure the directory we want to sync from exists
         # Make sure the directory we want to sync to exists
         # Use rsync to update the libs folder
-        restore_libs = (
-            f"mkdir -p {libs_path} && " f"mkdir -p {libs_cache_path} && " f"rsync -r --delete {libs_cache_path}/ {libs_path}/"
-        )
+        restore_libs = f"mkdir -p {libs_path} {libs_cache_path} && rsync -r --delete {libs_cache_path}/ {libs_path}/"
         self.run_command([restore_libs], shell=True)
 
-    def clear_environment(self, soft: bool = False) -> None:
+    def clear_environment(self, *, soft: bool = False) -> None:
         """
         Clear the environment, if soft is True, keep all the files of the project.
         """
@@ -500,18 +503,14 @@ class RemoteOrchestrator:
 
         if soft:
             LOGGER.debug("Cache full project")
-            cache_folder = (
-                f"mkdir -p {project_path} && " f"rm -rf {project_cache_path} && " f"mv {project_path} {project_cache_path}"
-            )
+            cache_folder = f"mkdir -p {project_path} && rm -rf {project_cache_path} && mv {project_path} {project_cache_path}"
             self.run_command([cache_folder], shell=True)
 
         self.client.environment_clear(self.environment)
 
         if soft:
             LOGGER.debug("Restore project from cache")
-            restore_folder = (
-                f"mkdir -p {project_cache_path} && " f"rm -rf {project_path} && " f"mv {project_cache_path} {project_path}"
-            )
+            restore_folder = f"mkdir -p {project_cache_path} && rm -rf {project_path} && mv {project_cache_path} {project_path}"
             self.run_command([restore_folder], shell=True)
 
     def install_project(self) -> None:
