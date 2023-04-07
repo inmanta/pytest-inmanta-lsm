@@ -357,7 +357,7 @@ def remote_orchestrator(
 
     yield remote_orchestrator_shared
 
-    # Stop the environment, to make sure it doesn't continue doing things in our back
+    # Stop the environment, to make sure it doesn't continue doing things behind our back
     remote_orchestrator_shared.client.halt_environment(remote_orchestrator_shared.environment)
 
 

@@ -460,7 +460,7 @@ class RemoteOrchestrator:
 
         if self.container_env:
             # If this is a container env, simply run the script as the inmanta user suffice
-            # Environment variables are loaded by the ssh
+            # Environment variables are loaded by the shell.
             # We run it in a shell, to make sure that the process has access to the environment
             # variables that the server uses
             result = self.run_command(
