@@ -61,6 +61,8 @@ class RemoteOrchestratorSettings(collections.abc.MutableMapping[str, object]):
         self.environment = environment
 
     def __contains__(self, __key: object) -> bool:
+        if not isinstance(__key, str):
+            return False
         try:
             self[__key]
             return True
@@ -73,6 +75,7 @@ class RemoteOrchestratorSettings(collections.abc.MutableMapping[str, object]):
             raise KeyError(__key)
 
         assert result.code == 200, str(result.result)
+        assert result.result is not None
         return result.result["value"]
 
     def __setitem__(self, __key: str, __value: object) -> None:
@@ -89,6 +92,7 @@ class RemoteOrchestratorSettings(collections.abc.MutableMapping[str, object]):
     def __iter__(self) -> typing.Iterator[str]:
         result = self.client.list_settings(self.environment)
         assert result.code == 200, str(result.result)
+        assert result.result is not None
         return iter(result.result["settings"])
 
     def __len__(self) -> int:
@@ -197,11 +201,13 @@ class RemoteOrchestrator:
             assert (
                 result.code == 200
             ), f"Wrong response code while verifying project, got {result.code} (expected 200): \n{result.result}"
+            assert result.result is not None
             for project in result.result["data"]:
                 if project["name"] == project_name:
                     return project["id"]
 
             result = self.client.project_create(name=project_name)
+            assert result.result is not None
             assert (
                 result.code == 200
             ), f"Wrong response code while creating project, got {result.code} (expected 200): \n{result.result}"
@@ -222,8 +228,9 @@ class RemoteOrchestrator:
         """
         server_status: Result = self.client.get_server_status()
         if server_status.code != 200:
-            raise Exception(f"Failed to get server status for {self._host}")
+            raise Exception(f"Failed to get server status for {self.host}")
         try:
+            assert server_status.result is not None
             return Version(server_status.result["data"]["version"])
         except (KeyError, TypeError):
             raise Exception(f"Unexpected response for server status API call: {server_status.result}")
@@ -243,7 +250,9 @@ class RemoteOrchestrator:
 
     def export_service_entities(self) -> None:
         """Initialize the remote orchestrator with the service model and check if all preconditions hold"""
-        self.project._exporter.run_export_plugin("service_entities_exporter")
+        exporter = self.project._exporter
+        assert exporter is not None, "Bad usage of the remote orchestrator object"
+        exporter.run_export_plugin("service_entities_exporter")
         self.sync_project()
 
     def run_command(
@@ -551,6 +560,7 @@ class RemoteOrchestrator:
 
         def is_deployment_finished() -> bool:
             response = self.client.get_version(self.environment, version)
+            assert response.result is not None
             LOGGER.info(
                 "Deployed %s of %s resources",
                 response.result["model"]["done"],
@@ -560,6 +570,7 @@ class RemoteOrchestrator:
 
         retry_limited(is_deployment_finished, timeout)
         result = self.client.get_version(self.environment, version)
+        assert result.result is not None
         for resource in result.result["resources"]:
             LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
             assert (
@@ -588,6 +599,7 @@ class RemoteOrchestrator:
         f"{pformat(result.get_result(), width=140)}"
 
         # get events that led to final state
+        assert result.result is not None
         events = result.result["data"][0]["events"]
 
         try:
@@ -603,6 +615,7 @@ class RemoteOrchestrator:
         f"{pformat(result.get_result(), width=140)}"
 
         # get stage reports
+        assert result.result is not None
         reports = result.result["report"]["reports"]
         for report in reversed(reports):
             # get latest failed step
