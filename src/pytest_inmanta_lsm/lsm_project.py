@@ -66,7 +66,7 @@ class LsmProject:
         """
         try:
             # Import lsm module in function scope for usage with v1 modules
-            import inmanta_plugins.lsm
+            import inmanta_plugins.lsm  # type: ignore
         except ImportError as e:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
 
@@ -93,7 +93,7 @@ class LsmProject:
         """
         try:
             # Import lsm module in function scope for usage with v1 modules
-            import inmanta_plugins.lsm
+            import inmanta_plugins.lsm  # type: ignore
         except ImportError as e:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
 
@@ -182,6 +182,7 @@ class LsmProject:
         #   attributes.
         if service.candidate_attributes is None:
             service.candidate_attributes = copy.deepcopy(service.active_attributes)
+            assert service.candidate_attributes is not None
 
         service.candidate_attributes.update(attributes)
         service.last_updated = datetime.datetime.now()

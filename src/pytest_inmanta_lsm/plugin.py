@@ -198,7 +198,16 @@ def remote_orchestrator_partial(request: pytest.FixtureRequest) -> Iterator[bool
 
 
 @pytest.fixture(scope="session")
-def remote_orchestrator_project_shared(request: pytest.FixtureRequest, project_shared: Project) -> Iterator[None]:
+def remote_orchestrator_shared(
+    request: pytest.FixtureRequest,
+    project_shared: Project,
+    remote_orchestrator_container: Optional[OrchestratorContainer],
+    remote_orchestrator_environment: str,
+    remote_orchestrator_no_clean: bool,
+    remote_orchestrator_host: Tuple[str, int],
+    remote_orchestrator_project_name: str,
+    remote_orchestrator_environment_name: str,
+) -> Iterator[RemoteOrchestrator]:
     """
     Shared project to be used by the remote orchestrator. Ensures the module being tested is synced to the remote orchestrator
     even if it is a v2 module.
@@ -233,31 +242,7 @@ def remote_orchestrator_project_shared(request: pytest.FixtureRequest, project_s
             # can't rsync and install a non-editable Python package the same way as an editable one (no pyproject.toml/setup.py)
             # => always use the test dir, even if the module is installed in non-editable mode (the user has been warned)
             shutil.copytree(mod.path, destination)
-    yield
 
-
-@pytest.fixture
-def remote_orchestrator_project(remote_orchestrator_project_shared: None, project: Project) -> Iterator[Project]:
-    """
-    Project to be used by the remote orchestrator. Yields the same object as the plain project fixture but ensures the
-    module being tested is synced to the remote orchestrator even if it is a v2 module.
-    """
-    yield project
-
-
-@pytest.fixture
-def remote_orchestrator(
-    request: pytest.FixtureRequest,
-    remote_orchestrator_project: Project,
-    remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
-    remote_orchestrator_container: Optional[OrchestratorContainer],
-    remote_orchestrator_environment: str,
-    remote_orchestrator_no_clean: bool,
-    remote_orchestrator_host: Tuple[str, int],
-    remote_orchestrator_partial: bool,
-    remote_orchestrator_project_name: str,
-    remote_orchestrator_environment_name: str,
-) -> Iterator[RemoteOrchestrator]:
     LOGGER.info("Setting up remote orchestrator")
 
     host, port = remote_orchestrator_host
@@ -291,6 +276,64 @@ def remote_orchestrator(
     except ParameterNotSetException:
         token = None
 
+    remote_orchestrator = RemoteOrchestrator(
+        host=host,
+        ssh_user=ssh_user,
+        ssh_port=ssh_port,
+        environment=UUID(remote_orchestrator_environment),
+        noclean=remote_orchestrator_no_clean,
+        ssl=ssl,
+        token=token,
+        ca_cert=ca_cert,
+        container_env=container_env,
+        port=port,
+        project_name=remote_orchestrator_project_name,
+        environment_name=remote_orchestrator_environment_name,
+    )
+
+    # Make sure we start our test suite with a clean environment
+    remote_orchestrator.clear_environment()
+
+    # Get the former cached modules back into the project to speed up
+    # subsequent test cases
+    remote_orchestrator.restore_libs_folder()
+
+    yield remote_orchestrator
+
+    # Cache the content of the libs folder for later calls to the orchestrator
+    remote_orchestrator.cache_libs_folder()
+
+    # If --lsm-no-clean is used, leave the orchestrator as it is, with all its
+    # file, otherwise cleanup the project
+    if not remote_orchestrator_no_clean:
+        remote_orchestrator.clear_environment()
+
+
+@pytest.fixture
+def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, project: Project) -> Iterator[Project]:
+    """
+    Project to be used by the remote orchestrator. Yields the same object as the plain project fixture but ensures the
+    module being tested is synced to the remote orchestrator even if it is a v2 module.
+    """
+    # Reload the config after the project fixture has run
+    remote_orchestrator_shared.setup_config()
+
+    yield project
+
+
+@pytest.fixture
+def remote_orchestrator(
+    remote_orchestrator_shared: RemoteOrchestrator,
+    remote_orchestrator_project: Project,
+    remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
+    remote_orchestrator_partial: bool,
+) -> Iterator[RemoteOrchestrator]:
+    # Attach test project to the remote orchestrator object
+    remote_orchestrator_shared.attach_project(remote_orchestrator_project)
+
+    # Clean environment, but keep project files
+    remote_orchestrator_shared.clear_environment(soft=True)
+
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
         "auto_deploy": True,
@@ -305,29 +348,17 @@ def remote_orchestrator(
     }
     settings.update(remote_orchestrator_settings)
 
-    remote_orchestrator = RemoteOrchestrator(
-        host=host,
-        ssh_user=ssh_user,
-        ssh_port=ssh_port,
-        environment=UUID(remote_orchestrator_environment),
-        project=remote_orchestrator_project,
-        settings=settings,
-        noclean=remote_orchestrator_no_clean,
-        ssl=ssl,
-        token=token,
-        ca_cert=ca_cert,
-        container_env=container_env,
-        port=port,
-        project_name=remote_orchestrator_project_name,
-        environment_name=remote_orchestrator_environment_name,
-    )
-    remote_orchestrator.clean()
+    # Update the settings on the orchestrator
+    for k, v in settings.items():
+        remote_orchestrator_shared.client.set_setting(remote_orchestrator_shared.environment, k, v)
 
-    yield remote_orchestrator
-    remote_orchestrator.pre_clean()
+    # Make sure the environment is running
+    remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
 
-    if not remote_orchestrator_no_clean:
-        remote_orchestrator.clean()
+    yield remote_orchestrator_shared
+
+    # Stop the environment, to make sure it doesn't continue doing things behind our back
+    remote_orchestrator_shared.client.halt_environment(remote_orchestrator_shared.environment)
 
 
 @pytest.fixture
