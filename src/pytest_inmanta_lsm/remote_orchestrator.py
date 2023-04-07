@@ -5,7 +5,6 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
-import collections.abc
 import logging
 import pathlib
 import shlex
@@ -34,69 +33,6 @@ SSH_CMD = [
     "-o",
     "UserKnownHostsFile=/dev/null",
 ]
-
-
-class RemoteOrchestratorSettings(collections.abc.MutableMapping[str, object]):
-    """
-    Wrapper for the orchestrator settings api.  The wrapper implements the interface
-    of a mutable mapping and behaves as such.  When you access a key, it is read from
-    the orchestrator, when you update a value, it is written to the orchestrator.
-
-    It is not meant to be performant, but simply convenient.
-
-    Usage examples:
-
-    ..code-block:: python
-
-        # 1. Check if partial compile is enabled:
-        enabled = remote_orchestrator.settings["lsm_partial_compile"]
-
-        # 2. Make sure that partial compile is enabled
-        remote_orchestrator.settings["lsm_partial_compile"] = True
-
-    """
-
-    def __init__(self, client: SyncClient, environment: UUID) -> None:
-        self.client = client
-        self.environment = environment
-
-    def __contains__(self, __key: object) -> bool:
-        if not isinstance(__key, str):
-            return False
-        try:
-            self[__key]
-            return True
-        except KeyError:
-            return False
-
-    def __getitem__(self, __key: str) -> object:
-        result = self.client.get_setting(self.environment, __key)
-        if result.code == 404:
-            raise KeyError(__key)
-
-        assert result.code == 200, str(result.result)
-        assert result.result is not None
-        return result.result["value"]
-
-    def __setitem__(self, __key: str, __value: object) -> None:
-        result = self.client.set_setting(self.environment, __key, __value)
-        assert result.code == 200, str(result.result)
-
-    def __delitem__(self, __key: str) -> None:
-        result = self.client.delete_setting(self.environment, __key)
-        if result.code == 404:
-            raise KeyError(__key)
-
-        assert result.code == 200, str(result.result)
-
-    def __iter__(self) -> typing.Iterator[str]:
-        result = self.client.list_settings(self.environment)
-        assert result.code == 200, str(result.result)
-        assert result.result is not None
-        return iter(result.result["settings"])
-
-    def __len__(self) -> int:
-        return len(list(iter(self)))
 
 
 class RemoteOrchestrator:
@@ -162,9 +98,6 @@ class RemoteOrchestrator:
             str(self.environment),
         )
         self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
-
-        # Create an attach a settings helper object
-        self.settings = RemoteOrchestratorSettings(self.client, self.environment)
 
     @property
     def project(self) -> Project:

@@ -350,8 +350,7 @@ def remote_orchestrator(
 
     # Update the settings on the orchestrator
     for k, v in settings.items():
-        if k in remote_orchestrator_shared.settings:
-            remote_orchestrator_shared.settings[k] = v
+        remote_orchestrator_shared.client.set_setting(remote_orchestrator_shared.environment, k, v)
 
     # Make sure the environment is running
     remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
