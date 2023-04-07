@@ -291,9 +291,6 @@ def remote_orchestrator_shared(
         environment_name=remote_orchestrator_environment_name,
     )
 
-    # Always start the test session from a clean slate
-    remote_orchestrator.clear_project_folder()
-
     # Get the former cached modules back into the project to speed up
     # subsequent test cases
     remote_orchestrator.restore_libs_folder()
@@ -307,7 +304,6 @@ def remote_orchestrator_shared(
     # file, otherwise cleanup the project
     if not remote_orchestrator_no_clean:
         remote_orchestrator.client.clear_environment(remote_orchestrator.environment)
-        remote_orchestrator.clear_project_folder()
 
 
 @pytest.fixture

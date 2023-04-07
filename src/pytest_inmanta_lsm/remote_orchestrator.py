@@ -324,13 +324,6 @@ class RemoteOrchestrator:
             LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
             raise e
 
-    def clear_project_folder(self) -> None:
-        """
-        Clear the project folder on the orchestrator.
-        """
-        LOGGER.debug("Cleaning the project on the remote orchestrator")
-        self.run_command(["rm", "-rf", str(self.remote_project_path)])
-
     def sync_local_folder(
         self,
         local_folder: pathlib.Path,
