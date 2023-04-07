@@ -291,6 +291,9 @@ def remote_orchestrator_shared(
         environment_name=remote_orchestrator_environment_name,
     )
 
+    # Make sure we start our test suite with a clean environment
+    remote_orchestrator.clear_environment()
+
     # Get the former cached modules back into the project to speed up
     # subsequent test cases
     remote_orchestrator.restore_libs_folder()
@@ -303,7 +306,7 @@ def remote_orchestrator_shared(
     # If --lsm-no-clean is used, leave the orchestrator as it is, with all its
     # file, otherwise cleanup the project
     if not remote_orchestrator_no_clean:
-        remote_orchestrator.client.clear_environment(remote_orchestrator.environment)
+        remote_orchestrator.clear_environment()
 
 
 @pytest.fixture
@@ -328,8 +331,8 @@ def remote_orchestrator(
     # Attach test project to the remote orchestrator object
     remote_orchestrator_shared.attach_project(remote_orchestrator_project)
 
-    # Clean environment
-    remote_orchestrator_shared.client.clear_environment(remote_orchestrator_shared.environment)
+    # Clean environment, but keep project files
+    remote_orchestrator_shared.clear_environment(soft=True)
 
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {

@@ -161,6 +161,7 @@ class RemoteOrchestrator:
             "/var/lib/inmanta/server/environments/",
             str(self.environment),
         )
+        self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
 
         # Create an attach a settings helper object
         self.settings = RemoteOrchestratorSettings(self.client, self.environment)
@@ -434,6 +435,7 @@ class RemoteOrchestrator:
         self.run_command(["mkdir", "-p", str(self.remote_project_path / ".git")])
 
         # Sync all the modules from all the module paths
+        modules: set[str] = set()
         for modules_dir_path in modules_dir_paths:
             for module in modules_dir_path.glob("*"):
                 if not module.is_dir():
@@ -443,21 +445,32 @@ class RemoteOrchestrator:
                 remote_module_path = self.remote_project_path / "libs" / module.name
                 self.sync_local_folder(module, remote_module_path, excludes=[])
 
+                # Pretend our module is version controlled to avoid warnings
+                self.run_command(["mkdir", "-p", str(remote_module_path / ".git")])
+
+                modules.add(module.name)
+
+        # Delete all modules which are on the remote libs folder but we didn't sync
+        grep_extra = ["grep", "-v"] + [x for module in modules for x in ["-e", module]]
+        grep_extra_cmd = shlex.join(grep_extra)
+
+        libs_path = shlex.quote(str(self.remote_project_path / "libs"))
+        clear_extra = f"rm -rf $(ls {libs_path} | {grep_extra_cmd} | xargs) || true"
+        self.run_command([clear_extra], shell=True)
+
     def cache_libs_folder(self) -> None:
         """
         Creates a cache directory with the content of the project's libs folder.
         """
         LOGGER.debug("Caching the project's libs folder")
         libs_path = shlex.quote(str(self.remote_project_path / "libs"))
-        project_cache_path = shlex.quote(str(self.remote_project_path.with_name(self.remote_project_path.name + "_cache")))
+        libs_cache_path = shlex.quote(str(self.remote_project_cache_path / "libs"))
 
         # Make sure the directory we want to sync from exists
         # Make sure the directory we want to sync to exists
         # Use rsync to update the libs folder cache
         cache_libs = (
-            f"mkdir -p {libs_path} && "
-            f"mkdir -p {project_cache_path} && "
-            f"rsync -r --delete {libs_path} {project_cache_path}"
+            f"mkdir -p {libs_path} && " f"mkdir -p {libs_cache_path} && " f"rsync -r --delete {libs_path}/ {libs_cache_path}/"
         )
         self.run_command([cache_libs], shell=True)
 
@@ -466,20 +479,40 @@ class RemoteOrchestrator:
         Update the project libs folder with what can be found in the cache.
         """
         LOGGER.debug("Restoring the project's libs folder")
-        project_path = shlex.quote(str(self.remote_project_path))
-        libs_cache_path = shlex.quote(
-            str(self.remote_project_path.with_name(self.remote_project_path.name + "_cache") / "libs")
-        )
+        libs_path = shlex.quote(str(self.remote_project_path / "libs"))
+        libs_cache_path = shlex.quote(str(self.remote_project_cache_path / "libs"))
 
         # Make sure the directory we want to sync from exists
         # Make sure the directory we want to sync to exists
         # Use rsync to update the libs folder
         restore_libs = (
-            f"mkdir -p {project_path} && "
-            f"mkdir -p {libs_cache_path} && "
-            f"rsync -r --delete {libs_cache_path} {project_path}"
+            f"mkdir -p {libs_path} && " f"mkdir -p {libs_cache_path} && " f"rsync -r --delete {libs_cache_path}/ {libs_path}/"
         )
         self.run_command([restore_libs], shell=True)
+
+    def clear_environment(self, soft: bool = False) -> None:
+        """
+        Clear the environment, if soft is True, keep all the files of the project.
+        """
+        LOGGER.debug("Clear environment")
+        project_path = shlex.quote(str(self.remote_project_path))
+        project_cache_path = shlex.quote(str(self.remote_project_cache_path))
+
+        if soft:
+            LOGGER.debug("Cache full project")
+            cache_folder = (
+                f"mkdir -p {project_path} && " f"rm -rf {project_cache_path} && " f"mv {project_path} {project_cache_path}"
+            )
+            self.run_command([cache_folder], shell=True)
+
+        self.client.environment_clear(self.environment)
+
+        if soft:
+            LOGGER.debug("Restore project from cache")
+            restore_folder = (
+                f"mkdir -p {project_cache_path} && " f"rm -rf {project_path} && " f"mv {project_cache_path} {project_path}"
+            )
+            self.run_command([restore_folder], shell=True)
 
     def install_project(self) -> None:
         """
