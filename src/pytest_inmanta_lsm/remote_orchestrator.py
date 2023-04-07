@@ -294,7 +294,7 @@ class RemoteOrchestrator:
         if cwd is not None:
             # Pretend that the command is a shell, and add a cd ... prefix to it
             shell = True
-            cwd_prefix = shlex.join(["cd", cwd]) + ";"
+            cwd_prefix = shlex.join(["cd", cwd]) + "; "
             cmd = cwd_prefix + cmd
 
         if shell:
@@ -454,9 +454,9 @@ class RemoteOrchestrator:
         grep_extra = ["grep", "-v"] + [x for module in modules for x in ["-e", module]]
         grep_extra_cmd = shlex.join(grep_extra)
 
-        libs_path = shlex.quote(str(self.remote_project_path / "libs"))
-        clear_extra = f"rm -rf $(ls {libs_path} | {grep_extra_cmd} | xargs) || true"
-        self.run_command([clear_extra], shell=True)
+        libs_path = str(self.remote_project_path / "libs")
+        clear_extra = f"rm -rf $(ls . | {grep_extra_cmd} | xargs)"
+        self.run_command([clear_extra], shell=True, cwd=libs_path)
 
     def cache_libs_folder(self) -> None:
         """
