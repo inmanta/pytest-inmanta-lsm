@@ -328,7 +328,7 @@ def remote_orchestrator(
     remote_orchestrator_project: Project,
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
     remote_orchestrator_partial: bool,
-) -> RemoteOrchestrator:
+) -> Iterator[RemoteOrchestrator]:
     # Attach test project to the remote orchestrator object
     remote_orchestrator_shared.attach_project(remote_orchestrator_project)
 
@@ -354,7 +354,13 @@ def remote_orchestrator(
         if k in remote_orchestrator_shared.settings:
             remote_orchestrator_shared.settings[k] = v
 
-    return remote_orchestrator_shared
+    # Make sure the environment is running
+    remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
+
+    yield remote_orchestrator_shared
+
+    # Stop the environment, to make sure it doesn't continue doing things in our back
+    remote_orchestrator_shared.client.halt_environment(remote_orchestrator_shared.environment)
 
 
 @pytest.fixture
