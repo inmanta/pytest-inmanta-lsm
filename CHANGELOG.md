@@ -2,6 +2,7 @@
 Changes in this release:
 - Update caching mechanism, don't keep project venv in between test session.
 - Halt environment after each test run, resume it before each test run.
+- Don't sync local project's cfcache to the remote orchestrator
 
 # v 1.12.0 (2023-04-03)
 Changes in this release:
