@@ -168,7 +168,7 @@ def remote_orchestrator_host(
     for _ in range(0, 10):
         try:
             http = "https" if inm_lsm_ssl.resolve(request.config) else "http"
-            response = requests.get(f"{http}://{host}:{port}/api/v1/serverstatus", timeout=1, verify=False)
+            response = requests.get(f"{http}://{host}:{port}/api/v1/serverstatus", timeout=2, verify=False)
             response.raise_for_status()
         except Exception as exc:
             LOGGER.warning(str(exc))
@@ -322,12 +322,26 @@ def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, 
 
 
 @pytest.fixture
+def remote_orchestrator_halt_environment(remote_orchestrator_shared: RemoteOrchestrator) -> Iterator[None]:
+    """
+    Fixture which makes sure the environment on the orchestrator is halted after the test run.  This logic is
+    extracted out of the remote_orchestrator fixture to make it easier to overwrite.
+    """
+    yield None
+
+    # Stop the environment, to make sure it doesn't continue doing things behind our back
+    # This behavior can be change by overwriting this fixture
+    remote_orchestrator_shared.client.halt_environment(remote_orchestrator_shared.environment)
+
+
+@pytest.fixture
 def remote_orchestrator(
     remote_orchestrator_shared: RemoteOrchestrator,
     remote_orchestrator_project: Project,
+    remote_orchestrator_halt_environment: None,
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
     remote_orchestrator_partial: bool,
-) -> Iterator[RemoteOrchestrator]:
+) -> RemoteOrchestrator:
     # Attach test project to the remote orchestrator object
     remote_orchestrator_shared.attach_project(remote_orchestrator_project)
 
@@ -355,10 +369,7 @@ def remote_orchestrator(
     # Make sure the environment is running
     remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
 
-    yield remote_orchestrator_shared
-
-    # Stop the environment, to make sure it doesn't continue doing things behind our back
-    remote_orchestrator_shared.client.halt_environment(remote_orchestrator_shared.environment)
+    return remote_orchestrator_shared
 
 
 @pytest.fixture
