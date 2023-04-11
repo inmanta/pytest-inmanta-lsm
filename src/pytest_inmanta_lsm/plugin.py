@@ -323,6 +323,10 @@ def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, 
 
 @pytest.fixture
 def remote_orchestrator_halt_environment(remote_orchestrator_shared: RemoteOrchestrator) -> Iterator[None]:
+    """
+    Fixture which makes sure the environment on the orchestrator is halted after the test run.  This logic is
+    extracted out of the remote_orchestrator fixture to make it easier to overwrite.
+    """
     yield None
 
     # Stop the environment, to make sure it doesn't continue doing things behind our back
