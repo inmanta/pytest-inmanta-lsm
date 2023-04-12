@@ -232,10 +232,10 @@ class RemoteOrchestrator:
 
         if shell:
             # The command we received should be run in a shell
-            cmd = shlex.join(["bash", "-c", cmd])
+            cmd = shlex.join(["bash", "-l", "-c", cmd])
 
         # If we need to change user, prefix the command with a sudo
-        if self.ssh_user != user or shell:
+        if self.ssh_user != user:
             # Make sure the user is a safe value to use
             user = shlex.quote(user)
             cmd = f"sudo --login --user={user} -- {cmd}"
