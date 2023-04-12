@@ -227,15 +227,14 @@ class RemoteOrchestrator:
         if cwd is not None:
             # Pretend that the command is a shell, and add a cd ... prefix to it
             shell = True
-            cwd_prefix = shlex.join(["cd", cwd]) + "; "
-            cmd = cwd_prefix + cmd
+            cmd = shlex.join(["cd", cwd]) + "; " + cmd
 
         if shell:
             # The command we received should be run in a shell
-            cmd = shlex.join(["bash", "-c", cmd])
+            cmd = shlex.join(["bash", "-l", "-c", cmd])
 
         # If we need to change user, prefix the command with a sudo
-        if self.ssh_user != user or shell:
+        if self.ssh_user != user:
             # Make sure the user is a safe value to use
             user = shlex.quote(user)
             cmd = f"sudo --login --user={user} -- {cmd}"
@@ -429,6 +428,8 @@ class RemoteOrchestrator:
     def clear_environment(self, *, soft: bool = False) -> None:
         """
         Clear the environment, if soft is True, keep all the files of the project.
+
+        :param soft: If true, keeps the project file in place.
         """
         LOGGER.debug("Clear environment")
         project_path = shlex.quote(str(self.remote_project_path))
