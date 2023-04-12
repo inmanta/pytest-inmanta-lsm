@@ -429,6 +429,8 @@ class RemoteOrchestrator:
     def clear_environment(self, *, soft: bool = False) -> None:
         """
         Clear the environment, if soft is True, keep all the files of the project.
+
+        :param soft: If true, keeps the project file in place.
         """
         LOGGER.debug("Clear environment")
         project_path = shlex.quote(str(self.remote_project_path))
