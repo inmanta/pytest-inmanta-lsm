@@ -165,6 +165,14 @@ inm_lsm_no_clean = BooleanTestParameter(
     legacy=inm_lsm_noclean_legacy,
 )
 
+inm_lsm_no_halt = BooleanTestParameter(
+    argument="--lsm-no-halt",
+    environment_variable="INMANTA_LSM_NO_HALT",
+    usage="Keep the environment running at the end of the test suite.",
+    default=False,
+    group=param_group,
+)
+
 inm_lsm_partial_compile = BooleanTestParameter(
     argument="--lsm-partial-compile",
     environment_variable="INMANTA_LSM_PARTIAL_COMPILE",
