@@ -46,6 +46,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_env_name,
     inm_lsm_host,
     inm_lsm_no_clean,
+    inm_lsm_no_halt,
     inm_lsm_partial_compile,
     inm_lsm_project_name,
     inm_lsm_srv_port,
@@ -146,6 +147,16 @@ def remote_orchestrator_no_clean(request: pytest.FixtureRequest) -> bool:
 
 
 @pytest.fixture(scope="session")
+def remote_orchestrator_no_halt(request: pytest.FixtureRequest) -> bool:
+    """
+    Check if the user specified that the orchestrator shouldn't be halted up after the test suite
+    has finished running.
+    Returns True if the orchestrator should be left running, False otherwise.
+    """
+    return inm_lsm_no_halt.resolve(request.config)
+
+
+@pytest.fixture(scope="session")
 def remote_orchestrator_host(
     remote_orchestrator_container: Optional[OrchestratorContainer],
     request: pytest.FixtureRequest,
@@ -204,6 +215,7 @@ def remote_orchestrator_shared(
     remote_orchestrator_container: Optional[OrchestratorContainer],
     remote_orchestrator_environment: str,
     remote_orchestrator_no_clean: bool,
+    remote_orchestrator_no_halt: bool,
     remote_orchestrator_host: Tuple[str, int],
     remote_orchestrator_project_name: str,
     remote_orchestrator_environment_name: str,
@@ -308,6 +320,11 @@ def remote_orchestrator_shared(
     if not remote_orchestrator_no_clean:
         remote_orchestrator.clear_environment()
 
+    # If --lsm-no-halt is used, leave the orchestrator running at the end of the
+    # test suite.  Otherwise the environment is halted.
+    if not remote_orchestrator_no_halt:
+        remote_orchestrator.client.halt_environment(remote_orchestrator.environment)
+
 
 @pytest.fixture
 def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, project: Project) -> Iterator[Project]:
@@ -322,23 +339,9 @@ def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, 
 
 
 @pytest.fixture
-def remote_orchestrator_halt_environment(remote_orchestrator_shared: RemoteOrchestrator) -> Iterator[None]:
-    """
-    Fixture which makes sure the environment on the orchestrator is halted after the test run.  This logic is
-    extracted out of the remote_orchestrator fixture to make it easier to overwrite.
-    """
-    yield None
-
-    # Stop the environment, to make sure it doesn't continue doing things behind our back
-    # This behavior can be change by overwriting this fixture
-    remote_orchestrator_shared.client.halt_environment(remote_orchestrator_shared.environment)
-
-
-@pytest.fixture
 def remote_orchestrator(
     remote_orchestrator_shared: RemoteOrchestrator,
     remote_orchestrator_project: Project,
-    remote_orchestrator_halt_environment: None,
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
     remote_orchestrator_partial: bool,
 ) -> RemoteOrchestrator:
