@@ -15,6 +15,7 @@ from pprint import pformat
 from uuid import UUID
 
 import inmanta.module
+import pytest_inmanta.plugin
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from inmanta.protocol.endpoints import SyncClient
@@ -369,7 +370,7 @@ class RemoteOrchestrator:
         libs_path = self.remote_project_path / "libs"
 
         # Sync all the modules in editable mode
-        modules: set[str] = set()
+        synced_modules: set[str] = set()
         for module in local_project.get_modules().values():
             if hasattr(inmanta.module, "ModuleV2") and isinstance(module, inmanta.module.ModuleV2) and not module.is_editable():
                 # Module v2 which are not editable installs should not be synced
@@ -377,26 +378,39 @@ class RemoteOrchestrator:
 
             # V1 modules and editable installs should be synced
             self.sync_local_folder(
-                local_folder=pathlib.Path(module.path),
+                local_folder=pathlib.Path(module._path),  # Use ._path instead of .path to stay backward compatible with iso4
                 remote_folder=libs_path / module.name,
                 excludes=[],
             )
 
-            modules.add(module.name)
+            synced_modules.add(module.name)
 
-        if len(modules) > 0:
-            # Make sure all the modules we synced appear to be version controlled
-            mkdir_module = ["mkdir"] + [x for module in modules for x in ["-p", module + "/.git"]]
-            self.run_command(mkdir_module, cwd=str(libs_path))
+        # Make sure that our current module is always synced, even if it is not an editable install
+        current_module, _ = pytest_inmanta.plugin.get_module()
+        if current_module.name not in synced_modules:
+            assert isinstance(current_module, inmanta.module.ModuleV2), type(current_module)
+            assert not current_module.is_editable(), "The module is installed in editable mode, it should have been synced."
+            LOGGER.warning(
+                "The module being tested is not installed in editable mode. This is not recommended. Install your module "
+                "in editable with `inmanta module install -e .` to make sure that all your latest changes are taken into "
+                "account when testing the module."
+            )
+            self.sync_local_folder(
+                local_folder=pathlib.Path(current_module.path),
+                remote_folder=libs_path / current_module.name,
+                excludes=[],
+            )
 
-        if len(modules) > 0:
-            # Delete all modules which are on the remote libs folder but we didn't sync
-            grep_extra = ["grep", "-v"] + [x for module in modules for x in ["-e", module]]
-            grep_extra_cmd = shlex.join(grep_extra)
-            clear_extra = f"rm -rf $(ls . | {grep_extra_cmd} | xargs)"
-        else:
-            # Delete all modules
-            clear_extra = "rm -rf *"
+            synced_modules.add(current_module.name)
+
+        # Make sure all the modules we synced appear to be version controlled
+        mkdir_module = ["mkdir"] + [x for module in synced_modules for x in ["-p", module + "/.git"]]
+        self.run_command(mkdir_module, cwd=str(libs_path))
+
+        # Delete all modules which are on the remote libs folder but we didn't sync
+        grep_extra = ["grep", "-v"] + [x for module in synced_modules for x in ["-e", module]]
+        grep_extra_cmd = shlex.join(grep_extra)
+        clear_extra = f"rm -rf $(ls . | {grep_extra_cmd} | xargs)"
 
         self.run_command([clear_extra], shell=True, cwd=str(libs_path))
 

@@ -19,9 +19,7 @@ import pkg_resources
 import pytest
 import pytest_inmanta.plugin
 import requests
-from inmanta import module
 from packaging import version
-from pytest_inmanta.parameters import inm_mod_in_place
 from pytest_inmanta.plugin import Project
 from pytest_inmanta.test_parameter import ParameterNotSetException
 
@@ -224,37 +222,6 @@ def remote_orchestrator_shared(
     Shared project to be used by the remote orchestrator. Ensures the module being tested is synced to the remote orchestrator
     even if it is a v2 module.
     """
-    in_place = inm_mod_in_place.resolve(request.config)
-    # no need to do anything if this version of inmanta does not support v2 modules or if in_place already adds it to the path
-    if hasattr(module, "ModuleV2") and not in_place:
-        mod: module.Module
-        mod, _ = pytest_inmanta.plugin.get_module()
-
-        # mod object is constructed from the source dir: it does not contain all installation metadata
-        installed: Optional[module.ModuleV2] = module.ModuleV2Source(urls=[]).get_installed_module(None, mod.name)
-        if isinstance(mod, module.ModuleV1):
-            # no need to do anything for v1 module except raise a warning in some edge scenarios
-            if installed is not None:
-                LOGGER.warning(
-                    "The module being tested is a v1 module but it is also installed as a v2 module. Local compiles will use"
-                    "the v2, but only the v1 will by synced to the server."
-                )
-        else:
-            # put v2 module in libs dir so it will be rsynced to the server
-            if not installed.is_editable() or not os.path.samefile(installed.path, mod.path):
-                LOGGER.warning(
-                    "The module being tested is not installed in editable mode. To ensure the remote orchestrator uses the same"
-                    " code as the local project, please install the module with `inmanta module install -e .` before running"
-                    " the tests."
-                )
-            destination: str = os.path.join(project_shared._test_project_dir, "libs", mod.name)
-            assert not os.path.exists(
-                destination
-            ), "Invalid state: expected clean libs dir, this is most likely an issue with the implementation of this fixture"
-            # can't rsync and install a non-editable Python package the same way as an editable one (no pyproject.toml/setup.py)
-            # => always use the test dir, even if the module is installed in non-editable mode (the user has been warned)
-            shutil.copytree(mod.path, destination)
-
     LOGGER.info("Setting up remote orchestrator")
 
     host, port = remote_orchestrator_host
