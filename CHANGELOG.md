@@ -3,6 +3,7 @@ Changes in this release:
 - Update caching mechanism, don't keep project venv in between test session.
 - Halt environment after the full test suite, resume it before each test run. (the environment can be left running using `--lsm-no-halt` option)
 - Don't sync local project's cfcache to the remote orchestrator
+- Sync all (v2) modules installed in editable mode in the local project.
 
 # v 1.12.0 (2023-04-03)
 Changes in this release:
