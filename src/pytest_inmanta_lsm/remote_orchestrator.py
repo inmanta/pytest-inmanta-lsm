@@ -366,6 +366,8 @@ class RemoteOrchestrator:
         # Fake that the project is a git repo
         self.run_command(["mkdir", "-p", str(self.remote_project_path / ".git")])
 
+        libs_path = self.remote_project_path / "libs"
+
         # Sync all the modules from all the module paths
         modules: set[str] = set()
         for modules_dir_path in modules_dir_paths:
@@ -374,17 +376,36 @@ class RemoteOrchestrator:
                     LOGGER.warning("%s is not a directory, it will be skipped", str(module))
                     continue
 
-                remote_module_path = self.remote_project_path / "libs" / module.name
-                self.sync_local_folder(module, remote_module_path, excludes=[])
+                self.sync_local_folder(
+                    local_folder=module,
+                    remote_folder=libs_path / module.name,
+                    excludes=[],
+                )
 
                 modules.add(module.name)
 
-        libs_path = str(self.remote_project_path / "libs")
+        # Sync all the modules in editable mode
+        for module in local_project.get_modules().values():
+            if not isinstance(module, inmanta.module.ModuleV2):
+                # Non-v2 modules can't be installed in editable mode
+                continue
+
+            if not module.is_editable():
+                # The module is not installed in editable mode
+                continue
+
+            self.sync_local_folder(
+                local_folder=pathlib.Path(module.path),
+                remote_folder=libs_path / module.name,
+                excludes=[],
+            )
+
+            modules.add(module.name)
 
         if len(modules) > 0:
             # Make sure all the modules we synced appear to be version controlled
             mkdir_module = ["mkdir"] + [x for module in modules for x in ["-p", module + "/.git"]]
-            self.run_command(mkdir_module, cwd=libs_path)
+            self.run_command(mkdir_module, cwd=str(libs_path))
 
         if len(modules) > 0:
             # Delete all modules which are on the remote libs folder but we didn't sync
@@ -395,7 +416,7 @@ class RemoteOrchestrator:
             # Delete all modules
             clear_extra = "rm -rf *"
 
-        self.run_command([clear_extra], shell=True, cwd=libs_path)
+        self.run_command([clear_extra], shell=True, cwd=str(libs_path))
 
     def cache_libs_folder(self) -> None:
         """
