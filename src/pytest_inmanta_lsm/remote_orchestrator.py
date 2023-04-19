@@ -371,7 +371,7 @@ class RemoteOrchestrator:
         # Sync all the modules in editable mode
         modules: set[str] = set()
         for module in local_project.get_modules().values():
-            if isinstance(module, inmanta.module.ModuleV2) and not module.is_editable():
+            if hasattr(inmanta.module, "ModuleV2") and isinstance(module, inmanta.module.ModuleV2) and not module.is_editable():
                 # Module v2 which are not editable installs should not be synced
                 continue
 
