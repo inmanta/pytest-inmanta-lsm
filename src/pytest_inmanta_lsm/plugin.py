@@ -361,9 +361,6 @@ def remote_orchestrator(
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
     remote_orchestrator_partial: bool,
 ) -> RemoteOrchestrator:
-    # Attach test project to the remote orchestrator object
-    remote_orchestrator_shared.attach_project(remote_orchestrator_project)
-
     # Clean environment, but keep project files
     remote_orchestrator_shared.clear_environment(soft=True)
 

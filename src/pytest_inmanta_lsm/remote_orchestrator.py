@@ -68,7 +68,7 @@ class OrchestratorProject:
         # The project should now exist
         assert result.code in (200, 201), str(result.result)
 
-        if self.name is not None and result.result["name"] != self.name:
+        if self.name is not None and result.result["data"]["name"] != self.name:
             # The current name doesn't match the one we want for this
             # project
             result = client.project_modify(
@@ -79,7 +79,7 @@ class OrchestratorProject:
             # Make sure the update has succeeded
             assert result.code == 200, str(result.result)
 
-        return inmanta.data.model.Project(**result.result)
+        return inmanta.data.model.Project(**result.result["data"])
 
 
 @dataclasses.dataclass
@@ -117,20 +117,26 @@ class OrchestratorEnvironment:
 
         # The environment should now exist
         assert result.code in (200, 201), str(result.result)
+        data: dict = result.result["data"]
 
-        if result.result["name"] != self.name or result.result["project_id"] != self.project.id:
+        if data["name"] != self.name or data["project_id"] != project.id:
             # The current name doesn't match the one we want for this
             # environment
             result = client.environment_modify(
                 id=self.id,
-                name=self.name or result.result["name"],
-                project_id=self.project.id,
+                name=self.name or data["name"],
+                project_id=project.id,
             )
 
             # Make sure the update has succeeded
             assert result.code == 200, str(result.result)
 
-        return inmanta.data.model.Environment(**result.result)
+            data = result.result["data"]
+
+        return inmanta.data.model.Environment(**data)
+
+    def __str__(self) -> str:
+        return str(self.id)
 
 
 class RemoteOrchestrator:
@@ -421,7 +427,7 @@ class RemoteOrchestrator:
                     continue
 
                 remote_module_path = libs_path / module.name
-                self.sync_local_folder(module, remote_module_path, excludes=[])
+                self.sync_local_folder(module_path, remote_module_path, excludes=[])
 
                 synced_modules.add(module.name)
 
