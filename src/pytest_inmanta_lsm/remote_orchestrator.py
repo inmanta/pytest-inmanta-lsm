@@ -404,9 +404,33 @@ class RemoteOrchestrator:
 
         libs_path = self.remote_project_path / "libs"
 
-        # Sync all the modules in editable mode
+        # Load the project and resolve all modules
+        modules = self.local_project.get_modules()
+
+        # Sync all the modules from all the module paths
         synced_modules: set[str] = set()
-        for module in self.local_project.get_modules().values():
+        for modules_dir_path in modules_dir_paths:
+            for module_path in modules_dir_path.glob("*"):
+                if not module_path.is_dir():
+                    LOGGER.warning("%s is not a directory, it will be skipped", str(module_path))
+                    continue
+
+                module = inmanta.module.Module.from_path(module_path)
+                if module is None:
+                    LOGGER.warning("%s is not a valid module, it will be skipped", str(module_path))
+                    continue
+
+                remote_module_path = libs_path / module.name
+                self.sync_local_folder(module, remote_module_path, excludes=[])
+
+                synced_modules.add(module.name)
+
+        # Sync all the modules in editable mode which were not found in the project module's paths
+        for module in modules.values():
+            if module.name in synced_modules:
+                # The module has already been synced
+                continue
+
             if hasattr(inmanta.module, "ModuleV2") and isinstance(module, inmanta.module.ModuleV2) and not module.is_editable():
                 # Module v2 which are not editable installs should not be synced
                 continue
