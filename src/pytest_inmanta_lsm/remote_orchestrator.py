@@ -5,22 +5,22 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+import dataclasses
 import logging
 import pathlib
 import shlex
 import subprocess
 import typing
-from pathlib import Path
+import uuid
 from pprint import pformat
 from uuid import UUID
 
+import inmanta.data.model
 import inmanta.module
-import pytest_inmanta.plugin
+import inmanta.protocol.endpoints
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
-from inmanta.protocol.endpoints import SyncClient
 from packaging.version import Version
-from pytest_inmanta.plugin import Project
 
 from pytest_inmanta_lsm import managed_service_instance, retry_limited
 
@@ -36,62 +36,156 @@ SSH_CMD = [
 ]
 
 
+@dataclasses.dataclass
+class OrchestratorProject:
+    """
+    Helper class to represent the project we want to work with on a real orchestrator.
+
+    :attr name: The name of the desired project, if None, the name won't be enforced
+        and be set to `pytest-inmanta-lsm` on project creation.
+    :attr id: The id of the desired project.
+    """
+
+    name: typing.Optional[str]
+    id: uuid.UUID
+
+    def ensure_exists(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
+        """
+        Make sure this project exists on the remote orchestrator this client has been
+        configured for.  Returns the project, as it is currently configured on the
+        orchestrator.
+
+        :param client: The client which can reach the orchestrator we want to configure.
+        """
+        result = client.project_get(self.id)
+        if result.code == 404:
+            # The project doesn't exist yet, we create it
+            result = client.project_create(
+                name=self.name or "pytest-inmanta-lsm",
+                project_id=self.id,
+            )
+
+        # The project should now exist
+        assert result.code in (200, 201), str(result.result)
+
+        if self.name is not None and result.result["name"] != self.name:
+            # The current name doesn't match the one we want for this
+            # project
+            result = client.project_modify(
+                id=self.id,
+                name=self.name,
+            )
+
+            # Make sure the update has succeeded
+            assert result.code == 200, str(result.result)
+
+        return inmanta.data.model.Project(**result.result)
+
+
+@dataclasses.dataclass
+class OrchestratorEnvironment:
+    """
+    Helper class to represent the environment we want to work with on a real orchestrator.
+
+    :attr name: The name of the desired environment, if None, the name won't be enforced
+        and be set to `pytest-inmanta-lsm` on environment creation.
+    :attr id: The id of the desired environment.
+    :attr project: The project this environment should be a part of.
+    """
+
+    name: typing.Optional[str]
+    id: uuid.UUID
+    project: OrchestratorProject
+
+    def ensure_exists(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Environment:
+        """
+        Make sure this environment exists on the remote orchestrator this client has been
+        configured for.  Returns the environment, as it is currently configured on the
+        orchestrator.
+
+        :param client: The client which can reach the orchestrator we want to configure.
+        """
+        project = self.project.ensure_exists(client)
+        result = client.environment_get(self.id)
+        if result.code == 404:
+            # The environment doesn't exist yet, we create it
+            result = client.environment_create(
+                environment_id=self.id,
+                name=self.name or "pytest-inmanta-lsm",
+                project_id=project.id,
+            )
+
+        # The environment should now exist
+        assert result.code in (200, 201), str(result.result)
+
+        if result.result["name"] != self.name or result.result["project_id"] != self.project.id:
+            # The current name doesn't match the one we want for this
+            # environment
+            result = client.environment_modify(
+                id=self.id,
+                name=self.name or result.result["name"],
+                project_id=self.project.id,
+            )
+
+            # Make sure the update has succeeded
+            assert result.code == 200, str(result.result)
+
+        return inmanta.data.model.Environment(**result.result)
+
+
 class RemoteOrchestrator:
+    """
+    This class helps to interact with a real remote orchestrator.  Its main focus is to help
+    sync a local project to this remote orchestrator, into the environment specified by the
+    user.  This class should be usable independently from any testing artifacts (like the Project
+    object from the `pytest_inmanta.plugin.project` fixture.)
+    """
+
     def __init__(
         self,
-        host: str,
-        ssh_user: str,
-        environment: UUID,
-        noclean: bool,
-        ssh_port: str = "22",
-        token: typing.Optional[str] = None,
-        ca_cert: typing.Optional[str] = None,
-        ssl: bool = False,
-        container_env: bool = False,
+        local_project: inmanta.module.Project,
+        environment: OrchestratorEnvironment,
         *,
-        port: int,
-        environment_name: str = "pytest-inmanta-lsm",
-        project_name: str = "pytest-inmanta-lsm",
+        host: str = "localhost",
+        port: int = 8888,
+        ssh_user: str = "inmanta",
+        ssh_port: int = 22,
+        token: typing.Optional[str] = None,
+        ssl: bool = False,
+        ca_cert: typing.Optional[str] = None,
+        container_env: bool = False,
     ) -> None:
         """
-        Utility object to manage a remote orchestrator and integrate with pytest-inmanta
+        :param local_project: The project on this local machine, that should be synced to the
+            remote orchestrator.
+        :param environment: The environment that should be configured on the remote orchestrator
+            and that this project should be sync to.
 
-        Parameters `environment_name` and `project_name` are used only when new environment is created. If environment with
-        given UUID (`environment`) exists in the orchestrator, these parameters are ignored.
-
-        :param host: the host to connect to, the orchestrator should be on port 8888, ssh on port 22
+        :param host: the host to connect to, the orchestrator should be on port 8888
+        :param port: The port the server is listening to
         :param ssh_user: the username to log on to the machine, should have sudo rights
         :param ssh_port: the port to use to log on to the machine
-        :param environment: uuid of the environment to use, is created if it doesn't exists
-        :param noclean: Option to indicate that after the run clean should not run. This exposes the attribute to other
-                        fixtures.
-        :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
         :param token: Token used for authentication
+        :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
         :param ca_cert: Certificate used for authentication
         :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
-        :param port: The port the server is listening to
-        :param environment_name: Name of the environment in web console
-        :param project_name: Name of the project in web console
         """
+        self.local_project = local_project
         self.environment = environment
+
         self.host = host
         self.port = port
         self.ssh_user = ssh_user
         self.ssh_port = ssh_port
-        self.noclean = noclean
         self.ssl = ssl
         self.token = token
         self.ca_cert = ca_cert
         self.container_env = container_env
-        self.environment_name = environment_name
-        self.project_name = project_name
 
         self.setup_config()
-        self.client = SyncClient("client")
-        self._ensure_environment()
+        self.client = inmanta.protocol.endpoints.SyncClient("client")
+        self.environment.ensure_exists(self.client)
         self.server_version = self._get_server_version()
-
-        self._project: typing.Optional[Project] = None
 
         # The path on the remote orchestrator where the project will be synced
         self.remote_project_path = pathlib.Path(
@@ -100,16 +194,12 @@ class RemoteOrchestrator:
         )
         self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
 
-    @property
-    def project(self) -> Project:
-        if self._project is None:
-            raise RuntimeError("Local project has not been assigned to this remote orchestrator")
-
-        return self._project
-
     def setup_config(self) -> None:
+        """
+        Setup the config required to make it possible for the client to reach the orchestrator.
+        """
         inmanta_config.Config.load_config()
-        inmanta_config.Config.set("config", "environment", str(self.environment))
+        inmanta_config.Config.set("config", "environment", str(self.environment.id))
 
         for section in ["compiler_rest_transport", "client_rest_transport"]:
             inmanta_config.Config.set(section, "host", self.host)
@@ -123,40 +213,6 @@ class RemoteOrchestrator:
             if self.token:
                 inmanta_config.Config.set(section, "token", self.token)
 
-    def _ensure_environment(self) -> None:
-        """Make sure the environment exists"""
-        result = self.client.get_environment(self.environment)
-        if result.code == 200:
-            # environment exists
-            return
-
-        # environment does not exists, find project
-        def ensure_project(project_name: str) -> str:
-            result = self.client.project_list()
-            assert (
-                result.code == 200
-            ), f"Wrong response code while verifying project, got {result.code} (expected 200): \n{result.result}"
-            assert result.result is not None
-            for project in result.result["data"]:
-                if project["name"] == project_name:
-                    return project["id"]
-
-            result = self.client.project_create(name=project_name)
-            assert result.result is not None
-            assert (
-                result.code == 200
-            ), f"Wrong response code while creating project, got {result.code} (expected 200): \n{result.result}"
-            return result.result["data"]["id"]
-
-        result = self.client.create_environment(
-            project_id=ensure_project(self.project_name),
-            name=self.environment_name,
-            environment_id=self.environment,
-        )
-        assert (
-            result.code == 200
-        ), f"Wrong response code while creating environment, got {result.code} (expected 200): \n{result.result}"
-
     def _get_server_version(self) -> Version:
         """
         Get the version of the remote orchestrator
@@ -169,26 +225,6 @@ class RemoteOrchestrator:
             return Version(server_status.result["data"]["version"])
         except (KeyError, TypeError):
             raise Exception(f"Unexpected response for server status API call: {server_status.result}")
-
-    def attach_project(self, project: Project) -> None:
-        """
-        The project object from the `pytest_inmanta.plugin.project` is required to be provided to
-        the remote orchestrator for it to work correctly.  This is only known when we enter
-        a function scoped fixture, while this object is constructed at the session scope.
-
-        So every time we enter a new function scope, the project should be attached again,
-        using this method.
-
-        :parma project: The project object coming from pytest_inmanta's project fixture
-        """
-        self._project = project
-
-    def export_service_entities(self) -> None:
-        """Initialize the remote orchestrator with the service model and check if all preconditions hold"""
-        exporter = self.project._exporter
-        assert exporter is not None, "Bad usage of the remote orchestrator object"
-        exporter.run_export_plugin("service_entities_exporter")
-        self.sync_project()
 
     def run_command(
         self,
@@ -338,14 +374,13 @@ class RemoteOrchestrator:
         """
         LOGGER.debug(
             "Sync local project folder at %s with remote orchestrator (%s)",
-            self.project._test_project_dir,
+            self.local_project._path,
             str(self.remote_project_path),
         )
 
-        local_project = inmanta.module.Project(self.project._test_project_dir)
-        local_project_path = pathlib.Path(self.project._test_project_dir)
+        local_project_path = pathlib.Path(self.local_project._path)
         modules_dir_paths: list[pathlib.Path] = [
-            local_project_path / module_dir for module_dir in local_project.metadata.modulepath
+            local_project_path / module_dir for module_dir in self.local_project.metadata.modulepath
         ]
 
         # All the files to exclude when syncing the project, either because
@@ -371,7 +406,7 @@ class RemoteOrchestrator:
 
         # Sync all the modules in editable mode
         synced_modules: set[str] = set()
-        for module in local_project.get_modules().values():
+        for module in self.local_project.get_modules().values():
             if hasattr(inmanta.module, "ModuleV2") and isinstance(module, inmanta.module.ModuleV2) and not module.is_editable():
                 # Module v2 which are not editable installs should not be synced
                 continue
@@ -384,24 +419,6 @@ class RemoteOrchestrator:
             )
 
             synced_modules.add(module.name)
-
-        # Make sure that our current module is always synced, even if it is not an editable install
-        current_module, _ = pytest_inmanta.plugin.get_module()
-        if current_module.name not in synced_modules:
-            assert isinstance(current_module, inmanta.module.ModuleV2), type(current_module)
-            assert not current_module.is_editable(), "The module is installed in editable mode, it should have been synced."
-            LOGGER.warning(
-                "The module being tested is not installed in editable mode. This is not recommended. Install your module "
-                "in editable with `inmanta module install -e .` to make sure that all your latest changes are taken into "
-                "account when testing the module."
-            )
-            self.sync_local_folder(
-                local_folder=pathlib.Path(current_module.path),
-                remote_folder=libs_path / current_module.name,
-                excludes=[],
-            )
-
-            synced_modules.add(current_module.name)
 
         # Make sure all the modules we synced appear to be version controlled
         mkdir_module = ["mkdir"] + [x for module in synced_modules for x in ["-p", module + "/.git"]]
@@ -513,13 +530,35 @@ class RemoteOrchestrator:
     def sync_project(self) -> None:
         """Synchronize the project to the lab orchestrator"""
         source_script = pathlib.Path(__file__).parent / "resources/setup_project.py"
-        destination_script = Path(self.project._test_project_dir, ".inm_lsm_setup_project.py")
+        destination_script = pathlib.Path(self.local_project._path, ".inm_lsm_setup_project.py")
         LOGGER.debug(f"Copying module V2 install script ({source_script}) in project folder {destination_script}")
         destination_script.write_text(source_script.read_text())
 
         LOGGER.info("Sending service model to the lab orchestrator")
         self.sync_project_folder()
         self.install_project()
+
+    def export_service_entities(self) -> None:
+        """
+        Sync the project to the remote orchestrator and export the service entities.
+        """
+        # Sync the project with the remote orchestrator
+        self.sync_project()
+
+        # Trigger an export of the service instance definitions
+        self.run_command(
+            args=[
+                ".env/bin/python",
+                "-m",
+                "inmanta.app",
+                "export",
+                "-e",
+                str(self.environment.id),
+                "--export-plugin",
+                "service_entities_exporter",
+            ],
+            cwd=str(self.remote_project_path),
+        )
 
     def wait_until_deployment_finishes(
         self,
