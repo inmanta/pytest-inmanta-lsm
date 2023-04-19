@@ -300,7 +300,7 @@ def remote_orchestrator_shared(
         token = None
 
     remote_orchestrator = RemoteOrchestrator(
-        module.Project.from_path(project_shared._test_project_dir),
+        module.Project(project_shared._test_project_dir),
         OrchestratorEnvironment(
             id=UUID(remote_orchestrator_environment),
             name=remote_orchestrator_environment_name,
