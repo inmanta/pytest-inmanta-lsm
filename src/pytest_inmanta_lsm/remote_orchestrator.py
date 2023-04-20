@@ -66,7 +66,7 @@ class OrchestratorEnvironment:
             raise LookupError(f"Can not find any environment with id {self.id}")
 
         # The environment should now exist
-        assert result.code == 200, str(result.result)
+        assert result.code in range(200, 300), str(result.result)
         return inmanta.data.model.Environment(**result.result["data"])
 
     def get_project(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
@@ -83,7 +83,7 @@ class OrchestratorEnvironment:
         # We don't explicitly check for a 404 here as a project can not exist without
         # its environment, so this request using the existing environment's project id
         # should never fail.
-        assert result.code == 200, str(result.result)
+        assert result.code in range(200, 300), str(result.result)
         return inmanta.data.model.Project(**result.result["data"])
 
     def configure_project(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
@@ -103,7 +103,7 @@ class OrchestratorEnvironment:
 
         # We didn't find any project with the desired name, so we create a new one
         result = client.project_create(name=project_name)
-        assert result.code == 201, str(result.result)
+        assert result.code in range(200, 300), str(result.result)
 
         return inmanta.data.model.Project(**result.result["data"])
 
@@ -123,7 +123,7 @@ class OrchestratorEnvironment:
                 name=self.name or "pytest-inmanta-lsm",
                 project_id=self.configure_project(client).id,
             )
-            assert result.code in (200, 201), str(result.result)
+            assert result.code in range(200, 300), str(result.result)
             return inmanta.data.model.Environment(**result.result["data"])
 
         current_project = self.get_project(client)
@@ -147,7 +147,7 @@ class OrchestratorEnvironment:
                 **updates,
             )
 
-            assert result.code == 200, str(result.result)
+            assert result.code in range(200, 300), str(result.result)
             return inmanta.data.model.Environment(**result.result["data"])
         else:
             return current_environment
@@ -438,7 +438,17 @@ class RemoteOrchestrator:
                     LOGGER.warning("%s is not a directory, it will be skipped", str(module_path))
                     continue
 
-                module = inmanta.module.Module.from_path(module_path)
+                if not hasattr(inmanta.module.Module, "from_path"):
+                    # Iso4 case
+                    module = (
+                        inmanta.module.Module(self.local_project, path=str(module_path))
+                        if (module_path / inmanta.module.Module.MODULE_FILE).exists()
+                        else None
+                    )
+                else:
+                    # Iso5+ case
+                    module = inmanta.module.Module.from_path(module_path)
+
                 if module is None:
                     LOGGER.warning("%s is not a valid module, it will be skipped", str(module_path))
                     continue
