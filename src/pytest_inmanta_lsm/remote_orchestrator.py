@@ -602,12 +602,15 @@ class RemoteOrchestrator:
         # Sync the project with the remote orchestrator
         self.sync_project()
 
+        if self.server_version < Version("5.dev"):
+            inmanta_command = ["inmanta"]
+        else:
+            inmanta_command = [".env/bin/python", "-m", "inmanta.app"]
+
         # Trigger an export of the service instance definitions
         self.run_command(
             args=[
-                ".env/bin/python",
-                "-m",
-                "inmanta.app",
+                *inmanta_command,
                 "export",
                 "-e",
                 str(self.environment.id),
