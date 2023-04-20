@@ -106,15 +106,6 @@ inm_lsm_env_name = StringTestParameter(
     argument="--lsm-environment-name",
     environment_variable="INMANTA_LSM_ENVIRONMENT_NAME",
     usage="Environment name. Used only when new environment is created, otherwise this parameter is ignored",
-    default="pytest-inmanta-lsm",
-    group=param_group,
-)
-
-inm_lsm_project_id = StringTestParameter(
-    argument="--lsm-project-id",
-    environment_variable="INMANTA_LSM_PROJECT_ID",
-    usage="The project to use on the remote server (is created if it doesn't exist)",
-    default="719c7ad5-6657-444b-b536-a27174cb7498",
     group=param_group,
 )
 
@@ -122,7 +113,6 @@ inm_lsm_project_name = StringTestParameter(
     argument="--lsm-project-name",
     environment_variable="INMANTA_LSM_PROJECT_NAME",
     usage="Project name to be used for this environment.",
-    default="pytest-inmanta-lsm",
     group=param_group,
 )
 

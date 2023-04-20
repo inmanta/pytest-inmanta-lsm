@@ -37,103 +37,120 @@ SSH_CMD = [
 
 
 @dataclasses.dataclass
-class OrchestratorProject:
-    """
-    Helper class to represent the project we want to work with on a real orchestrator.
-
-    :attr name: The name of the desired project, if None, the name won't be enforced
-        and be set to `pytest-inmanta-lsm` on project creation.
-    :attr id: The id of the desired project.
-    """
-
-    name: typing.Optional[str]
-    id: uuid.UUID
-
-    def ensure_exists(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
-        """
-        Make sure this project exists on the remote orchestrator this client has been
-        configured for.  Returns the project, as it is currently configured on the
-        orchestrator.
-
-        :param client: The client which can reach the orchestrator we want to configure.
-        """
-        result = client.project_get(self.id)
-        if result.code == 404:
-            # The project doesn't exist yet, we create it
-            result = client.project_create(
-                name=self.name or "pytest-inmanta-lsm",
-                project_id=self.id,
-            )
-
-        # The project should now exist
-        assert result.code in (200, 201), str(result.result)
-
-        if self.name is not None and result.result["data"]["name"] != self.name:
-            # The current name doesn't match the one we want for this
-            # project
-            result = client.project_modify(
-                id=self.id,
-                name=self.name,
-            )
-
-            # Make sure the update has succeeded
-            assert result.code == 200, str(result.result)
-
-        return inmanta.data.model.Project(**result.result["data"])
-
-
-@dataclasses.dataclass
 class OrchestratorEnvironment:
     """
     Helper class to represent the environment we want to work with on a real orchestrator.
 
+    :attr id: The id of the desired environment.
     :attr name: The name of the desired environment, if None, the name won't be enforced
         and be set to `pytest-inmanta-lsm` on environment creation.
-    :attr id: The id of the desired environment.
-    :attr project: The project this environment should be a part of.
+    :attr project: The project (name) this environment should be a part of.  If set to None,
+        we don't care about the project this environment is in, and if one needs to be
+        selected, we default to `pytest-inmanta-lsm` as project name.
     """
 
-    name: typing.Optional[str]
     id: uuid.UUID
-    project: OrchestratorProject
+    name: typing.Optional[str]
+    project: typing.Optional[str]
 
-    def ensure_exists(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Environment:
+    def get_environment(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Environment:
         """
-        Make sure this environment exists on the remote orchestrator this client has been
-        configured for.  Returns the environment, as it is currently configured on the
-        orchestrator.
+        Get the existing environment, using its id.  If the environment doesn't exist, raise
+        a LookupError.
 
         :param client: The client which can reach the orchestrator we want to configure.
         """
-        project = self.project.ensure_exists(client)
         result = client.environment_get(self.id)
         if result.code == 404:
             # The environment doesn't exist yet, we create it
+            raise LookupError(f"Can not find any environment with id {self.id}")
+
+        # The environment should now exist
+        assert result.code == 200, str(result.result)
+        return inmanta.data.model.Environment(**result.result["data"])
+
+    def get_project(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
+        """
+        Get the existing project this environment is part of, to get it, first gets the existing
+        environment.  Not finding the environment get raise a LookupError, which will be passed
+        seemlessly.
+
+        :param client: The client which can reach the orchestrator we want to configure.
+        """
+        environment = self.get_environment(client)
+        result = client.project_get(environment.project_id)
+
+        # We don't explicitly check for a 404 here as a project can not exist without
+        # its environment, so this request using the existing environment's project id
+        # should never fail.
+        assert result.code == 200, str(result.result)
+        return inmanta.data.model.Project(**result.result["data"])
+
+    def configure_project(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
+        """
+        Make sure that a project with the desired name or `pytest-inmanta-lsm` exists on the
+        remote orchestrator, and returns it.  Returns the project after the configuration has
+        been applied.
+
+        :param client: The client which can reach the orchestrator we want to configure.
+        """
+        project_name = self.project or "pytest-inmanta-lsm"
+
+        for raw_project in client.project_list().result["data"]:
+            project = inmanta.data.model.Project(**raw_project)
+            if project.name == project_name:
+                return project
+
+        # We didn't find any project with the desired name, so we create a new one
+        result = client.project_create(name=project_name)
+        assert result.code == 201, str(result.result)
+
+        return inmanta.data.model.Project(**result.result["data"])
+
+    def configure_environment(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Environment:
+        """
+        Make sure that our environment exists on the remote orchestrator, and has the desired
+        name and project.  Returns the environment after the configuration has been applied.
+
+        :param client: The client which can reach the orchestrator we want to configure.
+        """
+        try:
+            current_environment = self.get_environment(client)
+        except LookupError:
+            # The environment doesn't exist, we create it
             result = client.environment_create(
                 environment_id=self.id,
                 name=self.name or "pytest-inmanta-lsm",
-                project_id=project.id,
+                project_id=self.configure_project(client).id,
             )
+            assert result.code in (200, 201), str(result.result)
+            return inmanta.data.model.Environment(**result.result["data"])
 
-        # The environment should now exist
-        assert result.code in (200, 201), str(result.result)
-        data: dict = result.result["data"]
+        current_project = self.get_project(client)
 
-        if data["name"] != self.name or data["project_id"] != project.id:
-            # The current name doesn't match the one we want for this
-            # environment
+        updates: dict[str, object] = dict()
+        if self.name is not None and current_environment.name != self.name:
+            # We care about the environment name is it is not a match
+            # We update the environment name
+            updates["name"] = self.name
+
+        if self.project is not None and current_project.name != self.name:
+            # We care about the project name and it is not a match
+            # We make sure the project with the desired name exists and
+            # assign our environment to it
+            updates["project_id"] = self.configure_project(client).id
+
+        if len(updates) > 0:
+            # Apply the updates
             result = client.environment_modify(
                 id=self.id,
-                name=self.name or data["name"],
-                project_id=project.id,
+                **updates,
             )
 
-            # Make sure the update has succeeded
             assert result.code == 200, str(result.result)
-
-            data = result.result["data"]
-
-        return inmanta.data.model.Environment(**data)
+            return inmanta.data.model.Environment(**result.result["data"])
+        else:
+            return current_environment
 
     def __str__(self) -> str:
         return str(self.id)
@@ -190,7 +207,7 @@ class RemoteOrchestrator:
 
         self.setup_config()
         self.client = inmanta.protocol.endpoints.SyncClient("client")
-        self.environment.ensure_exists(self.client)
+        self.environment.configure_environment(self.client)
         self.server_version = self._get_server_version()
 
         # The path on the remote orchestrator where the project will be synced

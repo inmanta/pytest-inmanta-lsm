@@ -23,7 +23,7 @@ from inmanta import module
 from packaging import version
 from pytest_inmanta.parameters import inm_mod_in_place
 from pytest_inmanta.plugin import Project
-from pytest_inmanta.test_parameter import ParameterNotSetException
+from pytest_inmanta.test_parameter import ParameterNotSetException, StringTestParameter
 
 from pytest_inmanta_lsm import lsm_project
 from pytest_inmanta_lsm.orchestrator_container import (
@@ -48,7 +48,6 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_no_clean,
     inm_lsm_no_halt,
     inm_lsm_partial_compile,
-    inm_lsm_project_id,
     inm_lsm_project_name,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
@@ -58,7 +57,6 @@ from pytest_inmanta_lsm.parameters import (
 )
 from pytest_inmanta_lsm.remote_orchestrator import (
     OrchestratorEnvironment,
-    OrchestratorProject,
     RemoteOrchestrator,
 )
 
@@ -129,22 +127,11 @@ def remote_orchestrator_container(
 
 @pytest.fixture(scope="session")
 def remote_orchestrator_environment(request: pytest.FixtureRequest) -> str:
+    """
+    Returns the id of the environment on the remote orchestrator that should be used for this
+    test suite.  If the environment doesn't exist, it will be created.
+    """
     return inm_lsm_env.resolve(request.config)
-
-
-@pytest.fixture(scope="session")
-def remote_orchestrator_project_id(request: pytest.FixtureRequest) -> str:
-    return inm_lsm_project_id.resolve(request.config)
-
-
-@pytest.fixture(scope="session")
-def remote_orchestrator_environment_name(request: pytest.FixtureRequest) -> str:
-    return inm_lsm_env_name.resolve(request.config)
-
-
-@pytest.fixture(scope="session")
-def remote_orchestrator_project_name(request: pytest.FixtureRequest) -> str:
-    return inm_lsm_project_name.resolve(request.config)
 
 
 @pytest.fixture(scope="session")
@@ -227,9 +214,6 @@ def remote_orchestrator_shared(
     remote_orchestrator_no_clean: bool,
     remote_orchestrator_no_halt: bool,
     remote_orchestrator_host: Tuple[str, int],
-    remote_orchestrator_project_id: str,
-    remote_orchestrator_project_name: str,
-    remote_orchestrator_environment_name: str,
 ) -> Iterator[RemoteOrchestrator]:
     """
     Shared project to be used by the remote orchestrator. Ensures the module being tested is synced to the remote orchestrator
@@ -293,21 +277,22 @@ def remote_orchestrator_shared(
         ):
             LOGGER.warning("SSL currently doesn't work with the default docker-compose file.")
 
-    token: Optional[str]
-    try:
-        token = inm_lsm_token.resolve(request.config)
-    except ParameterNotSetException:
-        token = None
+    def get_optional_option(option: StringTestParameter) -> Optional[str]:
+        try:
+            return option.resolve(request.config)
+        except ParameterNotSetException:
+            return None
+
+    token = get_optional_option(inm_lsm_token)
+    environment_name = get_optional_option(inm_lsm_env_name)
+    project_name = get_optional_option(inm_lsm_project_name)
 
     remote_orchestrator = RemoteOrchestrator(
         module.Project(project_shared._test_project_dir),
         OrchestratorEnvironment(
             id=UUID(remote_orchestrator_environment),
-            name=remote_orchestrator_environment_name,
-            project=OrchestratorProject(
-                id=UUID(remote_orchestrator_project_id),
-                name=remote_orchestrator_project_name,
-            ),
+            name=environment_name,
+            project=project_name,
         ),
         host=host,
         port=port,
@@ -340,6 +325,24 @@ def remote_orchestrator_shared(
     # test suite.  Otherwise the environment is halted.
     if not remote_orchestrator_no_halt:
         remote_orchestrator.client.halt_environment(remote_orchestrator.environment)
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_environment_name(remote_orchestrator_shared: RemoteOrchestrator) -> str:
+    """
+    Get the name of the environment in use on the remote orchestrator.  This value can be set
+    using the `--lsm-environment-name` option.
+    """
+    return remote_orchestrator_shared.environment.get_environment(remote_orchestrator_shared.client).name
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_project_name(remote_orchestrator_shared: RemoteOrchestrator) -> str:
+    """
+    Get the name of the project the environment on the remote orchestrator is in.  This value can
+    be set using the `--lsm-project-name` option.
+    """
+    return remote_orchestrator_shared.environment.get_project(remote_orchestrator_shared.client).name
 
 
 @pytest.fixture
@@ -389,7 +392,7 @@ def remote_orchestrator(
 
 
 @pytest.fixture
-def unittest_lsm(project) -> Iterator[None]:
+def unittest_lsm(project: Project) -> Iterator[None]:
     """
     Adds a module named unittest_lsm to the project with a simple resource that always deploys successfully. The module is
     compatible with the remote orchestrator fixtures.
