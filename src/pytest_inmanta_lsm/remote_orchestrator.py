@@ -482,9 +482,11 @@ class RemoteOrchestrator:
         self.run_command(mkdir_module, cwd=str(libs_path))
 
         # Delete all modules which are on the remote libs folder but we didn't sync
+        # We do this to avoid any side effect from a modules that our project doesn't require but
+        # the project setup might install anyway
         grep_extra = ["grep", "-v"] + [x for module in synced_modules for x in ["-e", module]]
         grep_extra_cmd = shlex.join(grep_extra)
-        clear_extra = f"rm -rf $(ls . | {grep_extra_cmd} | xargs)"
+        clear_extra = f"ls . | {grep_extra_cmd} | xargs rm -rf"
 
         self.run_command([clear_extra], shell=True, cwd=str(libs_path))
 
