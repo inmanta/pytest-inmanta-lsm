@@ -130,7 +130,7 @@ class OrchestratorEnvironment:
 
         updates: dict[str, object] = dict()
         if self.name is not None and current_environment.name != self.name:
-            # We care about the environment name is it is not a match
+            # We care about the environment name if it is not a match
             # We update the environment name
             updates["name"] = self.name
 
@@ -152,9 +152,6 @@ class OrchestratorEnvironment:
         else:
             return current_environment
 
-    def __str__(self) -> str:
-        return str(self.id)
-
 
 class RemoteOrchestrator:
     """
@@ -167,7 +164,7 @@ class RemoteOrchestrator:
     def __init__(
         self,
         local_project: inmanta.module.Project,
-        environment: OrchestratorEnvironment,
+        orchestrator_environment: OrchestratorEnvironment,
         *,
         host: str = "localhost",
         port: int = 8888,
@@ -194,7 +191,8 @@ class RemoteOrchestrator:
         :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
         """
         self.local_project = local_project
-        self.environment = environment
+        self.orchestrator_environment = orchestrator_environment
+        self.environment = self.orchestrator_environment.id
 
         self.host = host
         self.port = port
@@ -207,7 +205,7 @@ class RemoteOrchestrator:
 
         self.setup_config()
         self.client = inmanta.protocol.endpoints.SyncClient("client")
-        self.environment.configure_environment(self.client)
+        self.orchestrator_environment.configure_environment(self.client)
         self.server_version = self._get_server_version()
 
         # The path on the remote orchestrator where the project will be synced
@@ -222,7 +220,7 @@ class RemoteOrchestrator:
         Setup the config required to make it possible for the client to reach the orchestrator.
         """
         inmanta_config.Config.load_config()
-        inmanta_config.Config.set("config", "environment", str(self.environment.id))
+        inmanta_config.Config.set("config", "environment", str(self.environment))
 
         for section in ["compiler_rest_transport", "client_rest_transport"]:
             inmanta_config.Config.set(section, "host", self.host)
@@ -584,7 +582,7 @@ class RemoteOrchestrator:
                 *inmanta_command,
                 "export",
                 "-e",
-                str(self.environment.id),
+                str(self.environment),
                 "--export-plugin",
                 "service_entities_exporter",
             ],
