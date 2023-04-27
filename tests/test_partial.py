@@ -21,12 +21,13 @@ from collections import abc
 from inmanta import env
 
 
-@pytest.fixture(scope="session")
-def module_venv(pytestconfig) -> abc.Iterator[env.VirtualEnv]:
+@pytest.fixture(scope="function")
+def module_venv(testdir: pytest.Testdir, pytestconfig: pytest.Config) -> abc.Iterator[env.VirtualEnv]:
     """
     Yields a Python environment with test_partial installed in it.
     """
-    with utils.module_v2_venv(pytestconfig.rootpath / "examples" / "test-partial") as venv:
+    module_dir = testdir.copy_example("test-partial")
+    with utils.module_v2_venv(module_dir) as venv:
         yield venv
 
 
@@ -42,26 +43,20 @@ def module_venv_active(
         yield venv
 
 
-def test_partial_compile(testdir, module_venv_active):
+def test_partial_compile(testdir: pytest.Testdir, module_venv_active: env.VirtualEnv):
     """
     Test behavior of the --lsm-partial-compile option.
     """
-
-    testdir.copy_example("test-partial")
-
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest_inprocess("tests/test_basics.py", "--lsm-partial-compile")
     result.assert_outcomes(passed=3)
 
 
-def test_partial_disabled(testdir, module_venv_active):
+def test_partial_disabled(testdir: pytest.Testdir, module_venv_active: env.VirtualEnv):
     """
     Test behavior of the --lsm-partial-compile option.
     """
-
-    testdir.copy_example("test-partial")
-
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest_inprocess("tests/test_basics.py")
