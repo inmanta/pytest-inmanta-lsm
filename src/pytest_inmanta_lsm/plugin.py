@@ -21,7 +21,6 @@ import pytest_inmanta.plugin
 import requests
 from inmanta import module
 from packaging import version
-from pytest_inmanta.parameters import inm_mod_in_place
 from pytest_inmanta.plugin import Project
 from pytest_inmanta.test_parameter import ParameterNotSetException, StringTestParameter
 
