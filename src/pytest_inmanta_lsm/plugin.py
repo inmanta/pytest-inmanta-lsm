@@ -238,11 +238,22 @@ def remote_orchestrator_shared(
             # this fixture is used outside of the context of a module test suite.
             raise RuntimeError(f"Module {mod.name}'s source could not be found")
 
-        elif not installed.is_editable() or not os.path.samefile(installed.path, mod.path):
+        elif not installed.is_editable():
             LOGGER.error(
                 "The module being tested is not installed in editable mode. To ensure the remote orchestrator uses the same"
                 " code as the local project, please install the module with `inmanta module install -e .` before running"
                 " the tests."
+            )
+            raise RuntimeError(f"Module at {mod.path} should be installed in editable mode.  See logs for details.")
+
+        elif not os.path.samefile(installed.path, mod.path):
+            LOGGER.error(
+                (
+                    "The module being tested is installed in editable mode but its path doesn't match the path of the module"
+                    " being tested: %s != %s"
+                ),
+                installed.path,
+                mod.path,
             )
             raise RuntimeError(f"Module at {mod.path} should be installed in editable mode.  See logs for details.")
 
