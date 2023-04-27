@@ -67,6 +67,7 @@ class OrchestratorEnvironment:
 
         # The environment should now exist
         assert result.code in range(200, 300), str(result.result)
+        assert result.result is not None
         return inmanta.data.model.Environment(**result.result["data"])
 
     def get_project(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
@@ -84,6 +85,7 @@ class OrchestratorEnvironment:
         # its environment, so this request using the existing environment's project id
         # should never fail.
         assert result.code in range(200, 300), str(result.result)
+        assert result.result is not None
         return inmanta.data.model.Project(**result.result["data"])
 
     def configure_project(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
@@ -96,7 +98,10 @@ class OrchestratorEnvironment:
         """
         project_name = self.project or "pytest-inmanta-lsm"
 
-        for raw_project in client.project_list().result["data"]:
+        result = client.project_list()
+        assert result.code in range(200, 300), str(result.result)
+        assert result.result is not None
+        for raw_project in result.result["data"]:
             project = inmanta.data.model.Project(**raw_project)
             if project.name == project_name:
                 return project
@@ -104,7 +109,7 @@ class OrchestratorEnvironment:
         # We didn't find any project with the desired name, so we create a new one
         result = client.project_create(name=project_name)
         assert result.code in range(200, 300), str(result.result)
-
+        assert result.result is not None
         return inmanta.data.model.Project(**result.result["data"])
 
     def configure_environment(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Environment:
@@ -124,6 +129,7 @@ class OrchestratorEnvironment:
                 project_id=self.configure_project(client).id,
             )
             assert result.code in range(200, 300), str(result.result)
+            assert result.result is not None
             return inmanta.data.model.Environment(**result.result["data"])
 
         current_project = self.get_project(client)
@@ -148,6 +154,7 @@ class OrchestratorEnvironment:
             )
 
             assert result.code in range(200, 300), str(result.result)
+            assert result.result is not None
             return inmanta.data.model.Environment(**result.result["data"])
         else:
             return current_environment

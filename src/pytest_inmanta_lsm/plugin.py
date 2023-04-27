@@ -232,6 +232,12 @@ def remote_orchestrator_shared(
                     "The module being tested is a v1 module but it is also installed as a v2 module. Local compiles will use"
                     "the v2, but only the v1 will by synced to the server."
                 )
+
+        elif installed is None:
+            # Make sure that the module v2 source can be found, it should always be the case, unless
+            # this fixture is used outside of the context of a module test suite.
+            raise RuntimeError(f"Module {mod.name}'s source could not be found")
+
         elif not installed.is_editable() or not os.path.samefile(installed.path, mod.path):
             LOGGER.error(
                 "The module being tested is not installed in editable mode. To ensure the remote orchestrator uses the same"
@@ -239,6 +245,7 @@ def remote_orchestrator_shared(
                 " the tests."
             )
             raise RuntimeError(f"Module at {mod.path} should be installed in editable mode.  See logs for details.")
+
         else:
             # The module is a v2 installed in editable mode, as expected
             pass
@@ -249,7 +256,7 @@ def remote_orchestrator_shared(
 
     if remote_orchestrator_container is None:
         ssh_user = inm_lsm_ssh_user.resolve(request.config)
-        ssh_port = str(inm_lsm_ssh_port.resolve(request.config))
+        ssh_port = inm_lsm_ssh_port.resolve(request.config)
         container_env = inm_lsm_container_env.resolve(request.config)
     else:
         # If the orchestrator is running in a container we deployed ourself, we overwrite
@@ -257,7 +264,7 @@ def remote_orchestrator_shared(
         # If the container image behaves differently than assume, those value won't work,
         # no mechanism exists currently to work around this.
         ssh_user = "inmanta"
-        ssh_port = "22"
+        ssh_port = 22
         container_env = True
 
     ssl = inm_lsm_ssl.resolve(request.config)
@@ -326,7 +333,7 @@ def remote_orchestrator_environment_name(remote_orchestrator_shared: RemoteOrche
     Get the name of the environment in use on the remote orchestrator.  This value can be set
     using the `--lsm-environment-name` option.
     """
-    return remote_orchestrator_shared.environment.get_environment(remote_orchestrator_shared.client).name
+    return remote_orchestrator_shared.orchestrator_environment.get_environment(remote_orchestrator_shared.client).name
 
 
 @pytest.fixture(scope="session")
@@ -335,7 +342,7 @@ def remote_orchestrator_project_name(remote_orchestrator_shared: RemoteOrchestra
     Get the name of the project the environment on the remote orchestrator is in.  This value can
     be set using the `--lsm-project-name` option.
     """
-    return remote_orchestrator_shared.environment.get_project(remote_orchestrator_shared.client).name
+    return remote_orchestrator_shared.orchestrator_environment.get_project(remote_orchestrator_shared.client).name
 
 
 @pytest.fixture
