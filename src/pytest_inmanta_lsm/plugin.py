@@ -263,8 +263,10 @@ def remote_orchestrator_shared(
     remote_orchestrator_host: Tuple[str, int],
 ) -> Iterator[RemoteOrchestrator]:
     """
-    Shared project to be used by the remote orchestrator. Ensures the module being tested is synced to the remote orchestrator
-    even if it is a v2 module.
+    Session fixture to setup the `RemoteOrchestrator` object that will be used to sync our project
+    to the remote orchestrator environment.  This fixture also makes sure that if the module being
+    tested is v2, it is installed in editable mode, as it is required to send it to the remote
+    orchestrator.
     """
     # no need to do anything if this version of inmanta does not support v2 modules
     if hasattr(module, "ModuleV2"):
