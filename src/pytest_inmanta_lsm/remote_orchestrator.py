@@ -461,19 +461,9 @@ class RemoteOrchestrator:
         # Delete all modules which are on the remote libs folder but we didn't sync
         # We do this to avoid any side effect from a module that our project doesn't require but
         # the project setup might install anyway
-        clear_extra = [
-            "find",
-            ".",
-            "-maxdepth",
-            "1",
-            *[x for module in synced_modules for x in ["!", "-name", module]],
-            "-exec",
-            "rm",
-            "-rf",
-            "{}",
-            "+",
-        ]
-
+        synced_modules = synced_modules.union([".", ".."])
+        skip_folders = [x for module in synced_modules for x in ["!", "-name", module]]
+        clear_extra = ["find", ".", "-maxdepth", "1", *skip_folders, "-exec", "rm", "-rf", "{}", "+"]
         self.run_command(clear_extra, cwd=str(libs_path))
 
     def cache_libs_folder(self) -> None:
