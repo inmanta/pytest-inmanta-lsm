@@ -438,7 +438,7 @@ class RemoteOrchestrator:
         # Load the project and resolve all modules
         modules = self.local_project.get_modules()
 
-        # Sync all the modules in editable mode which were not found in the project module's paths
+        # Sync all the modules except for v2 in non-editable install mode
         synced_modules: set[str] = set()
         for module in modules.values():
             if hasattr(inmanta.module, "ModuleV2") and isinstance(module, inmanta.module.ModuleV2) and not module.is_editable():
@@ -459,13 +459,24 @@ class RemoteOrchestrator:
         self.run_command(mkdir_module, cwd=str(libs_path))
 
         # Delete all modules which are on the remote libs folder but we didn't sync
-        # We do this to avoid any side effect from a modules that our project doesn't require but
+        # We do this to avoid any side effect from a module that our project doesn't require but
         # the project setup might install anyway
-        grep_extra = ["grep", "-v"] + [x for module in synced_modules for x in ["-e", module]]
-        grep_extra_cmd = shlex.join(grep_extra)
-        clear_extra = f"ls . | {grep_extra_cmd} | xargs rm -rf"
+        clear_extra = [
+            "find",
+            ".",
+            "-maxdepth",
+            "1",
+            r"\(",
+            *[x for module in synced_modules for x in ["-name", module]],
+            r"\)",
+            "-exec",
+            "rm",
+            "-rf",
+            "{}",
+            "+",
+        ]
 
-        self.run_command([clear_extra], shell=True, cwd=str(libs_path))
+        self.run_command(clear_extra, cwd=str(libs_path))
 
     def cache_libs_folder(self) -> None:
         """
