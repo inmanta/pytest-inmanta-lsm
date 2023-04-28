@@ -212,7 +212,7 @@ def verify_v2_editable_install() -> None:
     mod, _ = pytest_inmanta.plugin.get_module()
 
     if isinstance(mod, module.ModuleV1):
-        # Module v1 installed,
+        # Module v1 installed, it can't be badly installed, we exit here.
         return
 
     # mod object is constructed from the source dir: it does not contain all installation metadata
