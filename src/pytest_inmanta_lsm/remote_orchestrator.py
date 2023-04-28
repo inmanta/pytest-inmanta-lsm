@@ -170,7 +170,6 @@ class RemoteOrchestrator:
 
     def __init__(
         self,
-        local_project: inmanta.module.Project,
         orchestrator_environment: OrchestratorEnvironment,
         *,
         host: str = "localhost",
@@ -183,8 +182,6 @@ class RemoteOrchestrator:
         container_env: bool = False,
     ) -> None:
         """
-        :param local_project: The project on this local machine, that should be synced to the
-            remote orchestrator.
         :param environment: The environment that should be configured on the remote orchestrator
             and that this project should be sync to.
 
@@ -197,7 +194,6 @@ class RemoteOrchestrator:
         :param ca_cert: Certificate used for authentication
         :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
         """
-        self.local_project = local_project
         self.orchestrator_environment = orchestrator_environment
         self.environment = self.orchestrator_environment.id
 
@@ -221,6 +217,13 @@ class RemoteOrchestrator:
             str(self.environment),
         )
         self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
+
+    @property
+    def local_project(self) -> inmanta.module.Project:
+        """
+        Get and return the local inmanta project.
+        """
+        return inmanta.module.Project.get()
 
     def setup_config(self) -> None:
         """

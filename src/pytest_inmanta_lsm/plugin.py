@@ -299,7 +299,6 @@ def remote_orchestrator_shared(
     project_name = get_optional_option(inm_lsm_project_name)
 
     remote_orchestrator = RemoteOrchestrator(
-        module.Project(project_shared._test_project_dir),
         OrchestratorEnvironment(
             id=UUID(remote_orchestrator_environment),
             name=environment_name,
