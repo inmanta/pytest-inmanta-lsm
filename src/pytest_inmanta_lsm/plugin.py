@@ -204,6 +204,54 @@ def remote_orchestrator_partial(request: pytest.FixtureRequest) -> Iterator[bool
     yield inm_lsm_partial_compile.resolve(request.config)
 
 
+def verify_v2_editable_install() -> None:
+    """
+    Verify that if our module is a v2, it is correctly installed, in editable mode.
+    """
+    mod: module.Module
+    mod, _ = pytest_inmanta.plugin.get_module()
+
+    if isinstance(mod, module.ModuleV1):
+        # Module v1 installed,
+        return
+
+    # mod object is constructed from the source dir: it does not contain all installation metadata
+    installed: Optional[module.ModuleV2] = module.ModuleV2Source(urls=[]).get_installed_module(None, mod.name)
+
+    # Generic message to help fix any of the problems reported below
+    how_to_fix = (
+        "To ensure the remote orchestrator uses the same code as the local project, please install the module"
+        " with `inmanta module install -e .` before running the tests."
+    )
+
+    if installed is None:
+        # Make sure that the module v2 source can be found, it should always be the case, unless
+        # this fixture is used outside of the context of a module test suite.
+        LOGGER.error("The module being tested is not installed.  %s", how_to_fix)
+    elif not installed.is_editable():
+        # Make sure that the module is installed in editable mode
+        LOGGER.error("The module being tested is not installed in editable mode.  %s", how_to_fix)
+    elif not os.path.samefile(installed.path, mod.path):
+        # Make sure that the source of the module installed in editable mode is the same one
+        # used by pytest-inmanta
+        LOGGER.error(
+            (
+                "%s is installed in editable mode but its path doesn't match the path of the module"
+                " being tested: %s != %s.  %s"
+            ),
+            mod.name,
+            installed.path,
+            mod.path,
+            how_to_fix,
+        )
+    else:
+        # Everything is okay, we exit here
+        return
+
+    # We didn't exit, there was a failure, so we raise an exception
+    raise RuntimeError(f"Module at {mod.path} should be installed in editable mode.  See logs for details.")
+
+
 @pytest.fixture(scope="session")
 def remote_orchestrator_shared(
     request: pytest.FixtureRequest,
@@ -220,46 +268,7 @@ def remote_orchestrator_shared(
     """
     # no need to do anything if this version of inmanta does not support v2 modules
     if hasattr(module, "ModuleV2"):
-        mod: module.Module
-        mod, _ = pytest_inmanta.plugin.get_module()
-
-        # mod object is constructed from the source dir: it does not contain all installation metadata
-        installed: Optional[module.ModuleV2] = module.ModuleV2Source(urls=[]).get_installed_module(None, mod.name)
-        if isinstance(mod, module.ModuleV1):
-            # no need to do anything for v1 module except raise a warning in some edge scenarios
-            if installed is not None:
-                LOGGER.warning(
-                    "The module being tested is a v1 module but it is also installed as a v2 module. Local compiles will use"
-                    "the v2, but only the v1 will by synced to the server."
-                )
-
-        elif installed is None:
-            # Make sure that the module v2 source can be found, it should always be the case, unless
-            # this fixture is used outside of the context of a module test suite.
-            raise RuntimeError(f"Module {mod.name}'s source could not be found")
-
-        elif not installed.is_editable():
-            LOGGER.error(
-                "The module being tested is not installed in editable mode. To ensure the remote orchestrator uses the same"
-                " code as the local project, please install the module with `inmanta module install -e .` before running"
-                " the tests."
-            )
-            raise RuntimeError(f"Module at {mod.path} should be installed in editable mode.  See logs for details.")
-
-        elif not os.path.samefile(installed.path, mod.path):
-            LOGGER.error(
-                (
-                    "The module being tested is installed in editable mode but its path doesn't match the path of the module"
-                    " being tested: %s != %s"
-                ),
-                installed.path,
-                mod.path,
-            )
-            raise RuntimeError(f"Module at {mod.path} should be installed in editable mode.  See logs for details.")
-
-        else:
-            # The module is a v2 installed in editable mode, as expected
-            pass
+        verify_v2_editable_install()
 
     LOGGER.info("Setting up remote orchestrator")
 
