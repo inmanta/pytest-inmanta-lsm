@@ -223,7 +223,15 @@ class RemoteOrchestrator:
         """
         Get and return the local inmanta project.
         """
-        return inmanta.module.Project.get()
+        project = inmanta.module.Project.get()
+        if not project.loaded:
+            LOGGER.warning(
+                "The project at %s has not been loaded yet.  This probably means that this RemoteOrchestrator"
+                " object is used outside of the scope it has been designed for.  It might then not behave as"
+                " expected."
+            )
+
+        return project
 
     def setup_config(self) -> None:
         """
