@@ -333,6 +333,70 @@ class RemoteOrchestrator:
             LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
             raise e
 
+    def run_command_with_server_env(
+        self,
+        args: typing.Sequence[str],
+        *,
+        shell: bool = False,
+        cwd: typing.Optional[str] = None,
+        env: typing.Optional[typing.Mapping[str, str]] = None,
+    ) -> str:
+        """
+        Helper method to execute a command on the remote orchestrator machine, in the same context as
+        the orchestrator.  This means, with the same environment variables accessible, and the same
+        user as the orchestrator processes.
+
+        :param args: A sequence of string, which should be executed as a single command, on the
+            remote orchestrator.  If shell is True, the sequence should contain exactly one element.
+        :param shell: Whether to execute the argument in a shell (bash).
+        :param cwd: The directory on the remote orchestrator in which the command should be executed.
+        :param env: A mapping of environment variables that should be available to the process
+            running on the remote orchestrator.
+        """
+
+        if self.container_env:
+            # For container environment, the env var accessible to the orchestrator are
+            # always loaded for the inmanta user.
+            return self.run_command(args, shell=shell, cwd=cwd, env=env, user="inmanta")
+
+        if shell:
+            assert len(args) == 1, "When running command in a shell, only one arg should be provided"
+            cmd = args[0]
+        else:
+            # Join the command, safely escape all spaces
+            cmd = shlex.join(args)
+
+        # For non container environments, a systemd environment file needs to be loaded
+        # This is done using systemd-run
+        args_prefix = [
+            "sudo",
+            "systemd-run",
+            "--pipe",
+            "-p",
+            "User=inmanta",
+            "-p",
+            "EnvironmentFile=/etc/sysconfig/inmanta-server",
+        ]
+        for env_var, value in (env or {}).items():
+            # The extra env vars should be passed to systemd-run command
+            args_prefix.extend(["-p", f"Environment={shlex.quote(env_var)}={shlex.quote(value)}"])
+
+        # systemd-run should wait for the command to finish its execution
+        args_prefix.append("--wait")
+
+        base_cmd = shlex.join(args_prefix)
+
+        if cwd is not None:
+            # Pretend that the command is a shell, and add a cd ... prefix to it
+            shell = True
+            cmd = shlex.join(["cd", cwd]) + "; " + cmd
+
+        if shell:
+            # The command we received should be run in a shell
+            cmd = shlex.join(["bash", "-l", "-c", cmd])
+
+        return self.run_command(args=[base_cmd + " " + cmd], shell=True, user=self.ssh_user)
+
     def sync_local_folder(
         self,
         local_folder: pathlib.Path,
@@ -536,37 +600,9 @@ class RemoteOrchestrator:
         # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
         install_script_path = self.remote_project_path / ".inm_lsm_setup_project.py"
 
-        if self.container_env:
-            # If this is a container env, simply run the script as the inmanta user suffice
-            # Environment variables are loaded by the shell.
-            # We run it in a shell, to make sure that the process has access to the environment
-            # variables that the server uses
-            result = self.run_command(
-                args=[f"/opt/inmanta/bin/python {install_script_path}"],
-                shell=True,
-                env={"PROJECT_PATH": str(self.remote_project_path)},
-            )
-            LOGGER.debug("Installation logs: %s", result)
-            return
-
-        # Non-container environment, we run it as a systemd-run uni, to be able to load
-        # the env file that the server is using
-        result = self.run_command(
-            args=[
-                "sudo",
-                "systemd-run",
-                "--pipe",
-                "-p",
-                "User=inmanta",
-                "-p",
-                "EnvironmentFile=/etc/sysconfig/inmanta-server",
-                "-p",
-                f"Environment=PROJECT_PATH={self.remote_project_path}",
-                "--wait",
-                "/opt/inmanta/bin/python",
-                str(install_script_path),
-            ],
-            user=self.ssh_user,
+        result = self.run_command_with_server_env(
+            ["/opt/inmanta/bin/python", str(install_script_path)],
+            env={"PROJECT_PATH": str(self.remote_project_path)},
         )
         LOGGER.debug("Installation logs: %s", result)
 
@@ -594,7 +630,7 @@ class RemoteOrchestrator:
             inmanta_command = [".env/bin/python", "-m", "inmanta.app"]
 
         # Trigger an export of the service instance definitions
-        self.run_command(
+        self.run_command_with_server_env(
             args=[
                 *inmanta_command,
                 "export",

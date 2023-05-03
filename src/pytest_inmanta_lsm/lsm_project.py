@@ -18,7 +18,6 @@ import inmanta_lsm.const
 import inmanta_lsm.model
 import pytest
 import pytest_inmanta.plugin
-from inmanta_lsm.dict_path import DictPath, to_path
 
 # Error message to display when the lsm module is not reachable
 INMANTA_LSM_MODULE_NOT_LOADED = (
@@ -203,6 +202,10 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during allocation to update
         the attributes of a V2 service.
         """
+        # Import dict_path library of the lsm extension in the function scope, as it might
+        # not be available for older version of the product
+        from inmanta_lsm import dict_path  # type: ignore
+
         # Making some basic checks
         service = self.services[str(service_id)]
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
@@ -221,7 +224,7 @@ class LsmProject:
         # https://github.com/inmanta/inmanta-lsm/blob/39e9319381ce6cfc9fd22549e2b5a9cc7128ded2/src/inmanta_lsm/model.py#L2794
 
         for current_edit in edit:
-            dict_path_obj: DictPath = to_path(current_edit.target)
+            dict_path_obj = dict_path.to_path(current_edit.target)
 
             if current_edit.operation == inmanta_lsm.model.EditOperation.replace.value:
                 dict_path_obj.set_element(service.candidate_attributes, current_edit.value)
