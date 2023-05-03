@@ -379,7 +379,7 @@ class RemoteOrchestrator:
         ]
         for env_var, value in (env or {}).items():
             # The extra env vars should be passed to systemd-run command
-            args_prefix.extend("-p", f"Environment={shlex.quote(env_var)}={shlex.quote(value)}")
+            args_prefix.extend(["-p", f"Environment={shlex.quote(env_var)}={shlex.quote(value)}"])
 
         # systemd-run should wait for the command to finish its execution
         args_prefix.append("--wait")
