@@ -11,15 +11,15 @@ import typing
 import uuid
 import warnings
 
-import inmanta.server.extensions
 import inmanta.config
-import inmanta.execute.proxy
 import inmanta.const
+import inmanta.execute.proxy
 import inmanta.protocol.common
+import inmanta.server.extensions
 import inmanta.util
 import inmanta_lsm.const
-import inmanta_lsm.openapi
 import inmanta_lsm.model
+import inmanta_lsm.openapi
 import pytest
 import pytest_inmanta.plugin
 
@@ -250,7 +250,7 @@ class LsmProject:
             import inmanta_plugins.lsm  # type: ignore
         except ImportError as e:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
-        
+
         # Making some basic checks
         tid = tid or environment
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
@@ -282,9 +282,7 @@ class LsmProject:
         if format == inmanta.const.ApiDocsFormat.openapi:
             return inmanta.protocol.common.Result(
                 code=200,
-                result={
-                    "data": json.loads(openapi_json_str)
-                },
+                result={"data": json.loads(openapi_json_str)},
             )
 
         raise ValueError(f"Unsupported format: {format}")
