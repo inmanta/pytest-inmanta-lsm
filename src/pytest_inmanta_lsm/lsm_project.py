@@ -11,10 +11,14 @@ import typing
 import uuid
 import warnings
 
+import inmanta.server.extensions
 import inmanta.config
+import inmanta.execute.proxy
+import inmanta.const
 import inmanta.protocol.common
 import inmanta.util
 import inmanta_lsm.const
+import inmanta_lsm.openapi
 import inmanta_lsm.model
 import pytest
 import pytest_inmanta.plugin
@@ -234,6 +238,56 @@ class LsmProject:
         service.last_updated = datetime.datetime.now()
 
         return inmanta.protocol.common.Result(code=200, result={})
+
+    def lsm_services_openapi_docs(
+        self,
+        tid: typing.Optional[uuid.UUID] = None,
+        format: typing.Optional[inmanta.const.ApiDocsFormat] = inmanta.const.ApiDocsFormat.openapi,
+        environment: typing.Optional[uuid.UUID] = None,
+    ) -> inmanta.protocol.common.Result:
+        try:
+            # Import lsm module in function scope for usage with v1 modules
+            import inmanta_plugins.lsm  # type: ignore
+        except ImportError as e:
+            raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
+        
+        # Making some basic checks
+        tid = tid or environment
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
+        # Simulate the export of all service entities, mock of the lsm module exporter
+        all_bindings: dict[str, inmanta.execute.proxy.DynamicProxy] = {
+            instance.service_entity: instance
+            for binding_type in ["lsm::ServiceEntityBinding", "lsm::ServiceEntityBindingV2"]
+            for instance in self.project.get_instances(binding_type)
+        }
+
+        exporter = self.project._exporter
+        assert exporter is not None
+
+        service_entity_catalog = {
+            service_entity_binding.service_entity_name: inmanta_plugins.lsm.ServiceEntityBuilder.get_service_entity_from_model(
+                env=tid,
+                all_bindings=all_bindings,
+                entity_binding=service_entity_binding,
+                entity_type=exporter.types[service_entity_binding.service_entity],
+            )
+            for service_entity_binding in all_bindings.values()
+        }
+
+        # Simulate the openapi generation, mock of the inmanta_lsm api
+        service_entities = list(service_entity_catalog.values())
+        openapi = inmanta_lsm.openapi.OpenApiServiceEntityConverter(inmanta.server.extensions.FeatureManager())
+        openapi_json_str = openapi.generate_openapi_json(service_entities)
+        if format == inmanta.const.ApiDocsFormat.openapi:
+            return inmanta.protocol.common.Result(
+                code=200,
+                result={
+                    "data": json.loads(openapi_json_str)
+                },
+            )
+
+        raise ValueError(f"Unsupported format: {format}")
 
     def add_service(self, service: inmanta_lsm.model.ServiceInstance) -> None:
         """
