@@ -114,3 +114,19 @@ def test_model(lsm_project: lsm_project.LsmProject) -> None:
 
     # Do a second compile, everything should go fine
     lsm_project.compile("import quickstart", service_id=service.id)
+
+
+def test_generate_doc(lsm_project: lsm_project.LsmProject) -> None:
+    lsm_project.project.compile("import quickstart")
+    result = lsm_project.lsm_services_openapi_docs(tid=uuid.UUID(lsm_project.environment))
+    openapi_def = result.result["data"]
+    assert list(openapi_def["paths"].keys()) == [
+        '/lsm/v1/service_inventory/vlan-assignment',
+        '/lsm/v1/service_inventory/vlan-assignment/{service_id}',
+    ]
+    assert list(openapi_def["components"]["schemas"].keys()) == [
+        'vlan-assignment',
+        'DeploymentProgress',
+        'ServiceInstance',
+        'ServiceInstance-vlan-assignment',
+    ]

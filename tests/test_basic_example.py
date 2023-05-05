@@ -7,7 +7,7 @@
 """
 
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
-
+import pytest
 import utils
 import versions
 from packaging import version
@@ -34,6 +34,18 @@ def test_basic_example(testdir):
     result = testdir.runpytest("tests/test_quickstart.py")
 
     if versions.INMANTA_CORE_VERSION < version.Version("6"):
-        result.assert_outcomes(passed=2, skipped=1)
+        result.assert_outcomes(passed=3, skipped=1)
     else:
-        result.assert_outcomes(passed=3)
+        result.assert_outcomes(passed=4)
+
+
+def test_docs(testdir: pytest.Testdir):
+    """Make sure that our plugin works."""
+
+    testdir.copy_example("quickstart")
+
+    utils.add_version_constraint_to_project(testdir.tmpdir)
+
+    result = testdir.runpytest("tests/test_quickstart.py::test_generate_doc", "-vvv")
+
+    result.assert_outcomes(passed=1)
