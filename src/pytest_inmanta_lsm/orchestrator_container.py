@@ -36,7 +36,7 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
         encoding="utf-8",
         text=True,
         universal_newlines=True,
-        env={"PYTHONNOUSERSITE": 1},
+        env={"PYTHONNOUSERSITE": ""},
     )
     LOGGER.debug(f"Return code: {result.returncode}")
     LOGGER.debug("Stdout: %s", result.stdout)
