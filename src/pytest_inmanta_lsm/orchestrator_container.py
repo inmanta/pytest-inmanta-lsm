@@ -27,7 +27,6 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     Helper function to run command and log the results.  Raises a CalledProcessError
     if the command failed.
     """
-
     LOGGER.info(f"Running command: {cmd}")
     result = subprocess.run(
         args=cmd,
