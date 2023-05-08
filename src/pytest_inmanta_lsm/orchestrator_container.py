@@ -34,7 +34,6 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     paths = env_vars["PATH"].split(":")
     new_paths = ":".join([x for x in paths if ".env/bin" not in x])
     env_vars["PATH"] = new_paths
-    LOGGER.info(f"env_vars-123: {env_vars}")
     print(f"env_vars-123: {env_vars}")
     result = subprocess.run(
         args=cmd,
