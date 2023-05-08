@@ -1,5 +1,6 @@
 # v 2.0.0 (?)
 Changes in this release:
+- Fix bug about subprocesses started in the docker container that used the local venv of the composer venv and not the global venv.
 - Update caching mechanism, don't keep project venv in between test session.
 - Halt environment after the full test suite, resume it before each test run. (the environment can be left running using `--lsm-no-halt` option)
 - Don't sync local project's cfcache to the remote orchestrator
