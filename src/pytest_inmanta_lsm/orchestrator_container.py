@@ -31,9 +31,11 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     LOGGER.info(f"Running command: {cmd}")
     env_vars = dict(os.environ)
     env_vars["PYTHONNOUSERSITE"] = ""
-    path = env_vars["PATH"]
-    LOGGER.info(f"path-123: {path}")
-    print(f"path-123: {path}")
+    paths = env_vars["PATH"].split(":")
+    new_paths = ":".join([x for x in paths if ".env/bin" not in x])
+    env_vars["PATH"] = new_paths
+    LOGGER.info(f"env_vars-123: {env_vars}")
+    print(f"env_vars-123: {env_vars}")
     result = subprocess.run(
         args=cmd,
         cwd=str(cwd),
