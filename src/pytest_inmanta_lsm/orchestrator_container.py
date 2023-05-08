@@ -31,6 +31,7 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     LOGGER.info(f"Running command: {cmd}")
     env_vars = dict(os.environ)
     env_vars["PYTHONNOUSERSITE"] = ""
+    print(env_vars["PATH"])
     result = subprocess.run(
         args=cmd,
         cwd=str(cwd),
