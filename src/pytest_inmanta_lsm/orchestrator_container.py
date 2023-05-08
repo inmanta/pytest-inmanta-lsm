@@ -7,6 +7,7 @@
 """
 import json
 import logging
+import os
 import shutil
 import subprocess
 from configparser import Interpolation
@@ -28,6 +29,8 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     if the command failed.
     """
     LOGGER.info(f"Running command: {cmd}")
+    env_vars = dict(os.environ)
+    env_vars["PYTHONNOUSERSITE"] = ""
     result = subprocess.run(
         args=cmd,
         cwd=str(cwd),
@@ -36,7 +39,7 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
         encoding="utf-8",
         text=True,
         universal_newlines=True,
-        env={"PYTHONNOUSERSITE": ""},
+        env=env_vars,
     )
     LOGGER.debug(f"Return code: {result.returncode}")
     LOGGER.debug("Stdout: %s", result.stdout)
