@@ -30,7 +30,7 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     """
     LOGGER.info(f"Running command: {cmd}")
     env_vars = dict(os.environ)
-    del env_vars["PYTHONPATH"]
+    env_vars.pop("PYTHONPATH", None)
     result = subprocess.run(
         args=cmd,
         cwd=str(cwd),
