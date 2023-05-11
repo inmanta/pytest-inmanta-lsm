@@ -259,7 +259,7 @@ class LsmProject:
         all_bindings: dict[str, inmanta.execute.proxy.DynamicProxy] = {
             instance.service_entity: instance
             for binding_type in ["lsm::ServiceEntityBinding", "lsm::ServiceEntityBindingV2"]
-            for instance in self.project.get_instances(binding_type)
+            for instance in (self.project.get_instances(binding_type) if binding_type in self.project.types else [])
         }
 
         exporter = self.project._exporter
@@ -268,7 +268,6 @@ class LsmProject:
         service_entity_catalog = {
             service_entity_binding.service_entity_name: inmanta_plugins.lsm.ServiceEntityBuilder.get_service_entity_from_model(
                 env=tid,
-                all_bindings=all_bindings,
                 entity_binding=service_entity_binding,
                 entity_type=exporter.types[service_entity_binding.service_entity],
             )
