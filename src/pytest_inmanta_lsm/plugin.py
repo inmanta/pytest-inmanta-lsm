@@ -21,9 +21,8 @@ import pytest_inmanta.plugin
 import requests
 from inmanta import module
 from packaging import version
-from pytest_inmanta.parameters import inm_mod_in_place
 from pytest_inmanta.plugin import Project
-from pytest_inmanta.test_parameter import ParameterNotSetException
+from pytest_inmanta.test_parameter import ParameterNotSetException, StringTestParameter
 
 from pytest_inmanta_lsm import lsm_project
 from pytest_inmanta_lsm.orchestrator_container import (
@@ -46,6 +45,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_env_name,
     inm_lsm_host,
     inm_lsm_no_clean,
+    inm_lsm_no_halt,
     inm_lsm_partial_compile,
     inm_lsm_project_name,
     inm_lsm_srv_port,
@@ -54,7 +54,10 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_ssl,
     inm_lsm_token,
 )
-from pytest_inmanta_lsm.remote_orchestrator import RemoteOrchestrator
+from pytest_inmanta_lsm.remote_orchestrator import (
+    OrchestratorEnvironment,
+    RemoteOrchestrator,
+)
 
 try:
     # make sure that lsm methods are loaded
@@ -123,17 +126,11 @@ def remote_orchestrator_container(
 
 @pytest.fixture(scope="session")
 def remote_orchestrator_environment(request: pytest.FixtureRequest) -> str:
+    """
+    Returns the id of the environment on the remote orchestrator that should be used for this
+    test suite.  If the environment doesn't exist, it will be created.
+    """
     return inm_lsm_env.resolve(request.config)
-
-
-@pytest.fixture(scope="session")
-def remote_orchestrator_environment_name(request: pytest.FixtureRequest) -> str:
-    return inm_lsm_env_name.resolve(request.config)
-
-
-@pytest.fixture(scope="session")
-def remote_orchestrator_project_name(request: pytest.FixtureRequest) -> str:
-    return inm_lsm_project_name.resolve(request.config)
 
 
 @pytest.fixture(scope="session")
@@ -143,6 +140,16 @@ def remote_orchestrator_no_clean(request: pytest.FixtureRequest) -> bool:
     Returns True if the orchestrator should be left as is, False otherwise.
     """
     return inm_lsm_no_clean.resolve(request.config)
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_no_halt(request: pytest.FixtureRequest) -> bool:
+    """
+    Check if the user specified that the orchestrator shouldn't be halted up after the test suite
+    has finished running.
+    Returns True if the orchestrator should be left running, False otherwise.
+    """
+    return inm_lsm_no_halt.resolve(request.config)
 
 
 @pytest.fixture(scope="session")
@@ -168,7 +175,7 @@ def remote_orchestrator_host(
     for _ in range(0, 10):
         try:
             http = "https" if inm_lsm_ssl.resolve(request.config) else "http"
-            response = requests.get(f"{http}://{host}:{port}/api/v1/serverstatus", timeout=1, verify=False)
+            response = requests.get(f"{http}://{host}:{port}/api/v1/serverstatus", timeout=2, verify=False)
             response.raise_for_status()
         except Exception as exc:
             LOGGER.warning(str(exc))
@@ -197,74 +204,81 @@ def remote_orchestrator_partial(request: pytest.FixtureRequest) -> Iterator[bool
     yield inm_lsm_partial_compile.resolve(request.config)
 
 
+def verify_v2_editable_install() -> None:
+    """
+    Verify that if our module is a v2, it is correctly installed, in editable mode.
+    """
+    mod: module.Module
+    mod, _ = pytest_inmanta.plugin.get_module()
+
+    if isinstance(mod, module.ModuleV1):
+        # Module v1 installed, it can't be badly installed, we exit here.
+        return
+
+    # mod object is constructed from the source dir: it does not contain all installation metadata
+    installed: Optional[module.ModuleV2] = module.ModuleV2Source(urls=[]).get_installed_module(None, mod.name)
+
+    # Generic message to help fix any of the problems reported below
+    how_to_fix = (
+        "To ensure the remote orchestrator uses the same code as the local project, please install the module"
+        " with `inmanta module install -e .` before running the tests."
+    )
+
+    if installed is None:
+        # Make sure that the module v2 source can be found, it should always be the case, unless
+        # this fixture is used outside of the context of a module test suite.
+        LOGGER.error("The module being tested is not installed.  %s", how_to_fix)
+    elif not installed.is_editable():
+        # Make sure that the module is installed in editable mode
+        LOGGER.error("The module being tested is not installed in editable mode.  %s", how_to_fix)
+    elif not os.path.samefile(installed.path, mod.path):
+        # Make sure that the source of the module installed in editable mode is the same one
+        # used by pytest-inmanta
+        LOGGER.error(
+            (
+                "%s is installed in editable mode but its path doesn't match the path of the module"
+                " being tested: %s != %s.  %s"
+            ),
+            mod.name,
+            installed.path,
+            mod.path,
+            how_to_fix,
+        )
+    else:
+        # Everything is okay, we exit here
+        return
+
+    # We didn't exit, there was a failure, so we raise an exception
+    raise RuntimeError(f"Module at {mod.path} should be installed in editable mode.  See logs for details.")
+
+
 @pytest.fixture(scope="session")
-def remote_orchestrator_project_shared(request: pytest.FixtureRequest, project_shared: Project) -> Iterator[None]:
-    """
-    Shared project to be used by the remote orchestrator. Ensures the module being tested is synced to the remote orchestrator
-    even if it is a v2 module.
-    """
-    in_place = inm_mod_in_place.resolve(request.config)
-    # no need to do anything if this version of inmanta does not support v2 modules or if in_place already adds it to the path
-    if hasattr(module, "ModuleV2") and not in_place:
-        mod: module.Module
-        mod, _ = pytest_inmanta.plugin.get_module()
-
-        # mod object is constructed from the source dir: it does not contain all installation metadata
-        installed: Optional[module.ModuleV2] = module.ModuleV2Source(urls=[]).get_installed_module(None, mod.name)
-        if isinstance(mod, module.ModuleV1):
-            # no need to do anything for v1 module except raise a warning in some edge scenarios
-            if installed is not None:
-                LOGGER.warning(
-                    "The module being tested is a v1 module but it is also installed as a v2 module. Local compiles will use"
-                    "the v2, but only the v1 will by synced to the server."
-                )
-        else:
-            # put v2 module in libs dir so it will be rsynced to the server
-            if not installed.is_editable() or not os.path.samefile(installed.path, mod.path):
-                LOGGER.warning(
-                    "The module being tested is not installed in editable mode. To ensure the remote orchestrator uses the same"
-                    " code as the local project, please install the module with `inmanta module install -e .` before running"
-                    " the tests."
-                )
-            destination: str = os.path.join(project_shared._test_project_dir, "libs", mod.name)
-            assert not os.path.exists(
-                destination
-            ), "Invalid state: expected clean libs dir, this is most likely an issue with the implementation of this fixture"
-            # can't rsync and install a non-editable Python package the same way as an editable one (no pyproject.toml/setup.py)
-            # => always use the test dir, even if the module is installed in non-editable mode (the user has been warned)
-            shutil.copytree(mod.path, destination)
-    yield
-
-
-@pytest.fixture
-def remote_orchestrator_project(remote_orchestrator_project_shared: None, project: Project) -> Iterator[Project]:
-    """
-    Project to be used by the remote orchestrator. Yields the same object as the plain project fixture but ensures the
-    module being tested is synced to the remote orchestrator even if it is a v2 module.
-    """
-    yield project
-
-
-@pytest.fixture
-def remote_orchestrator(
+def remote_orchestrator_shared(
     request: pytest.FixtureRequest,
-    remote_orchestrator_project: Project,
-    remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
+    project_shared: Project,
     remote_orchestrator_container: Optional[OrchestratorContainer],
     remote_orchestrator_environment: str,
     remote_orchestrator_no_clean: bool,
+    remote_orchestrator_no_halt: bool,
     remote_orchestrator_host: Tuple[str, int],
-    remote_orchestrator_partial: bool,
-    remote_orchestrator_project_name: str,
-    remote_orchestrator_environment_name: str,
 ) -> Iterator[RemoteOrchestrator]:
+    """
+    Session fixture to setup the `RemoteOrchestrator` object that will be used to sync our project
+    to the remote orchestrator environment.  This fixture also makes sure that if the module being
+    tested is v2, it is installed in editable mode, as it is required to send it to the remote
+    orchestrator.
+    """
+    # no need to do anything if this version of inmanta does not support v2 modules
+    if hasattr(module, "ModuleV2"):
+        verify_v2_editable_install()
+
     LOGGER.info("Setting up remote orchestrator")
 
     host, port = remote_orchestrator_host
 
     if remote_orchestrator_container is None:
         ssh_user = inm_lsm_ssh_user.resolve(request.config)
-        ssh_port = str(inm_lsm_ssh_port.resolve(request.config))
+        ssh_port = inm_lsm_ssh_port.resolve(request.config)
         container_env = inm_lsm_container_env.resolve(request.config)
     else:
         # If the orchestrator is running in a container we deployed ourself, we overwrite
@@ -272,7 +286,7 @@ def remote_orchestrator(
         # If the container image behaves differently than assume, those value won't work,
         # no mechanism exists currently to work around this.
         ssh_user = "inmanta"
-        ssh_port = "22"
+        ssh_port = 22
         container_env = True
 
     ssl = inm_lsm_ssl.resolve(request.config)
@@ -285,11 +299,94 @@ def remote_orchestrator(
         ):
             LOGGER.warning("SSL currently doesn't work with the default docker-compose file.")
 
-    token: Optional[str]
-    try:
-        token = inm_lsm_token.resolve(request.config)
-    except ParameterNotSetException:
-        token = None
+    def get_optional_option(option: StringTestParameter) -> Optional[str]:
+        try:
+            return option.resolve(request.config)
+        except ParameterNotSetException:
+            return None
+
+    token = get_optional_option(inm_lsm_token)
+    environment_name = get_optional_option(inm_lsm_env_name)
+    project_name = get_optional_option(inm_lsm_project_name)
+
+    remote_orchestrator = RemoteOrchestrator(
+        OrchestratorEnvironment(
+            id=UUID(remote_orchestrator_environment),
+            name=environment_name,
+            project=project_name,
+        ),
+        host=host,
+        port=port,
+        ssh_user=ssh_user,
+        ssh_port=ssh_port,
+        ssl=ssl,
+        token=token,
+        ca_cert=ca_cert,
+        container_env=container_env,
+    )
+
+    # Make sure we start our test suite with a clean environment
+    remote_orchestrator.clear_environment()
+
+    # Get the former cached modules back into the project to speed up
+    # subsequent test cases
+    remote_orchestrator.restore_libs_folder()
+
+    yield remote_orchestrator
+
+    # Cache the content of the libs folder for later calls to the orchestrator
+    remote_orchestrator.cache_libs_folder()
+
+    # If --lsm-no-clean is used, leave the orchestrator as it is, with all its
+    # file, otherwise cleanup the project
+    if not remote_orchestrator_no_clean:
+        remote_orchestrator.clear_environment()
+
+    # If --lsm-no-halt is used, leave the orchestrator running at the end of the
+    # test suite.  Otherwise the environment is halted.
+    if not remote_orchestrator_no_halt:
+        remote_orchestrator.client.halt_environment(remote_orchestrator.environment)
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_environment_name(remote_orchestrator_shared: RemoteOrchestrator) -> str:
+    """
+    Get the name of the environment in use on the remote orchestrator.  This value can be set
+    using the `--lsm-environment-name` option.
+    """
+    return remote_orchestrator_shared.orchestrator_environment.get_environment(remote_orchestrator_shared.client).name
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_project_name(remote_orchestrator_shared: RemoteOrchestrator) -> str:
+    """
+    Get the name of the project the environment on the remote orchestrator is in.  This value can
+    be set using the `--lsm-project-name` option.
+    """
+    return remote_orchestrator_shared.orchestrator_environment.get_project(remote_orchestrator_shared.client).name
+
+
+@pytest.fixture
+def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, project: Project) -> Iterator[Project]:
+    """
+    Project to be used by the remote orchestrator. Yields the same object as the plain project fixture but ensures the
+    module being tested is synced to the remote orchestrator even if it is a v2 module.
+    """
+    # Reload the config after the project fixture has run
+    remote_orchestrator_shared.setup_config()
+
+    yield project
+
+
+@pytest.fixture
+def remote_orchestrator(
+    remote_orchestrator_shared: RemoteOrchestrator,
+    remote_orchestrator_project: Project,
+    remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
+    remote_orchestrator_partial: bool,
+) -> RemoteOrchestrator:
+    # Clean environment, but keep project files
+    remote_orchestrator_shared.clear_environment(soft=True)
 
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
@@ -305,33 +402,18 @@ def remote_orchestrator(
     }
     settings.update(remote_orchestrator_settings)
 
-    remote_orchestrator = RemoteOrchestrator(
-        host=host,
-        ssh_user=ssh_user,
-        ssh_port=ssh_port,
-        environment=UUID(remote_orchestrator_environment),
-        project=remote_orchestrator_project,
-        settings=settings,
-        noclean=remote_orchestrator_no_clean,
-        ssl=ssl,
-        token=token,
-        ca_cert=ca_cert,
-        container_env=container_env,
-        port=port,
-        project_name=remote_orchestrator_project_name,
-        environment_name=remote_orchestrator_environment_name,
-    )
-    remote_orchestrator.clean()
+    # Update the settings on the orchestrator
+    for k, v in settings.items():
+        remote_orchestrator_shared.client.set_setting(remote_orchestrator_shared.environment, k, v)
 
-    yield remote_orchestrator
-    remote_orchestrator.pre_clean()
+    # Make sure the environment is running
+    remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
 
-    if not remote_orchestrator_no_clean:
-        remote_orchestrator.clean()
+    return remote_orchestrator_shared
 
 
 @pytest.fixture
-def unittest_lsm(project) -> Iterator[None]:
+def unittest_lsm(project: Project) -> Iterator[None]:
     """
     Adds a module named unittest_lsm to the project with a simple resource that always deploys successfully. The module is
     compatible with the remote orchestrator fixtures.

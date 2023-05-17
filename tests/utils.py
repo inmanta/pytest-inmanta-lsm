@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from configparser import ConfigParser
 from importlib.abc import Loader
 from types import ModuleType
 from typing import Iterator, Optional, Sequence, Tuple
@@ -24,11 +25,22 @@ from inmanta import env
 def add_version_constraint_to_project(project_dir: py.path.local):
     constraints = os.environ.get("INMANTA_LSM_MODULE_CONSTRAINTS", "")
     if constraints:
-        with open(project_dir / "module.yml", "r") as fh:
-            module_config = yaml.safe_load(fh)
-            module_config["requires"] = constraints.split(";")
-        with open(project_dir / "module.yml", "w") as fh:
-            yaml.dump(module_config, fh)
+        if os.path.exists(project_dir / "module.yml"):  # v1 module
+            with open(project_dir / "module.yml", "r") as fh:
+                module_config = yaml.safe_load(fh)
+                module_config["requires"] = constraints.split(";")
+            with open(project_dir / "module.yml", "w") as fh:
+                yaml.dump(module_config, fh)
+        else:  # v2 module
+            parser = ConfigParser()
+            parser.read(str(project_dir / "setup.cfg"))
+            existing_requires: str = parser.get("options", "install_requires", fallback="").strip()
+            if existing_requires:
+                existing_requires = existing_requires + "\n"
+            constraints_list = [f"inmanta-module-{c}" for c in constraints.split(";")]
+            parser.set("options", "install_requires", "\n" + existing_requires + "\n".join(constraints_list))
+            with open(project_dir / "setup.cfg", "w") as fh:
+                parser.write(fh)
 
 
 # ported from pytest-inmanta
@@ -53,6 +65,7 @@ def module_v2_venv(module_path: str) -> Iterator[env.VirtualEnv]:
                 "-X",
                 "module",
                 "install",
+                "-e",
                 module_path,
             ],
         )
