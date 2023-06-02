@@ -489,7 +489,7 @@ class RemoteOrchestrator:
         # All the files to exclude when syncing the project, either because
         # we will sync them separately later, or because their content doesn't
         # have anything to do on the remote orchestrator
-        excludes = [".env", "env", ".cfcache"]
+        excludes = [".env", "env", ".cfcache", "__pycache__"]
 
         # Exclude modules dirs, as we will sync them separately later
         for modules_dir_path in modules_dir_paths:
@@ -521,7 +521,7 @@ class RemoteOrchestrator:
             self.sync_local_folder(
                 local_folder=pathlib.Path(module._path),  # Use ._path instead of .path to stay backward compatible with iso4
                 remote_folder=libs_path / module.name,
-                excludes=[],
+                excludes=["__pycache__"],
             )
 
             synced_modules.add(module.name)

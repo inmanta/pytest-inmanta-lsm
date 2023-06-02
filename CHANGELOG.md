@@ -1,5 +1,6 @@
 # v 3.1.0 (?)
 Changes in this release:
+- Ignore `__pycache__` dirs when rsyncing the project to the remote orchestrator
 
 # v 3.0.0 (2023-05-17)
 Changes in this release:
