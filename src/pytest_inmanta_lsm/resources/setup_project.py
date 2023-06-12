@@ -27,6 +27,7 @@ logging.root.setLevel(logging.DEBUG)
 
 LOGGER = logging.getLogger(project_path.name)
 
+
 @contextlib.contextmanager
 def env_vars(var: abc.Mapping[str, str]) -> abc.Iterator[None]:
     """
