@@ -325,12 +325,12 @@ class RemoteOrchestrator:
                     f"{self.ssh_user}@{self.host}",
                     cmd,
                 ],
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 universal_newlines=True,
             )
         except subprocess.CalledProcessError as e:
             LOGGER.error("Failed to execute command: %s", cmd)
-            LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
+            LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stdout))
             raise e
 
     def run_command_with_server_env(

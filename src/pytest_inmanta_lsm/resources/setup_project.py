@@ -18,24 +18,14 @@ from inmanta import env, module
 # The project_path has to be provided in env var
 project_path = pathlib.Path(os.environ["PROJECT_PATH"])
 
-LOGGER = logging.getLogger(project_path.name)
-
-try:
-    # Setup logging, this logic is taken from inmanta (non stable api)
-    # https://github.com/inmanta/inmanta-core/blob/47d26e6a441bcbb3766c688c4891505690b2db58/src/inmanta/app.py#L708
-    from inmanta.app import _get_default_stream_handler
-
-    stream_handler = _get_default_stream_handler()
-except Exception as e:
-    stream_handler = logging.StreamHandler(stream=sys.stdout)
-    stream_handler.setLevel(logging.INFO)
-
-    print(str(e))
+stream_handler = logging.StreamHandler(stream=sys.stdout)
+stream_handler.setLevel(logging.DEBUG)
 
 logging.root.handlers = []
 logging.root.addHandler(stream_handler)
 logging.root.setLevel(logging.DEBUG)
 
+LOGGER = logging.getLogger(project_path.name)
 
 @contextlib.contextmanager
 def env_vars(var: abc.Mapping[str, str]) -> abc.Iterator[None]:
