@@ -218,7 +218,7 @@ export INMANTA_LSM_USER=<user>
  ```bash
 export INMANTA_MODULE_REPO=https://USER:LICENSE_TOKEN@modules.inmanta.com/git/inmanta-service-orchestrator/5/{}.git
 ```
-Information on how to configure a Python package repository for V2 modules, instead of a Git URL, can be found (here)[https://github.com/inmanta/pytest-inmanta#options].
+Information on how to configure a Python package repository for V2 modules, instead of a Git URL, can be found [here](https://github.com/inmanta/pytest-inmanta#options).
 
 4. run the tests
 
