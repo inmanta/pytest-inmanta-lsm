@@ -2,6 +2,8 @@
 Changes in this release:
 - Ignore `__pycache__` dirs when rsyncing the project to the remote orchestrator
 - Fix issue where the output of pip is not displayed in the log when the pip command fails.
+- Add information to the README on how to configure a Python package repository for V2 modules.
+- Cleanup the settings overview in the README to prevent confusion regarding the name of the environment variable associated with a config option.
 
 # v 3.0.0 (2023-05-17)
 Changes in this release:
