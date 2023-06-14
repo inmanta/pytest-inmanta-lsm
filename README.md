@@ -109,7 +109,7 @@ The following options are available, each with a corresponding environment varia
 
 ```
 pytest-inmanta-lsm:
-  --lsm-ca-cert=LSM_CA_CERT
+  --lsm-ca-cert
                         The path to the CA certificate file used to authenticate
                         the remote orchestrator. (overrides INMANTA_LSM_CA_CERT)
   --lsm-container-env   If set to true, expect the orchestrator to be running in
@@ -120,45 +120,45 @@ pytest-inmanta-lsm:
   --lsm-ctr             If set, the fixtures will deploy and orchestrator on the
                         host, using docker (overrides INMANTA_LSM_CONTAINER,
                         defaults to False)
-  --lsm-ctr-cfg-file=LSM_CTR_CFG_FILE
+  --lsm-ctr-cfg-file
                         A path to a config file that should be loaded inside the
                         container a server conf. (overrides
                         INMANTA_LSM_CONTAINER_CONFIG_FILE, defaults to
                         src/pytest_inmanta_lsm/resources/my-server-
                         conf.cfg)
-  --lsm-ctr-compose-file=LSM_CTR_COMPOSE_FILE
+  --lsm-ctr-compose-file
                         The path to a docker-compose file, that should be used
                         to setup an orchestrator (overrides
                         INMANTA_LSM_CONTAINER_COMPOSE_FILE, defaults to
                         src/pytest_inmanta_lsm/resources/docker-
                         compose.yml)
-  --lsm-ctr-db-version=LSM_CTR_DB_VERSION
+  --lsm-ctr-db-version
                         The version of postgresql to use for the db of the
                         orchestrator (overrides
                         INMANTA_LSM_CONTAINER_DB_VERSION, defaults to 10)
-  --lsm-ctr-env-file=LSM_CTR_ENV_FILE
+  --lsm-ctr-env-file
                         A path to an env file that should be loaded in the
                         container. (overrides INMANTA_LSM_CONTAINER_ENV_FILE,
                         defaults to
                         src/pytest_inmanta_lsm/resources/my-env-file)
-  --lsm-ctr-image=LSM_CTR_IMAGE
+  --lsm-ctr-image
                         The container image to use for the orchestrator
                         (overrides INMANTA_LSM_CONTAINER_IMAGE, defaults to
                         containers.inmanta.com/containers/service-
                         orchestrator:4)
-  --lsm-ctr-jwe-file=LSM_CTR_JWE_FILE
+  --lsm-ctr-jwe-file
                         A path to an entitlement file, required by the
                         orchestrator (overrides INMANTA_LSM_CONTAINER_JWE_FILE,
                         defaults to /etc/inmanta/license/com.inmanta.jwe)
-  --lsm-ctr-license-file=LSM_CTR_LICENSE_FILE
+  --lsm-ctr-license-file
                         A path to a license file, required by the orchestrator
                         (overrides INMANTA_LSM_CONTAINER_LICENSE_FILE, defaults
                         to /etc/inmanta/license/com.inmanta.license)
-  --lsm-ctr-pub-key-file=LSM_CTR_PUB_KEY_FILE
+  --lsm-ctr-pub-key-file
                         A path to a public key that should be set in the
                         container (overrides INMANTA_LSM_CONTAINER_PUB_KEY_FILE,
                         defaults to $HOME/.ssh/id_rsa.pub)
-  --lsm-environment=LSM_ENVIRONMENT
+  --lsm-environment
                         The environment to use on the remote server (is created
                         if it doesn't exist) (overrides INMANTA_LSM_ENVIRONMENT,
                         defaults to 719c7ad5-6657-444b-b536-a27174cb7498)
@@ -168,19 +168,19 @@ pytest-inmanta-lsm:
   --lsm-no-clean        Don't cleanup the orchestrator after tests (for
                         debugging purposes) (overrides INMANTA_LSM_NO_CLEAN,
                         defaults to False)
-  --lsm-srv-port=LSM_SRV_PORT
+  --lsm-srv-port
                         Port the orchestrator api is listening to (overrides
                         INMANTA_LSM_SRV_PORT, defaults to 8888)
-  --lsm-ssh-port=LSM_SSH_PORT
+  --lsm-ssh-port
                         Port to use to ssh to the remote orchestrator (overrides
                         INMANTA_LSM_SSH_PORT, defaults to 22)
-  --lsm-ssh-user=LSM_SSH_USER
+  --lsm-ssh-user
                         Username to use to ssh to the remote orchestrator
                         (overrides INMANTA_LSM_SSH_USER, defaults to centos)
   --lsm-ssl             [True | False] Choose whether to use SSL/TLS or not when
                         connecting to the remote orchestrator. (overrides
                         INMANTA_LSM_SSL, defaults to False)
-  --lsm-token=LSM_TOKEN
+  --lsm-token
                         The token used to authenticate to the remote
                         orchestrator when authentication is enabled. (overrides
                         INMANTA_LSM_TOKEN)
