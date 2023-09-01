@@ -28,3 +28,4 @@ directories_to_lint:
     - examples
     - src
     - tests
+python_binary: python3.9
