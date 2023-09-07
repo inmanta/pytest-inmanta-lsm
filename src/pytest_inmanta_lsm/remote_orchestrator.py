@@ -581,7 +581,8 @@ class RemoteOrchestrator:
             cache_folder = f"mkdir -p {project_path} && rm -rf {project_cache_path} && mv {project_path} {project_cache_path}"
             self.run_command([cache_folder], shell=True)
 
-        self.client.environment_clear(self.environment)
+        result = self.client.environment_clear(self.environment)
+        assert result.code in range(200, 300), str(result.result)
 
         if soft:
             LOGGER.debug("Restore project from cache")
