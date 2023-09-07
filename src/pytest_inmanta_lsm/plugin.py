@@ -405,8 +405,9 @@ def remote_orchestrator(
 
     # Update the settings on the orchestrator
     for k, v in settings.items():
-        result = remote_orchestrator_shared.client.set_setting(remote_orchestrator_shared.environment, k, v)
-        assert result.code in range(200, 300), str(result.result)
+        # We don't check the result here as some options might not exist is some versions of the
+        # orchestrator.
+        remote_orchestrator_shared.client.set_setting(remote_orchestrator_shared.environment, k, v)
 
     # Make sure the environment is running
     result = remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
