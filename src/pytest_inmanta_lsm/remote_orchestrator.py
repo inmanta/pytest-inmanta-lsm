@@ -206,8 +206,12 @@ class RemoteOrchestrator:
         self.ca_cert = ca_cert
         self.container_env = container_env
 
-        self.setup_config()
+        # Build the client once, it loads the config on every call
         self.client = inmanta.protocol.endpoints.SyncClient("client")
+
+        # Setting up the client when the config is loaded
+        self.setup_config()
+
         self.orchestrator_environment.configure_environment(self.client)
         self.server_version = self._get_server_version()
 
@@ -581,7 +585,8 @@ class RemoteOrchestrator:
             cache_folder = f"mkdir -p {project_path} && rm -rf {project_cache_path} && mv {project_path} {project_cache_path}"
             self.run_command([cache_folder], shell=True)
 
-        self.client.environment_clear(self.environment)
+        result = self.client.environment_clear(self.environment)
+        assert result.code in range(200, 300), str(result.result)
 
         if soft:
             LOGGER.debug("Restore project from cache")

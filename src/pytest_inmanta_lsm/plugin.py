@@ -337,6 +337,9 @@ def remote_orchestrator_shared(
     # Cache the content of the libs folder for later calls to the orchestrator
     remote_orchestrator.cache_libs_folder()
 
+    # Configure the client once more, to make sure we can cleanup everything behind us
+    remote_orchestrator.setup_config()
+
     # If --lsm-no-clean is used, leave the orchestrator as it is, with all its
     # file, otherwise cleanup the project
     if not remote_orchestrator_no_clean:
@@ -345,7 +348,8 @@ def remote_orchestrator_shared(
     # If --lsm-no-halt is used, leave the orchestrator running at the end of the
     # test suite.  Otherwise the environment is halted.
     if not remote_orchestrator_no_halt:
-        remote_orchestrator.client.halt_environment(remote_orchestrator.environment)
+        result = remote_orchestrator.client.halt_environment(remote_orchestrator.environment)
+        assert result.code in range(200, 300), str(result.result)
 
 
 @pytest.fixture(scope="session")
@@ -404,10 +408,13 @@ def remote_orchestrator(
 
     # Update the settings on the orchestrator
     for k, v in settings.items():
+        # We don't check the result here as some options might not exist is some versions of the
+        # orchestrator.
         remote_orchestrator_shared.client.set_setting(remote_orchestrator_shared.environment, k, v)
 
     # Make sure the environment is running
-    remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
+    result = remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
+    assert result.code in range(200, 300), str(result.result)
 
     return remote_orchestrator_shared
 
