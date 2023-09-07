@@ -317,9 +317,7 @@ class ManagedServiceInstance:
         """
         if timeout is None:
             # Get the current deploy interval from the environment settings
-            environment = self.remote_orchestrator.orchestrator_environment.get_environment(
-                self.remote_orchestrator.client
-            )
+            environment = self.remote_orchestrator.orchestrator_environment.get_environment(self.remote_orchestrator.client)
             autostart_agent_deploy_interval: int = environment.settings["autostart_agent_deploy_interval"]
 
             # Set as default timeout twice the deploy interval, this should help with agent backoff
