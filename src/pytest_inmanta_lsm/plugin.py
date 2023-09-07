@@ -337,6 +337,9 @@ def remote_orchestrator_shared(
     # Cache the content of the libs folder for later calls to the orchestrator
     remote_orchestrator.cache_libs_folder()
 
+    # Configure the client once more, to make sure we can cleanup everything behind us
+    remote_orchestrator.setup_config()
+
     # If --lsm-no-clean is used, leave the orchestrator as it is, with all its
     # file, otherwise cleanup the project
     if not remote_orchestrator_no_clean:
