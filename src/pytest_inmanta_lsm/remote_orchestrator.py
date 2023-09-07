@@ -206,8 +206,10 @@ class RemoteOrchestrator:
         self.ca_cert = ca_cert
         self.container_env = container_env
 
+        # Build the client once, it loads the config on every call
+        self.client = inmanta.protocol.endpoints.SyncClient("client")
+
         # Setting up the client when the config is loaded
-        self.client: inmanta.protocol.endpoints.SyncClient
         self.setup_config()
 
         self.orchestrator_environment.configure_environment(self.client)
@@ -254,8 +256,6 @@ class RemoteOrchestrator:
                     inmanta_config.Config.set(section, "ssl_ca_cert_file", self.ca_cert)
             if self.token:
                 inmanta_config.Config.set(section, "token", self.token)
-
-        self.client = inmanta.protocol.endpoints.SyncClient("client")
 
     def _get_server_version(self) -> Version:
         """
