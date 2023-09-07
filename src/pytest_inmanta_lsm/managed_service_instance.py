@@ -291,7 +291,7 @@ class ManagedServiceInstance:
         states: Optional[Collection[str]] = None,
         version: Optional[int] = None,
         versions: Optional[Collection[int]] = None,
-        timeout: Optional[int] = None,
+        timeout: int = DEFAULT_TIMEOUT,
         bad_states: Collection[str] = ALL_BAD_STATES,
         start_version: Optional[int] = None,
     ) -> None:
@@ -315,16 +315,6 @@ class ManagedServiceInstance:
         :raises VersionMismatchError: If version(s) is(are) provided and the ending state has a version not in it
         :raises VersionExceededError: If version(s) is(are) provided and the current state goes past it(them)
         """
-        if timeout is None:
-            # Get the current deploy interval from the environment settings
-            environment = self.remote_orchestrator.orchestrator_environment.get_environment(self.remote_orchestrator.client)
-            autostart_agent_deploy_interval: int = environment.settings["autostart_agent_deploy_interval"]
-
-            # Set as default timeout twice the deploy interval, this should help with agent backoff
-            # issues.  The minimum value picked is the DEFAULT_TIMEOUT, which remains unchanged, to
-            # stay backward compatible.
-            timeout = max(ManagedServiceInstance.DEFAULT_TIMEOUT, 2 * autostart_agent_deploy_interval)
-
         desired_states: List[str] = []
         if state is None and states is not None:
             desired_states.extend(states)
