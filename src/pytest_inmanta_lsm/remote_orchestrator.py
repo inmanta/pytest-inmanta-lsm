@@ -240,7 +240,6 @@ class RemoteOrchestrator:
     def setup_config(self) -> None:
         """
         Setup the config required to make it possible for the client to reach the orchestrator.
-        The client object is also reconstructed to be sure it load the correct values.
         """
         inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self.environment))
