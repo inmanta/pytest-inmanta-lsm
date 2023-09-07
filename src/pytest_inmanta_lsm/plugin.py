@@ -389,9 +389,6 @@ def remote_orchestrator(
     # Clean environment, but keep project files
     remote_orchestrator_shared.clear_environment(soft=True)
 
-    # Re-create the environment
-    remote_orchestrator_shared.orchestrator_environment.configure_environment(remote_orchestrator_shared.client)
-
     # set the defaults here and lets the fixture override specific values
     settings: Dict[str, Union[bool, str, int]] = {
         "auto_deploy": True,
