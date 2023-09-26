@@ -134,12 +134,7 @@ class OrchestratorEnvironment:
 
         current_project = self.get_project(client)
 
-        updates: dict[str, object] = dict()
-        if self.name is not None and current_environment.name != self.name:
-            # We care about the environment name if it is not a match
-            # We update the environment name
-            updates["name"] = self.name
-
+        updates: dict[str, object] = dict(name=self.name)
         if self.project is not None and current_project.name != self.name:
             # We care about the project name and it is not a match
             # We make sure the project with the desired name exists and
