@@ -358,17 +358,18 @@ class RemoteOrchestrator:
             running on the remote orchestrator.
         """
 
-        if self.container_env:
-            # For container environment, the env var accessible to the orchestrator are
-            # always loaded for the inmanta user.
-            return self.run_command(args, shell=shell, cwd=cwd, env=env, user="inmanta")
-
         if shell:
             assert len(args) == 1, "When running command in a shell, only one arg should be provided"
             cmd = args[0]
         else:
             # Join the command, safely escape all spaces
             cmd = shlex.join(args)
+
+        if self.container_env:
+            # For container environment, the env var accessible to the orchestrator are
+            # always loaded for the inmanta user upon login, so we force the use of a shell,
+            # which will use the bash -l option.
+            return self.run_command([cmd], shell=True, cwd=cwd, env=env, user="inmanta")
 
         # For non container environments, a systemd environment file needs to be loaded
         # This is done using systemd-run
