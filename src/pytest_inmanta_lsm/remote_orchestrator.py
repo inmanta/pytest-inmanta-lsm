@@ -136,11 +136,10 @@ class OrchestratorEnvironment:
 
         updates: dict[str, object] = dict()
         if self.name is not None and current_environment.name != self.name:
-            # We care about the environment name if it is not a match
-            # We update the environment name
+            # If the name is different, we include the name in the change dict
             updates["name"] = self.name
 
-        if self.project is not None and current_project.name != self.name:
+        if self.project is not None and current_project.name != self.project:
             # We care about the project name and it is not a match
             # We make sure the project with the desired name exists and
             # assign our environment to it
@@ -148,6 +147,8 @@ class OrchestratorEnvironment:
 
         if len(updates) > 0:
             # Apply the updates
+            # The name should always be provided
+            updates["name"] = updates.get("name", current_environment.name)
             result = client.environment_modify(
                 id=self.id,
                 **updates,
@@ -358,17 +359,18 @@ class RemoteOrchestrator:
             running on the remote orchestrator.
         """
 
-        if self.container_env:
-            # For container environment, the env var accessible to the orchestrator are
-            # always loaded for the inmanta user.
-            return self.run_command(args, shell=shell, cwd=cwd, env=env, user="inmanta")
-
         if shell:
             assert len(args) == 1, "When running command in a shell, only one arg should be provided"
             cmd = args[0]
         else:
             # Join the command, safely escape all spaces
             cmd = shlex.join(args)
+
+        if self.container_env:
+            # For container environment, the env var accessible to the orchestrator are
+            # always loaded for the inmanta user upon login, so we force the use of a shell,
+            # which will use the bash -l option.
+            return self.run_command([cmd], shell=True, cwd=cwd, env=env, user="inmanta")
 
         # For non container environments, a systemd environment file needs to be loaded
         # This is done using systemd-run

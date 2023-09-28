@@ -5,6 +5,8 @@ Changes in this release:
 - Add information to the README on how to configure a Python package repository for V2 modules.
 - Cleanup the settings overview in the README to prevent confusion regarding the name of the environment variable associated with a config option.
 - Assert that all api calls toward the orchestrator which are expected to succeed actually succeeded.
+- Fix project installation for container environment outside of our lab.
+- Fix environment's project update.
 
 # v 3.0.0 (2023-05-17)
 Changes in this release:
