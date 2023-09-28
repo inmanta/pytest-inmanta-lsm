@@ -10,14 +10,20 @@ import uuid
 
 import inmanta_lsm.model
 
-from pytest_inmanta_lsm import lsm_project
+from pytest_inmanta_lsm import lsm_project, remote_orchestrator
 
 SERVICE_NAME = "vlan-assignment"
 
 
-def test_full_cycle(project, remote_orchestrator):
+def test_full_cycle(project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator):
     # get connection to remote_orchestrator
     client = remote_orchestrator.client
+
+    # Check that run_command_with_server_env loads all the environment variables that the inmanta
+    # user has access to
+    env = remote_orchestrator.run_command_with_server_env(["env"])
+    env_with_login = remote_orchestrator.run_command_with_server_env(["bash", "-l", "-c", "env"])
+    assert env == env_with_login
 
     # setup project
     project.compile(
