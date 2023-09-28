@@ -135,7 +135,7 @@ class OrchestratorEnvironment:
         current_project = self.get_project(client)
 
         updates: dict[str, object] = dict()
-        if current_environment.name != self.name:
+        if self.name is not None and current_environment.name != self.name:
             # If the name is different, we include the name in the change dict
             updates["name"] = self.name
 
@@ -148,8 +148,7 @@ class OrchestratorEnvironment:
         if len(updates) > 0:
             # Apply the updates
             # The name should always be provided
-            assert self.name is not None
-            updates["name"] = self.name
+            updates["name"] = updates.get("name", current_environment.name)
             result = client.environment_modify(
                 id=self.id,
                 **updates,
