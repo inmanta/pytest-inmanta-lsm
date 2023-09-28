@@ -148,6 +148,7 @@ class OrchestratorEnvironment:
         if len(updates) > 0:
             # Apply the updates
             # The name should always be provided
+            assert self.name is not None
             updates["name"] = self.name
             result = client.environment_modify(
                 id=self.id,
