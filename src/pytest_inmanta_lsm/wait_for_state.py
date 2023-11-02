@@ -8,8 +8,9 @@
 
 import logging
 import time
-import devtools
 from typing import Any, Callable, Collection, List, Optional
+
+import devtools
 
 from pytest_inmanta_lsm import managed_service_instance as msi
 from pytest_inmanta_lsm.exceptions import BadStateError, TimeoutError
