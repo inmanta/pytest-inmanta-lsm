@@ -42,10 +42,7 @@ setup(
         ]
     },
     include_package_data=True,
-    install_requires=[
-        "pytest-inmanta~=2.5",
-        "inmanta-lsm",
-    ],
+    install_requires=["pytest-inmanta~=2.5", "inmanta-lsm", "devtools"],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Framework :: Pytest",
