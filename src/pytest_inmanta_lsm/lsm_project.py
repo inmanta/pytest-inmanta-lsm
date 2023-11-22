@@ -27,11 +27,11 @@ INMANTA_LSM_MODULE_NOT_LOADED = (
     "    - If you are using v2 modules: make sure the inmanta-module-lsm is installed in your venv."
 )
 
-# Try to import from inmanta.util.dict_path, if not available pass
+# Try to import from inmanta.util.dict_path, if not available, fall back to the deprecated inmanta_lsm.dict_path
 try:
     from inmanta.util import dict_path
 except ImportError:
-    pass
+    from inmanta_lsm import dict_path  # type: ignore
 
 
 class LsmProject:
