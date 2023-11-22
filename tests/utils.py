@@ -61,9 +61,7 @@ def module_v2_venv(module_path: str) -> Iterator[env.VirtualEnv]:
             [
                 venv.python_path,
                 "-m",
-                "inmanta.app",
-                "-X",
-                "module",
+                "pip",
                 "install",
                 "-e",
                 module_path,
