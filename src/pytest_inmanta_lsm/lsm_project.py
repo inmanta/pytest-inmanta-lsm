@@ -168,7 +168,7 @@ class LsmProject:
         service_entity: str,
         service_id: uuid.UUID,
         current_version: int,
-        attributes: typing.Dict[inmanta_lsm.model.StrictStr, typing.Any],
+        attributes: typing.Dict[str, typing.Any],
     ) -> inmanta.protocol.common.Result:
         """
         This is a mock for the lsm api, this method is called during allocation to update
