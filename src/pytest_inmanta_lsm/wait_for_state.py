@@ -8,8 +8,9 @@
 
 import logging
 import time
-from pprint import pformat
 from typing import Any, Callable, Collection, List, Optional
+
+import devtools
 
 from pytest_inmanta_lsm import managed_service_instance as msi
 from pytest_inmanta_lsm.exceptions import BadStateError, TimeoutError
@@ -97,7 +98,7 @@ class WaitForState(object):
     def __compose_error_msg_with_bad_state_error(self, error_msg: str, current_state: State) -> str:
         bad_state_error = self.__get_bad_state_error(current_state)
         if bad_state_error:
-            error_msg += f", error: {pformat(bad_state_error, indent=4, width=140)}"
+            error_msg += f", error: {devtools.debug.format(bad_state_error)}"
 
         return error_msg
 

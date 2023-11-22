@@ -7,6 +7,8 @@ Changes in this release:
 - Assert that all api calls toward the orchestrator which are expected to succeed actually succeeded.
 - Fix project installation for container environment outside of our lab.
 - Fix environment's project update.
+- Use devtools to improve Diagnosis logging.
+- Improve support for iso7
 
 # v 3.0.0 (2023-05-17)
 Changes in this release:
