@@ -27,6 +27,12 @@ INMANTA_LSM_MODULE_NOT_LOADED = (
     "    - If you are using v2 modules: make sure the inmanta-module-lsm is installed in your venv."
 )
 
+# Try to import from inmanta.util.dict_path, if not available pass
+try:
+    from inmanta.util import dict_path
+except ImportError:
+    pass
+
 
 class LsmProject:
     def __init__(
@@ -202,10 +208,6 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during allocation to update
         the attributes of a V2 service.
         """
-        # Import dict_path library of the lsm extension in the function scope, as it might
-        # not be available for older version of the product
-        from inmanta_lsm import dict_path  # type: ignore
-
         # Making some basic checks
         service = self.services[str(service_id)]
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
