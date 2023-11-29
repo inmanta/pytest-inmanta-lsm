@@ -1,4 +1,4 @@
-# v 3.1.0 (?)
+# v 3.1.0 (2023-11-29)
 Changes in this release:
 - Ignore `__pycache__` dirs when rsyncing the project to the remote orchestrator
 - Fix issue where the output of pip is not displayed in the log when the pip command fails.
