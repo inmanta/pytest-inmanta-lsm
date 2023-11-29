@@ -18,23 +18,14 @@ from inmanta import env, module
 # The project_path has to be provided in env var
 project_path = pathlib.Path(os.environ["PROJECT_PATH"])
 
-LOGGER = logging.getLogger(project_path.name)
-
-try:
-    # Setup logging, this logic is taken from inmanta (non stable api)
-    # https://github.com/inmanta/inmanta-core/blob/47d26e6a441bcbb3766c688c4891505690b2db58/src/inmanta/app.py#L708
-    from inmanta.app import _get_default_stream_handler
-
-    stream_handler = _get_default_stream_handler()
-except Exception as e:
-    stream_handler = logging.StreamHandler(stream=sys.stdout)
-    stream_handler.setLevel(logging.INFO)
-
-    print(str(e))
+stream_handler = logging.StreamHandler(stream=sys.stdout)
+stream_handler.setLevel(logging.DEBUG)
 
 logging.root.handlers = []
 logging.root.addHandler(stream_handler)
 logging.root.setLevel(logging.DEBUG)
+
+LOGGER = logging.getLogger(project_path.name)
 
 
 @contextlib.contextmanager
@@ -90,19 +81,26 @@ for dir in (project_path / "libs").iterdir():
 
 # Install all v2 modules in editable mode using the project's configured package sources
 if v2_modules:
-    urls: abc.Sequence[str] = project.module_source.urls
-    if not urls:
-        raise Exception("No package repos configured for project")
-    # plain Python install so core does not apply project's sources -> we need to configure pip index ourselves
-    with env_vars(
-        {
-            "PIP_INDEX_URL": urls[0],
-            "PIP_PRE": "0" if project.install_mode == module.InstallMode.release else "1",
-            "PIP_EXTRA_INDEX_URL": " ".join(urls[1:]),
-        }
-    ):
-        LOGGER.info(f"Installing modules from source: {[mod.name for mod in v2_modules]}")
-        project.virtualenv.install_from_source([env.LocalPackagePath(mod.path, editable=True) for mod in v2_modules])
+    LOGGER.info(f"Installing modules from source: {[mod.name for mod in v2_modules]}")
+    paths = [env.LocalPackagePath(mod.path, editable=True) for mod in v2_modules]
+
+    if hasattr(project.virtualenv, "install_for_config"):
+        # For ISO7
+        project.virtualenv.install_for_config([], project.metadata.pip, paths=paths)
+    else:
+        # Pre ISO7
+        # plain Python install so core does not apply project's sources -> we need to configure pip index ourselves
+        urls: abc.Sequence[str] = project.module_source.urls
+        if not urls:
+            raise Exception("No package repos configured for project")
+        with env_vars(
+            {
+                "PIP_INDEX_URL": urls[0],
+                "PIP_PRE": "0" if project.install_mode == module.InstallMode.release else "1",
+                "PIP_EXTRA_INDEX_URL": " ".join(urls[1:]),
+            }
+        ):
+            project.virtualenv.install_from_source(paths)
 
 # Install all other dependencies
 LOGGER.info("Installing other project dependencies")

@@ -16,6 +16,7 @@ import inmanta.protocol.common
 import inmanta.util
 import inmanta_lsm.const
 import inmanta_lsm.model
+import pydantic.types
 import pytest
 import pytest_inmanta.plugin
 
@@ -26,6 +27,12 @@ INMANTA_LSM_MODULE_NOT_LOADED = (
     "fixture has been executed.\n"
     "    - If you are using v2 modules: make sure the inmanta-module-lsm is installed in your venv."
 )
+
+# Try to import from inmanta.util.dict_path, if not available, fall back to the deprecated inmanta_lsm.dict_path
+try:
+    from inmanta.util import dict_path
+except ImportError:
+    from inmanta_lsm import dict_path
 
 
 class LsmProject:
@@ -162,7 +169,7 @@ class LsmProject:
         service_entity: str,
         service_id: uuid.UUID,
         current_version: int,
-        attributes: typing.Dict[inmanta_lsm.model.StrictStr, typing.Any],
+        attributes: typing.Dict[pydantic.types.StrictStr, typing.Any],
     ) -> inmanta.protocol.common.Result:
         """
         This is a mock for the lsm api, this method is called during allocation to update
@@ -202,10 +209,6 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during allocation to update
         the attributes of a V2 service.
         """
-        # Import dict_path library of the lsm extension in the function scope, as it might
-        # not be available for older version of the product
-        from inmanta_lsm import dict_path  # type: ignore
-
         # Making some basic checks
         service = self.services[str(service_id)]
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
