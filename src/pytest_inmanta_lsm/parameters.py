@@ -152,7 +152,7 @@ inm_lsm_ctr_image = StringTestParameter(
     argument="--lsm-ctr-image",
     environment_variable="INMANTA_LSM_CONTAINER_IMAGE",
     usage="The container image to use for the orchestrator",
-    default="containers.inmanta.com/containers/service-orchestrator:4",
+    default="containers.inmanta.com/containers/service-orchestrator:6",
     group=param_group,
 )
 
@@ -160,7 +160,7 @@ inm_lsm_ctr_db_version = StringTestParameter(
     argument="--lsm-ctr-db-version",
     environment_variable="INMANTA_LSM_CONTAINER_DB_VERSION",
     usage="The version of postgresql to use for the db of the orchestrator",
-    default="10",
+    default="13",
     group=param_group,
 )
 
