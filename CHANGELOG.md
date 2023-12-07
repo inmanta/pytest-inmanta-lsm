@@ -1,5 +1,6 @@
 # v 3.2.0 (?)
 Changes in this release:
+- Update default tags of ISO and postgres containers
 
 # v 3.1.0 (2023-11-29)
 Changes in this release:
