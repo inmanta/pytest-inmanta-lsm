@@ -11,7 +11,7 @@ lock:
     variable: INMANTA_LSM_HOST
     quantity: 1
 additional_constraints:
-    - inmanta-lsm~=4.0.dev
+    - inmanta-lsm>=5.0.dev
 env_vars:
     # This option is ignored when the tests run against a docker container.
     INMANTA_LSM_SSH_USER: rocky
