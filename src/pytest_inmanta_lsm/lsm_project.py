@@ -3,6 +3,7 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+
 import copy
 import datetime
 import functools

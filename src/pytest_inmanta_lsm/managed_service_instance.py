@@ -5,6 +5,7 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+
 import json
 import logging
 from pprint import pformat

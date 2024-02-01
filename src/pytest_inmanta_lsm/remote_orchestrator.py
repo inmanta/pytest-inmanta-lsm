@@ -5,6 +5,7 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+
 import dataclasses
 import logging
 import pathlib
