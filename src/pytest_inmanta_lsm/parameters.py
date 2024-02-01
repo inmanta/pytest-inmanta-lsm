@@ -5,6 +5,7 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+
 from pathlib import Path
 
 from pytest_inmanta.test_parameter import (

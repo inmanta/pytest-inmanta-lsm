@@ -5,6 +5,7 @@
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
+
 from typing import Collection
 
 from pytest_inmanta_lsm import managed_service_instance as msi
