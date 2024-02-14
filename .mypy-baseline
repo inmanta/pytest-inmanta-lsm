@@ -1,0 +1,44 @@
+src/pytest_inmanta_lsm/failed_resources_logs.py:59: error: Argument 1 to "_extract_logs" of "FailedResourcesLogs" has incompatible type "Optional[Dict[str, Any]]"; expected "Dict[str, Any]"
+src/pytest_inmanta_lsm/failed_resources_logs.py:68: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/remote_orchestrator.py:140: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/remote_orchestrator.py:146: error: Item "None" of "Optional[Exporter]" has no attribute "run_export_plugin"
+src/pytest_inmanta_lsm/remote_orchestrator.py:165: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/remote_orchestrator.py:173: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/remote_orchestrator.py:385: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/remote_orchestrator.py:386: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/remote_orchestrator.py:388: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/remote_orchestrator.py:392: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/remote_orchestrator.py:422: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/remote_orchestrator.py:437: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/wait_for_state.py:28: error: Argument 1 of "__eq__" is incompatible with supertype "object"; supertype defines the argument type as "object"
+src/pytest_inmanta_lsm/wait_for_state.py:28: note: This violates the Liskov substitution principle
+src/pytest_inmanta_lsm/wait_for_state.py:28: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#incompatible-overrides
+src/pytest_inmanta_lsm/wait_for_state.py:28: note: It is recommended for "__eq__" to work with arbitrary objects, for example:
+src/pytest_inmanta_lsm/wait_for_state.py:28: note:     def __eq__(self, other: object) -> bool:
+src/pytest_inmanta_lsm/wait_for_state.py:28: note:         if not isinstance(other, State):
+src/pytest_inmanta_lsm/wait_for_state.py:28: note:             return NotImplemented
+src/pytest_inmanta_lsm/wait_for_state.py:28: note:         return <logic to compare two State instances>
+src/pytest_inmanta_lsm/wait_for_state.py:69: error: "Callable[[State, List[str]], bool]" has no attribute "__func__"
+src/pytest_inmanta_lsm/wait_for_state.py:70: error: "Callable[[State], bool]" has no attribute "__func__"
+src/pytest_inmanta_lsm/wait_for_state.py:71: error: "Callable[[State, Collection[str]], bool]" has no attribute "__func__"
+src/pytest_inmanta_lsm/wait_for_state.py:72: error: "Callable[[State], Any]" has no attribute "__func__"
+src/pytest_inmanta_lsm/wait_for_state.py:136: error: Argument 1 has incompatible type "Optional[int]"; expected "int"
+src/pytest_inmanta_lsm/wait_for_state.py:138: error: Argument "key" to "sort" of "list" has incompatible type "Callable[[State], Optional[int]]"; expected "Callable[[State], Union[SupportsDunderLT, SupportsDunderGT]]"
+src/pytest_inmanta_lsm/wait_for_state.py:138: error: Incompatible return value type (got "Optional[int]", expected "Union[SupportsDunderLT, SupportsDunderGT]")
+src/pytest_inmanta_lsm/wait_for_state.py:166: error: Argument 3 to "BadStateError" has incompatible type "State"; expected "str"
+src/pytest_inmanta_lsm/wait_for_state.py:180: error: Argument 3 to "BadStateError" has incompatible type "State"; expected "str"
+src/pytest_inmanta_lsm/managed_service_instance.py:14: error: Cannot find implementation or library stub for module named "inmanta_lsm.diagnose.model"
+src/pytest_inmanta_lsm/managed_service_instance.py:14: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#missing-imports
+src/pytest_inmanta_lsm/managed_service_instance.py:113: error: Unsupported right operand type for in ("Optional[Dict[str, Any]]")
+src/pytest_inmanta_lsm/managed_service_instance.py:114: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/managed_service_instance.py:118: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/managed_service_instance.py:119: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/managed_service_instance.py:121: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/managed_service_instance.py:261: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/managed_service_instance.py:262: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/managed_service_instance.py:281: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/managed_service_instance.py:337: error: Argument 3 to "VersionMismatchError" has incompatible type "Optional[int]"; expected "int"
+src/pytest_inmanta_lsm/managed_service_instance.py:366: error: Value of type "Optional[Dict[str, Any]]" is not indexable
+src/pytest_inmanta_lsm/plugin.py:55: error: Module "inmanta_lsm" has no attribute "methods"
+Generated HTML report (via XSLT): /home/hugo/work/inmanta/github-repos/pytest-inmanta-lsm/mypy/index.html
+Found 34 errors in 5 files (checked 9 source files)
