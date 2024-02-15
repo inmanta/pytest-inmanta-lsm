@@ -26,10 +26,10 @@ parse = """(?x)
     (?P<minor>0|[1-9]\\d*)\\.
     (?P<patch>0|[1-9]\\d*)
     (?:
-        .                             # dash seperator for pre-release section
-        (?P<dev_l>[a-zA-Z-]+)         # pre-release label
-        (?P<dev_n>[0])        # pre-release version number
-    )?                                # pre-release section is optional
+        .
+        (?P<dev_l>[a-zA-Z-]+)
+        (?P<dev_n>[0])
+    )?                                # this `.dev0` section is optional
 """
 serialize = [
     "{major}.{minor}.{patch}",
