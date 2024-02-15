@@ -43,7 +43,7 @@ parse = """(?x)
     (?P<minor>0|[1-9]\\d*)\\.
     (?P<patch>0|[1-9]\\d*)
 """
-serialize = "{major}.{minor}.{patch}"
+serialize = ["{major}.{minor}.{patch}"]
 search = "version = {current_version}"
 replace = "version = {new_version}"
 
@@ -54,7 +54,7 @@ parse = """(?x)
     (?P<minor>0|[1-9]\\d*)\\.
     (?P<patch>0|[1-9]\\d*)
 """
-serialize = "{major}.{minor}.{patch}"
+serialize = ["{major}.{minor}.{patch}"]
 search = "version=\"{current_version}\""
 replace = "version=\"{new_version}\""
 
