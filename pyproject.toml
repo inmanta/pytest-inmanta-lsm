@@ -51,5 +51,5 @@ values = ["", "dev"]
 optional_value = ""
 
 [tool.bumpversion.parts.dev_n]
-values = ["0"]
-optional_value = "0"
+values = ["", "0"]
+optional_value = ""
