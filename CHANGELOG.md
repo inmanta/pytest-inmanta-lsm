@@ -3,6 +3,7 @@
 
 ## v3.2.0 - ?
 
+- patch on blublu
 - bloblo
 - Update default tags of ISO and postgres containers
 
