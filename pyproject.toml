@@ -32,8 +32,8 @@ parse = """(?x)
     )?                                # pre-release section is optional
 """
 serialize = [
-    "{major}.{minor}.{patch}.{dev_l}{dev_n}",
     "{major}.{minor}.{patch}",
+    "{major}.{minor}.{patch}.{dev_l}{dev_n}",
 ]
 
 [[tool.bumpversion.files]]
