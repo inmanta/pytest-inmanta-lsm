@@ -18,9 +18,23 @@ exclude = '''
 '''
 
 [tool.bumpversion]
-current_version = "3.2.0.dev0"
+current_version = "3.1.0"
 tag = false
 commit = false
+parse = """(?x)
+    (?P<major>0|[1-9]\\d*)\\.
+    (?P<minor>0|[1-9]\\d*)\\.
+    (?P<patch>0|[1-9]\\d*)
+    (?:
+        .                             # dash seperator for pre-release section
+        (?P<dev_l>[a-zA-Z-]+)         # pre-release label
+        (?P<dev_n>[0])        # pre-release version number
+    )?                                # pre-release section is optional
+"""
+serialize = [
+    "{major}.{minor}.{patch}.{dev_l}{dev_n}",
+    "{major}.{minor}.{patch}",
+]
 
 [[tool.bumpversion.files]]
 filename = "setup.cfg"
@@ -31,3 +45,11 @@ replace = "version = {new_version}"
 filename = "setup.py"
 search = "version=\"{current_version}\""
 replace = "version=\"{new_version}\""
+
+[tool.bumpversion.parts.dev_l]
+values = ["", "dev"]
+optional_value = ""
+
+[tool.bumpversion.parts.dev_n]
+values = ["0"]
+optional_value = "0"
