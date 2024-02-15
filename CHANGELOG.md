@@ -3,6 +3,7 @@
 
 ## v3.2.1 - ?
 
+- blublu
 - new feature
 
 ## v3.2.0 - ?
