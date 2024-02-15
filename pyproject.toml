@@ -16,3 +16,18 @@ exclude = '''
   | dist
 )/
 '''
+
+[tool.bumpversion]
+current_version = '3.2.0'
+tag = false
+commit = false
+
+[[tool.bumpversion.files]]
+filename = "setup.cfg"
+search = "version = {current_version}"
+replace = "version = {new_version}"
+
+[[tool.bumpversion.files]]
+filename = "setup.py"
+search = "version=\"{current_version}\""
+replace = "version=\"{new_version}\""
