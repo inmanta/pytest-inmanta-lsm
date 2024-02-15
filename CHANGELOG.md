@@ -3,6 +3,7 @@
 
 ## v3.2.0 - ?
 
+- bloblo
 - Update default tags of ISO and postgres containers
 
 # v3.1.0 (2023-11-29)
