@@ -1,3 +1,7 @@
+# v 3.2.0 (2024-02-20)
+Changes in this release:
+- Update default tags of ISO and postgres containers
+
 # v 3.1.0 (2023-11-29)
 Changes in this release:
 - Ignore `__pycache__` dirs when rsyncing the project to the remote orchestrator
