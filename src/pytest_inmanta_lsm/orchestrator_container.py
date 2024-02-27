@@ -43,8 +43,10 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
             universal_newlines=True,
             env=env_vars,
         )
-    except FileNotFoundError:
-        raise FileNotFoundError("The `docker-compose` command is not found. You need it to have a local orchestrator.")
+    except FileNotFoundError as e:
+        if e.filename == "docker-compose":
+            raise FileNotFoundError("The `docker-compose` command is not found. You need it to have a local orchestrator.")
+        raise e
 
     LOGGER.debug(f"Return code: {result.returncode}")
     LOGGER.debug("Stdout: %s", result.stdout)
