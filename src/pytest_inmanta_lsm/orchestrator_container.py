@@ -32,16 +32,22 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     LOGGER.info(f"Running command: {cmd}")
     env_vars = dict(os.environ)
     env_vars.pop("PYTHONPATH", None)
-    result = subprocess.run(
-        args=cmd,
-        cwd=str(cwd),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        encoding="utf-8",
-        text=True,
-        universal_newlines=True,
-        env=env_vars,
-    )
+    try:
+        result = subprocess.run(
+            args=cmd,
+            cwd=str(cwd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            text=True,
+            universal_newlines=True,
+            env=env_vars,
+        )
+    except FileNotFoundError as e:
+        if e.filename == "docker-compose":
+            raise FileNotFoundError("The `docker-compose` command is not found. You need it to have a local orchestrator.")
+        raise e
+
     LOGGER.debug(f"Return code: {result.returncode}")
     LOGGER.debug("Stdout: %s", result.stdout)
     LOGGER.debug("Stderr: %s", result.stderr)
@@ -219,7 +225,6 @@ class OrchestratorContainer:
         # Pull container images
         cmd = ["docker-compose", "--verbose", "pull"]
         run_cmd(cmd=cmd, cwd=self.cwd)
-
         # Starting the lab
         cmd = ["docker-compose", "--verbose", "up", "-d"]
         run_cmd(cmd=cmd, cwd=self.cwd)

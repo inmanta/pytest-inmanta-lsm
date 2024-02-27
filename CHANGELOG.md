@@ -1,5 +1,6 @@
 # v 3.3.0 (?)
 Changes in this release:
+- Better logs when `docker-compose` in not installed
 
 # v 3.2.0 (2024-02-20)
 Changes in this release:
