@@ -565,7 +565,7 @@ class AsyncManagedServiceInstance:
         assert response.code in range(200, 300), str(response.result)
         if returned_type is not None:
             assert response.result is not None, str(response)
-            return pydantic.parse_obj_as(returned_type, response.result["data"])
+            return pydantic.TypeAdapter(returned_type).validate_python(response.result["data"])
         else:
             return None
 
@@ -594,7 +594,7 @@ class AsyncManagedServiceInstance:
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             service_id=self.instance_id,
-            filter={"version": [(">=", since_version)]},
+            filter={"version": f"ge:{since_version}"},
         )
 
     async def wait_for_state(
@@ -653,16 +653,16 @@ class AsyncManagedServiceInstance:
 
         # Save the last version we treated, to avoid going through the full history at every
         # iteration
-        last_version = start_version or ((await self.get()).version - 1)
+        last_version = start_version or (await self.get()).version
         while True:
             # Go through each log since the last iteration, starting from the oldest
             # states, after the last version we controlled at the previous iteration
             for log in sorted(
-                await self.history(since_version=last_version + 1),
+                await self.history(since_version=last_version),
                 key=lambda log: log.version,
             ):
                 try:
-                    if is_done(log):
+                    if log.version > last_version and is_done(log):
                         return await self.get()
                 except exceptions.BadStateError:
                     # We encountered a bad state, print the diagnosis then quit
@@ -906,6 +906,11 @@ class AsyncManagedServiceInstance:
         if current_version is None:
             current_version = (await self.get()).version
 
+        if wait_for_state is None:
+            # For the set state, there is a meaningful default target state, the
+            # state we want to set the service in
+            wait_for_state = state
+
         LOGGER.info("Setting service instance %s to state %s", self.instance_name, state)
         await self.request(
             "lsm_services_set_state",
@@ -917,14 +922,11 @@ class AsyncManagedServiceInstance:
             message=f"Manually setting state to {state}",
         )
 
-        if wait_for_state is not None:
-            # Wait for our service to reach the target state
-            return await self.wait_for_state(
-                target_state=wait_for_state,
-                target_version=wait_for_version,
-                bad_states=bad_states,
-                timeout=timeout,
-                start_version=current_version,
-            )
-        else:
-            return await self.get()
+        # Wait for our service to reach the target state
+        return await self.wait_for_state(
+            target_state=wait_for_state,
+            target_version=wait_for_version,
+            bad_states=bad_states,
+            timeout=timeout,
+            start_version=current_version,
+        )
