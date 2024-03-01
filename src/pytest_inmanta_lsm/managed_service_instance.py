@@ -28,11 +28,6 @@ from pytest_inmanta_lsm import wait_for_state
 LOGGER = logging.getLogger(__name__)
 
 
-class State(pydantic.BaseModel):
-    name: str
-    version: int
-
-
 class ManagedServiceInstance:
     """Object that represents a service instance that contains the method to
     push it through its lifecycle and verify its status
@@ -369,7 +364,7 @@ class ManagedServiceInstance:
                 return False
             return current_state.version == start_version
 
-        def get_bad_state_error(current_state: State) -> FullDiagnosis:
+        def get_bad_state_error(current_state: wait_for_state.State) -> FullDiagnosis:
             result = self.remote_orchestrator.client.lsm_services_diagnose(
                 tid=self.remote_orchestrator.environment,
                 service_entity=self.service_entity_name,
@@ -411,20 +406,100 @@ class ManagedServiceInstance:
 T = typing.TypeVar("T")
 
 
+class ManagedServiceInstanceError(RuntimeError, typing.Generic[T]):
+    """
+    Base exception for error raised by a managed service instance.
+    """
+
+    def __init__(self, instance: T, *args: object) -> None:
+        super().__init__(*args)
+        self.instance = instance
+
+
+class VersionExceededError(ManagedServiceInstanceError[T]):
+    """
+    This error is raised when a managed instance reaches a version that is greater than
+    the one we were waiting for.
+    """
+
+    def __init__(
+        self,
+        instance: T,
+        target_version: int,
+        log: model.ServiceInstanceLog,
+        *args: object,
+    ) -> None:
+        super().__init__(
+            instance,
+            f"Service instance version {log.version} (state: {log.state}) is greater "
+            f"than the target version ({target_version})",
+            *args,
+        )
+        self.target_version = target_version
+        self.log = log
+
+
+class BadStateError(ManagedServiceInstanceError[T]):
+    """
+    This error is raised when a managed instance goes into a state that is considered to
+    be a bad one.
+    """
+
+    def __init__(
+        self,
+        instance: T,
+        bad_states: typing.Collection[str],
+        log: model.ServiceInstanceLog,
+        *args: object,
+    ) -> None:
+        super().__init__(
+            instance,
+            f"Service instance for into bad state {log.state} (version: {log.version}) " f"from bad state list: {bad_states}",
+            *args,
+        )
+        self.bad_states = bad_states
+        self.log = log
+
+
+class StateTimeoutError(ManagedServiceInstanceError[T], TimeoutError):
+    """
+    This error is raised when we hit a timeout, while waiting for a service instance to
+    reach a target state.
+    """
+
+    def __init__(
+        self,
+        instance: T,
+        target_state: str,
+        target_version: typing.Optional[int],
+        timeout: float,
+        *args: object,
+    ) -> None:
+        super().__init__(
+            instance,
+            f"Timeout of {timeout} seconds reached while waiting for service instance to "
+            f"go into state {target_state} (version: {target_version if target_version is not None else 'any'})",
+            *args,
+        )
+        self.target_state = target_state
+        self.target_version = target_version
+        self.timeout = timeout
+
+
 class AsyncManagedServiceInstance:
 
     DEFAULT_TIMEOUT = 600.0
     RETRY_INTERVAL = 5.0
-    CREATE_FLOW_BAD_STATES: List[State] = [State("rejected"), State("failed")]
+    CREATE_FLOW_BAD_STATES: list[str] = ["rejected", "failed"]
 
-    UPDATE_FLOW_BAD_STATES: List[State] = [
-        State("update_start_failed"),
-        State("update_acknowledged_failed"),
-        State("update_designed_failed"),
-        State("update_rejected"),
-        State("update_rejected_failed"),
-        State("update_failed"),
-        State("failed"),
+    UPDATE_FLOW_BAD_STATES: list[str] = [
+        "update_start_failed",
+        "update_acknowledged_failed",
+        "update_designed_failed",
+        "update_rejected",
+        "update_rejected_failed",
+        "update_failed",
+        "failed",
     ]
 
     DELETE_FLOW_BAD_STATES: List[str] = []
@@ -457,8 +532,15 @@ class AsyncManagedServiceInstance:
         else:
             return self._instance_id
 
+    @property
+    def instance_name(self) -> str:
+        if self._instance_name is None:
+            raise RuntimeError("Instance name is unknown, did you call create already?")
+        else:
+            return self._instance_name
+
     @typing.overload
-    async def request(self, method: str, **kwargs: object) -> None:
+    async def request(self, method: str, returned_type: None = None, **kwargs: object) -> None:
         pass
 
     @typing.overload
@@ -482,6 +564,7 @@ class AsyncManagedServiceInstance:
         response: protocol.Result = await getattr(self.remote_orchestrator.async_client, method)(**kwargs)
         assert response.code in range(200, 300), str(response.result)
         if returned_type is not None:
+            assert response.result is not None, str(response)
             return pydantic.parse_obj_as(returned_type, response.result["data"])
         else:
             return None
@@ -516,9 +599,10 @@ class AsyncManagedServiceInstance:
 
     async def wait_for_state(
         self,
-        target_state: State,
+        target_state: str,
+        target_version: typing.Optional[int] = None,
         *,
-        bad_states: typing.Optional[Collection[State]] = None,
+        bad_states: typing.Optional[typing.Collection[str]] = None,
         timeout: typing.Optional[float] = None,
         start_version: Optional[int] = None,
     ) -> model.ServiceInstance:
@@ -535,6 +619,9 @@ class AsyncManagedServiceInstance:
             look for versions after this one.  If no start version is provided, we assume that
             the start version is the one before the version in which we are seeing the service
             in at the time this method is called.
+        :raises BadStateError: If the instance went into a bad state
+        :raises TimeoutError: If the timeout is reached while waiting for the desired state
+        :raises VersionExceededError: If version is provided and the current state goes past it
         """
         if timeout is None:
             timeout = self.DEFAULT_TIMEOUT
@@ -542,33 +629,21 @@ class AsyncManagedServiceInstance:
         if bad_states is None:
             bad_states = self.ALL_BAD_STATES
 
-        def match_state(log: model.ServiceInstanceLog, state: State) -> bool:
-            if log.state != state.name:
-                # Not our state
-                return False
-
-            if state.version is not None and state.version != log.version:
-                # Not the correct version
-                return False
-
-            # The version name and the version are a match, this is our state!
-            return True
-
         def is_done(log: model.ServiceInstanceLog) -> bool:
-            # Check if we are in the desired state
-            if match_state(log, target_state):
-                return True
+            if target_version is None:
+                # Check if we are in the desired state
+                return log.state == target_state
 
             # Check if the service version is passed the maximum value we can accept
-            if target_state.version is not None and log.version > target_state.version:
-                raise exceptions.VersionExceededError(self, target_state.version, log.version)
+            if log.version > target_version:
+                raise VersionExceededError(self, target_version, log)
 
             # Check if we are in any of the bad states
-            if any(match_state(log, state) for state in bad_states):
-                raise exceptions.BadStateError(self, bad_states, log.state)
+            if log.state in bad_states:
+                raise BadStateError(self, bad_states, log)
 
-            # We are not done waiting
-            return False
+            # Check if both the version and the state match
+            return log.version == target_version and log.state == target_state
 
         # Save the start time to know when we should trigger a timeout error
         start = time.time()
@@ -582,7 +657,10 @@ class AsyncManagedServiceInstance:
         while True:
             # Go through each log since the last iteration, starting from the oldest
             # states, after the last version we controlled at the previous iteration
-            for log in reversed(await self.history(since_version=last_version + 1)):
+            for log in sorted(
+                await self.history(since_version=last_version + 1),
+                key=lambda log: log.version,
+            ):
                 try:
                     if is_done(log):
                         return await self.get()
@@ -600,7 +678,7 @@ class AsyncManagedServiceInstance:
                     )
                     LOGGER.info(
                         "Service instance %s reached bad state %s: \n%s",
-                        self._instance_name,
+                        self.instance_name,
                         log.state,
                         devtools.debug.format(diagnosis),
                     )
@@ -610,7 +688,7 @@ class AsyncManagedServiceInstance:
                     # We reached a new state, log it for the user
                     LOGGER.debug(
                         "Service instance %s moved to state %s (version %s)",
-                        self._instance_name,
+                        self.instance_name,
                         log.state,
                         log.version,
                     )
@@ -627,7 +705,7 @@ class AsyncManagedServiceInstance:
                     target_state,
                     log.state,
                 )
-                raise exceptions.TimeoutError(self, timeout)
+                raise StateTimeoutError(self, target_state, target_version, timeout)
 
             # Wait then try again
             await asyncio.sleep(self.RETRY_INTERVAL)
@@ -636,8 +714,9 @@ class AsyncManagedServiceInstance:
         self,
         attributes: dict[str, object],
         *,
-        wait_for_state: typing.Optional[State] = None,
-        bad_states: typing.Optional[Collection[State]] = None,
+        wait_for_state: typing.Optional[str] = None,
+        wait_for_version: typing.Optional[int] = None,
+        bad_states: typing.Optional[typing.Collection[str]] = None,
         timeout: typing.Optional[float] = None,
     ) -> model.ServiceInstance:
         """
@@ -649,8 +728,8 @@ class AsyncManagedServiceInstance:
             self.CREATE_FLOW_BAD_STATES.
         :param timeout: how long can we wait for service to achieve given state (in seconds)
         :raises BadStateError: If the instance went into a bad state
-        :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
-        :raises VersionExceededError: If version(s) is(are) provided and the current state goes past it(them)
+        :raises TimeoutError: If the timeout is reached while waiting for the desired state
+        :raises VersionExceededError: If version is provided and the current state goes past it
         """
         if bad_states is None:
             bad_states = self.CREATE_FLOW_BAD_STATES
@@ -685,7 +764,7 @@ class AsyncManagedServiceInstance:
                 f"{self.service_entity_name}"
                 f"({service_entity.service_identity}={service_instance.service_identity_attribute_value})"
             )
-            LOGGER.info("Created instance has name %s", self._instance_name)
+            LOGGER.info("Created instance has name %s", self.instance_name)
         else:
             # There is no service_identity_display_name, so we use the instance id
             self._instance_name = f"{self.service_entity_name}({self.instance_id})"
@@ -694,6 +773,7 @@ class AsyncManagedServiceInstance:
             # Wait for our service to reach the target state
             return await self.wait_for_state(
                 target_state=wait_for_state,
+                target_version=wait_for_version,
                 bad_states=bad_states,
                 timeout=timeout,
                 start_version=1,
@@ -706,8 +786,9 @@ class AsyncManagedServiceInstance:
         edit: list[model.PatchCallEdit],
         *,
         current_version: typing.Optional[int] = None,
-        wait_for_state: typing.Optional[State] = None,
-        bad_states: typing.Optional[Collection[State]] = None,
+        wait_for_state: typing.Optional[str] = None,
+        wait_for_version: typing.Optional[int] = None,
+        bad_states: typing.Optional[typing.Collection[str]] = None,
         timeout: typing.Optional[float] = None,
     ) -> model.ServiceInstance:
         """
@@ -720,8 +801,8 @@ class AsyncManagedServiceInstance:
             self.UPDATE_FLOW_BAD_STATES.
         :param timeout: how long can we wait for service to achieve given state (in seconds)
         :raises BadStateError: If the instance went into a bad state
-        :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
-        :raises VersionExceededError: If version(s) is(are) provided and the current state goes past it(them)
+        :raises TimeoutError: If the timeout is reached while waiting for the desired state
+        :raises VersionExceededError: If version is provided and the current state goes past it
         """
         if current_version is None:
             current_version = (await self.get()).version
@@ -729,7 +810,7 @@ class AsyncManagedServiceInstance:
         if bad_states is None:
             bad_states = self.UPDATE_FLOW_BAD_STATES
 
-        LOGGER.info("Updating service instance %s: %s", self._instance_name, devtools.debug.format(edit))
+        LOGGER.info("Updating service instance %s: %s", self.instance_name, devtools.debug.format(edit))
         await self.request(
             "lsm_services_patch",
             tid=self.remote_orchestrator.environment,
@@ -745,6 +826,7 @@ class AsyncManagedServiceInstance:
             # Wait for our service to reach the target state
             return await self.wait_for_state(
                 target_state=wait_for_state,
+                target_version=wait_for_version,
                 bad_states=bad_states,
                 timeout=timeout,
                 start_version=current_version,
@@ -756,8 +838,9 @@ class AsyncManagedServiceInstance:
         self,
         *,
         current_version: typing.Optional[int] = None,
-        wait_for_state: typing.Optional[State] = None,
-        bad_states: typing.Optional[Collection[State]] = None,
+        wait_for_state: typing.Optional[str] = None,
+        wait_for_version: typing.Optional[int] = None,
+        bad_states: typing.Optional[typing.Collection[str]] = None,
         timeout: typing.Optional[float] = None,
     ) -> model.ServiceInstance:
         """
@@ -769,8 +852,8 @@ class AsyncManagedServiceInstance:
             self.UPDATE_FLOW_BAD_STATES.
         :param timeout: how long can we wait for service to achieve given state (in seconds)
         :raises BadStateError: If the instance went into a bad state
-        :raises TimeoutError: If the timeout is reached while waiting for the desired state(s)
-        :raises VersionExceededError: If version(s) is(are) provided and the current state goes past it(them)
+        :raises TimeoutError: If the timeout is reached while waiting for the desired state
+        :raises VersionExceededError: If version is provided and the current state goes past it
         """
         if current_version is None:
             current_version = (await self.get()).version
@@ -778,7 +861,7 @@ class AsyncManagedServiceInstance:
         if bad_states is None:
             bad_states = self.DELETE_FLOW_BAD_STATES
 
-        LOGGER.info("Deleting service instance %s", self._instance_name)
+        LOGGER.info("Deleting service instance %s", self.instance_name)
         await self.request(
             "lsm_services_delete",
             tid=self.remote_orchestrator.environment,
@@ -791,6 +874,54 @@ class AsyncManagedServiceInstance:
             # Wait for our service to reach the target state
             return await self.wait_for_state(
                 target_state=wait_for_state,
+                target_version=wait_for_version,
+                bad_states=bad_states,
+                timeout=timeout,
+                start_version=current_version,
+            )
+        else:
+            return await self.get()
+
+    async def set_state(
+        self,
+        state: str,
+        *,
+        current_version: typing.Optional[int] = None,
+        wait_for_state: typing.Optional[str] = None,
+        wait_for_version: typing.Optional[int] = None,
+        bad_states: typing.Optional[typing.Collection[str]] = None,
+        timeout: typing.Optional[float] = None,
+    ) -> model.ServiceInstance:
+        """
+        Set the service instance to a given state, and wait for it to go into `wait_for_state`.
+
+        :param wait_for_state: wait for this state to be reached, if set to None, returns directly, and doesn't wait.
+        :param bad_states: stop waiting and fail if any of these states are reached.   If set to None, default to
+            self.ALL_BAD_STATES.
+        :param timeout: how long can we wait for service to achieve given state (in seconds)
+        :raises BadStateError: If the instance went into a bad state
+        :raises TimeoutError: If the timeout is reached while waiting for the desired state
+        :raises VersionExceededError: If version is provided and the current state goes past it
+        """
+        if current_version is None:
+            current_version = (await self.get()).version
+
+        LOGGER.info("Setting service instance %s to state %s", self.instance_name, state)
+        await self.request(
+            "lsm_services_set_state",
+            tid=self.remote_orchestrator.environment,
+            service_entity=self.service_entity_name,
+            service_id=self.instance_id,
+            current_version=current_version,
+            target_state=state,
+            message=f"Manually setting state to {state}",
+        )
+
+        if wait_for_state is not None:
+            # Wait for our service to reach the target state
+            return await self.wait_for_state(
+                target_state=wait_for_state,
+                target_version=wait_for_version,
                 bad_states=bad_states,
                 timeout=timeout,
                 start_version=current_version,
