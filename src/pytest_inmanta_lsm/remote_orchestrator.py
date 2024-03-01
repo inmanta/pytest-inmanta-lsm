@@ -210,6 +210,7 @@ class RemoteOrchestrator:
 
         # Build the client once, it loads the config on every call
         self.client = inmanta.protocol.endpoints.SyncClient("client")
+        self.async_client = inmanta.protocol.endpoints.Client("client")
 
         # Setting up the client when the config is loaded
         self.setup_config()
