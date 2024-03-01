@@ -656,12 +656,16 @@ class AsyncManagedServiceInstance:
         last_version = start_version or (await self.get()).version
         while True:
             # Go through each log since the last iteration, starting from the oldest
-            # states, after the last version we controlled at the previous iteration
+            # states, including the last version we controlled at the previous iteration
+            # to make sure the list returned by the server is not empty
+            # cf. https://github.com/inmanta/inmanta-lsm/issues/1635
             for log in sorted(
                 await self.history(since_version=last_version),
                 key=lambda log: log.version,
             ):
                 try:
+                    # Always skip the last version, as it is either our start version, or a
+                    # version we checked on the previous iteration.
                     if log.version > last_version and is_done(log):
                         return await self.get()
                 except exceptions.BadStateError:
