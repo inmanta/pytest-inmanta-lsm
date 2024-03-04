@@ -14,8 +14,6 @@ import uuid
 
 import devtools
 import inmanta.util
-import pydantic
-from inmanta import protocol
 from inmanta_lsm import model
 from inmanta_lsm.diagnose.model import FullDiagnosis
 
@@ -160,46 +158,12 @@ class ServiceInstance:
         else:
             return self._instance_name
 
-    @typing.overload
-    async def request(self, method: str, returned_type: None = None, **kwargs: object) -> None:
-        pass
-
-    @typing.overload
-    async def request(self, method: str, returned_type: type[T], **kwargs: object) -> T:
-        pass
-
-    async def request(
-        self,
-        method: str,
-        returned_type: typing.Optional[type[T]] = None,
-        **kwargs: object,
-    ) -> typing.Optional[T]:
-        """
-        Helper method to send a request to the orchestrator, which we expect to succeed with 20X code and
-        return an object of a given type.
-
-        :param method: The name of the method to execute
-        :param returned_type: The type of the object that the api should return
-        :param **kwargs: Parameters to pass to the method we are calling
-        """
-        response: protocol.Result = await getattr(self.remote_orchestrator.async_client, method)(**kwargs)
-        assert response.code in range(200, 300), str(response.result)
-        if returned_type is not None:
-            assert response.result is not None, str(response)
-            try:
-                return pydantic.TypeAdapter(returned_type).validate_python(response.result["data"])
-            except AttributeError:
-                # Handle pydantic v1
-                return pydantic.parse_obj_as(returned_type, response.result["data"])
-        else:
-            return None
-
     async def get(self) -> model.ServiceInstance:
         """
         Get the current managed service instance in its current state, and return it as a
         ServiceInstance object.
         """
-        return await self.request(
+        return await self.remote_orchestrator.request(
             "lsm_services_get",
             model.ServiceInstance,
             tid=self.remote_orchestrator.environment,
@@ -213,7 +177,7 @@ class ServiceInstance:
 
         :param since_version: The version (included) starting from which we should gather the logs.
         """
-        return await self.request(
+        return await self.remote_orchestrator.request(
             "lsm_service_log_list",
             list[model.ServiceInstanceLog],
             tid=self.remote_orchestrator.environment,
@@ -303,7 +267,7 @@ class ServiceInstance:
                         return await self.get()
                 except BadStateError:
                     # We encountered a bad state, print the diagnosis then quit
-                    diagnosis = await self.request(
+                    diagnosis = await self.remote_orchestrator.request(
                         "lsm_services_diagnose",
                         FullDiagnosis,
                         tid=self.remote_orchestrator.environment,
@@ -377,7 +341,7 @@ class ServiceInstance:
         LOGGER.info(
             "Creating new %s service instance with attributes: %s", self.service_entity_name, devtools.debug.format(attributes)
         )
-        service_instance = await self.request(
+        service_instance = await self.remote_orchestrator.request(
             "lsm_services_create",
             model.ServiceInstance,
             tid=self.remote_orchestrator.environment,
@@ -394,7 +358,7 @@ class ServiceInstance:
         LOGGER.info("Created instance has ID %s", self.instance_id)
 
         # Try to create a nice name for our instance, based on the service_identity_display_name
-        service_entity = await self.request(
+        service_entity = await self.remote_orchestrator.request(
             "lsm_service_catalog_get_entity",
             model.ServiceEntity,
             tid=self.remote_orchestrator.environment,
@@ -456,7 +420,7 @@ class ServiceInstance:
             bad_states = self.UPDATE_FLOW_BAD_STATES
 
         LOGGER.info("Updating service instance %s: %s", self.instance_name, devtools.debug.format(edit))
-        await self.request(
+        await self.remote_orchestrator.request(
             "lsm_services_patch",
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
@@ -510,7 +474,7 @@ class ServiceInstance:
             bad_states = self.DELETE_FLOW_BAD_STATES
 
         LOGGER.info("Deleting service instance %s", self.instance_name)
-        await self.request(
+        await self.remote_orchestrator.request(
             "lsm_services_delete",
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
@@ -563,7 +527,7 @@ class ServiceInstance:
             wait_for_state = state
 
         LOGGER.info("Setting service instance %s to state %s", self.instance_name, state)
-        await self.request(
+        await self.remote_orchestrator.request(
             "lsm_services_set_state",
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,

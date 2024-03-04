@@ -6,6 +6,7 @@
     :license: Inmanta EULA
 """
 
+import asyncio
 import datetime
 import uuid
 
@@ -24,7 +25,6 @@ async def service_full_cycle(
     address: str,
     vlan_id: int,
     vlan_id_update: int,
-    rejected: bool = False,
 ) -> None:
     # Create an async service instance object
     instance = service_instance.ServiceInstance(
@@ -40,12 +40,9 @@ async def service_full_cycle(
             "address": address,
             "vlan_id": vlan_id,
         },
-        wait_for_state="up" if not rejected else "rejected",
+        wait_for_state="up",
+        timeout=60,
     )
-
-    if rejected:
-        # We are done here
-        return
 
     # Update the vlan id
     await instance.update(
@@ -58,10 +55,49 @@ async def service_full_cycle(
             ),
         ],
         wait_for_state="up",
+        timeout=60,
     )
 
     # Delete the instance
-    await instance.delete(wait_for_state="terminated")
+    await instance.delete(wait_for_state="terminated", timeout=60)
+
+
+async def service_duplicate_rejection(
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+) -> None:
+    # Create an async service instance object
+    instance = service_instance.ServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+
+    # Find an instance in the inventory, and duplicate its attributes
+    instances: list[inmanta_lsm.model.ServiceInstance] = []
+    while not instances:
+        await asyncio.sleep(1)
+        instances = await remote_orchestrator.request(
+            "lsm_services_list",
+            list[inmanta_lsm.model.ServiceInstance],
+            tid=remote_orchestrator.environment,
+            service_entity=SERVICE_NAME,
+        )
+
+    # Pick the first instance
+    source_instance = instances[0]
+
+    # Pick the first non empty attribute set
+    attributes = source_instance.candidate_attributes or source_instance.active_attributes
+
+    # Create a new instance with duplicated attributes, it should be
+    # rejected
+    await instance.create(
+        attributes,
+        wait_for_state="rejected",
+        timeout=60,
+    )
+
+    # Delete the instance
+    await instance.delete(wait_for_state="terminated", timeout=60)
 
 
 def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
@@ -88,18 +124,9 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
         vlan_id_update=42,
     )
 
-    # Create a second service that should be rejected, we know it will
-    # be rejected and not the first one as the first one will start its execution first
-    # (first item in the scenarios list), hence validation the usage of these parameters
-    # first.
-    duplicated_service = service_full_cycle(
+    # Create a second service that should be rejected
+    duplicated_service = service_duplicate_rejection(
         remote_orchestrator=remote_orchestrator,
-        router_ip="10.1.9.17",
-        interface_name="eth1",
-        address="10.0.0.254/24",
-        vlan_id=14,
-        vlan_id_update=42,
-        rejected=True,
     )
 
     # Create another valid service
@@ -113,7 +140,7 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
     )
 
     # Run all the services
-    util.execute_scenarios(first_service, duplicated_service, another_service)
+    util.execute_scenarios(first_service, duplicated_service, another_service, timeout=60)
 
 
 def test_transient_state(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
@@ -145,16 +172,18 @@ def test_transient_state(project: plugin.Project, remote_orchestrator: remote_or
             "vlan_id": 14,
         },
         wait_for_state="creating",
+        timeout=60,
     )
 
     # Wait for up state
     instance.wait_for_state(
         target_state="up",
         start_version=created.version,
+        timeout=60,
     )
 
     # Delete the instance
-    instance.delete(wait_for_state="terminated")
+    instance.delete(wait_for_state="terminated", timeout=60)
 
 
 def test_model(lsm_project: lsm_project.LsmProject) -> None:
