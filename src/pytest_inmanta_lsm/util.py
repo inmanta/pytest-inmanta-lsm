@@ -55,7 +55,7 @@ def execute_scenarios(
         scenarios = (execute_sequentially(*scenarios),)
 
     if timeout:
-        # If we received a timeout parameter, we make sure each scenario can not
+        # If we received a timeout parameter, we make sure each scenario
         # will stop if the timeout is reached
         scenarios = tuple(asyncio.wait_for(s, timeout=timeout) for s in scenarios)
 
