@@ -17,21 +17,71 @@ It requires an LSM enabled orchestrator, with no ssl or authentication enabled, 
 
 ### First case: using a remote orchestrator
 
-This plugin is built around the remote_orchestrator fixture.
+This plugin is built around the remote_orchestrator fixture and the `ServiceInstance` class.
 
-A typical testcase using this plugin looks as follows:
+Typical test cases using this fixture will look as follow:
+1. `test_full_cycle` relies on the helper function `service_full_cycle` to create, update and delete a service instance, following its progress asynchronously.  Multiple services are created by invoking the helper function multiple times.  All the coroutines created are passed to `util.execute_scenarios` which will take care of deploying all the services, and report the failures if any.  This asynchronous test case allows us to test multiple services at the same time, without a complete reset of the orchestrator.
+2. `test_transient_state` simply synchronously deploys and delete a service, and illustrates the usage of the `wait_for_state` method.
 ```python
+import uuid
+import inmanta_lsm.model
+from pytest_inmanta import plugin
 
-def test_full_cycle(project, remote_orchestrator):
+from pytest_inmanta_lsm import lsm_project, remote_orchestrator, service_instance, util
+
+SERVICE_NAME = "vlan-assignment"
+
+
+async def service_full_cycle(
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    router_ip: str,
+    interface_name: str,
+    address: str,
+    vlan_id: int,
+    vlan_id_update: int,
+) -> None:
+    # Create an async service instance object
+    instance = service_instance.ServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+
+    # Create the service instance on the remote orchestrator
+    await instance.create(
+        {
+            "router_ip": router_ip,
+            "interface_name": interface_name,
+            "address": address,
+            "vlan_id": vlan_id,
+        },
+        wait_for_state="up",
+        timeout=60,
+    )
+
+    # Update the vlan id
+    await instance.update(
+        [
+            inmanta_lsm.model.PatchCallEdit(
+                edit_id=str(uuid.uuid4()),
+                operation=inmanta_lsm.model.EditOperation.replace,
+                target="vlan_id",
+                value=vlan_id_update,
+            ),
+        ],
+        wait_for_state="up",
+        timeout=60,
+    )
+
+    # Delete the instance
+    await instance.delete(wait_for_state="terminated", timeout=60)
+
+
+def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
     # get connection to remote_orchestrator
     client = remote_orchestrator.client
 
     # setup project
-    project.compile(
-        """
-        import quickstart
-        """
-    )
+    project.compile("import quickstart")
 
     # sync project and export service entities
     remote_orchestrator.export_service_entities()
@@ -40,28 +90,76 @@ def test_full_cycle(project, remote_orchestrator):
     result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
     assert result.code == 200
 
-    # get a ManagedInstance object, to simplifies interacting with a specific service instance
-    service_instance = remote_orchestrator.get_managed_instance(SERVICE_NAME)
-
-    # create an instance and wait for it to be up
-    service_instance.create(
-        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-        wait_for_state="up",
+    # Create a first service that should be deployed
+    first_service = service_full_cycle(
+        remote_orchestrator=remote_orchestrator,
+        router_ip="10.1.9.17",
+        interface_name="eth1",
+        address="10.0.0.254/24",
+        vlan_id=14,
+        vlan_id_update=42,
     )
 
-    # make validation fail by creating a duplicate
-    remote_orchestrator.get_managed_instance(SERVICE_NAME).create(
-        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-        wait_for_state="rejected",
+    # Create another valid service
+    another_service = service_full_cycle(
+        remote_orchestrator=remote_orchestrator,
+        router_ip="10.1.9.18",
+        interface_name="eth2",
+        address="10.0.0.253/24",
+        vlan_id=15,
+        vlan_id_update=52,
     )
 
-    service_instance.update(
-        attribute_updates={"vlan_id": 42},
-        wait_for_state="up",
+    # Run all the services
+    util.execute_scenarios(first_service, another_service, timeout=60)
+
+
+def test_transient_state(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    # get connection to remote_orchestrator
+    client = remote_orchestrator.client
+
+    # setup project
+    project.compile("import quickstart")
+
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
+
+    # verify the service is in the catalog
+    result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
+    assert result.code == 200
+
+    # Test the synchronous service instance class
+    instance = service_instance.SyncServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
     )
 
-    # break it down
-    service_instance.delete()
+    # Create the service instance and stop waiting in a transient state
+    created = instance.create(
+        {
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
+        wait_for_state="creating",
+        timeout=60,
+    )
+
+    # Wait for up state, we provide here the version from which we should follow the
+    # service, which is the version in which we last stopped following the service.  This
+    # guarantees that we don't "miss" the target state, in case it is a transient one, and
+    # don't confuse the start state for the target one in case it is the same one.
+    # The start version should always be the last version in which we know our service has
+    # been, BEFORE the target state we expect our service to go into.
+    instance.wait_for_state(
+        target_state="up",
+        start_version=created.version,
+        timeout=60,
+    )
+
+    # Delete the instance
+    instance.delete(wait_for_state="terminated", timeout=60)
 
 ```
 

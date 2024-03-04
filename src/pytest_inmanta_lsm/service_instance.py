@@ -193,7 +193,7 @@ class ServiceInstance:
         *,
         bad_states: typing.Optional[typing.Collection[str]] = None,
         timeout: typing.Optional[float] = None,
-        start_version: typing.Optional[int] = None,
+        start_version: int,
     ) -> model.ServiceInstance:
         """
         Wait for this service instance to reach the desired target state.
@@ -208,9 +208,7 @@ class ServiceInstance:
             raise a StateTimeoutError.  If set to None, uses the DEFAULT_TIMEOUT attribute of the
             object.
         :param start_version: The initial version we know the service has been in, we only
-            look for versions after this one.  If no start version is provided, we assume that
-            the start version is the one before the version in which we are seeing the service
-            in at the time this method is called.
+            look for versions after this one.
         :raises BadStateError: If the instance went into a bad state
         :raises StateTimeoutError: If the timeout is reached while waiting for the desired state
         :raises VersionExceededError: If version is provided and the current state goes past it
@@ -250,7 +248,7 @@ class ServiceInstance:
 
         # Save the last version we treated, to avoid going through the full history at every
         # iteration
-        last_version = start_version or (await self.get()).version
+        last_version = start_version
         while True:
             # Go through each log since the last iteration, starting from the oldest
             # states, including the last version we controlled at the previous iteration
