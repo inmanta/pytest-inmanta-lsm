@@ -39,7 +39,7 @@ implementation vlanAssignment for VlanAssignment:
     self.resources += all
 end
 
-binding = lsm::ServiceEntityBinding(
+binding = lsm::ServiceEntityBindingV2(
     service_entity="quickstart::VlanAssignment",
     lifecycle=lsm::fsm::simple,
     service_entity_name="vlan-assignment",

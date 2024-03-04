@@ -186,7 +186,11 @@ class ServiceInstance:
         assert response.code in range(200, 300), str(response.result)
         if returned_type is not None:
             assert response.result is not None, str(response)
-            return pydantic.TypeAdapter(returned_type).validate_python(response.result["data"])
+            try:
+                return pydantic.TypeAdapter(returned_type).validate_python(response.result["data"])
+            except AttributeError:
+                # Handle pydantic v1
+                return pydantic.parse_obj_as(returned_type, response.result["data"])
         else:
             return None
 
@@ -635,4 +639,7 @@ class SyncServiceInstance:
         """
         Set an attribute on the wrapped service instance.
         """
-        return setattr(self.async_service_instance, __name, __value)
+        if __name != "async_service_instance":
+            return setattr(self.async_service_instance, __name, __value)
+        else:
+            super().__setattr__(__name, __value)
