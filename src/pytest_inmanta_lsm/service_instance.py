@@ -1,7 +1,7 @@
 """
     Pytest Inmanta LSM
 
-    :copyright: 2020 Inmanta
+    :copyright: 2024 Inmanta
     :contact: code@inmanta.com
     :license: Inmanta EULA
 """
