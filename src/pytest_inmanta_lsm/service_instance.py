@@ -351,7 +351,7 @@ class ServiceInstance:
             service_instance.version == 1
         ), f"Error while creating instance: wrong version, got {service_instance.version} (expected 1)"
 
-        # Safe the instance id for later
+        # Save the instance id for later
         self._instance_id = service_instance.id
         LOGGER.info("Created instance has ID %s", self.instance_id)
 
