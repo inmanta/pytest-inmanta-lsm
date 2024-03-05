@@ -8,24 +8,26 @@
 
 import asyncio
 import collections.abc
+import sys
 import typing
 
+if sys.version_info < (3, 11):
 
-class MultiException(RuntimeError):
-    """A single exception collecting multiple Exceptions"""
+    class ExceptionGroupError(Exception):
+        """A combination of multiple unrelated exceptions."""
 
-    def __init__(self, others: list[Exception]) -> None:
-        super().__init__()
-        self.others = others
+        def __init__(self, __message: str, __exceptions: typing.Sequence[Exception]) -> None:
+            super().__init__(__message)
+            self.exceptions = __exceptions
 
-    def format(self) -> str:
-        return "Reported %d errors" % len(self.others)
+else:
+    # The ExceptionGroup has been introduced in python3.11, if we have
+    # a recent enough version of python, we should use it.
+    # https://docs.python.org/3/library/exceptions.html#ExceptionGroup
+    ExceptionGroupError = ExceptionGroup
 
-    def __str__(self) -> str:
-        return "Reported %d errors:\n\t" % len(self.others) + "\n\t".join([str(e) for e in self.others])
 
-
-def execute_scenarios(
+async def execute_scenarios(
     *scenarios: collections.abc.Awaitable,
     sequential: bool = False,
     timeout: typing.Optional[float] = None,
@@ -59,14 +61,10 @@ def execute_scenarios(
         # will stop if the timeout is reached
         scenarios = tuple(asyncio.wait_for(s, timeout=timeout) for s in scenarios)
 
-    async def main() -> list[Exception]:
-        return await asyncio.gather(
-            *scenarios,
-            return_exceptions=True,
-        )
-
-    # Execute all the scenarios in parallel and gather the exceptions
-    exceptions = asyncio.run(main())
+    exceptions = await asyncio.gather(
+        *scenarios,
+        return_exceptions=True,
+    )
 
     # Filter the list of exceptions
     exceptions = [exc for exc in exceptions if exc is not None]
@@ -80,4 +78,22 @@ def execute_scenarios(
         raise exceptions[0]
 
     # Raise multi-exceptions
-    raise MultiException(exceptions)
+    raise ExceptionGroupError("Multiple scenarios failed", exceptions)
+
+
+def sync_execute_scenarios(
+    *scenarios: collections.abc.Awaitable,
+    sequential: bool = False,
+    timeout: typing.Optional[float] = None,
+) -> None:
+    """
+    Execute all the given scenarios.  If a scenario fails, raises its exception (after
+    all scenarios are done).  If multiple scenarios fail, raise a wrapper exception that
+    contains them all.
+
+    :param sequential: Execute all the scenarios sequentially instead of concurrently.
+        Defaults to False, can be enabled for debugging purposes, to get cleaner logs.
+    :param timeout: A global timeout to set for the execution of all scenarios.
+    """
+
+    asyncio.run(execute_scenarios(*scenarios, sequential=sequential, timeout=timeout))

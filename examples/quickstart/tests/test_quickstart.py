@@ -140,7 +140,7 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
     )
 
     # Run all the services
-    util.execute_scenarios(first_service, duplicated_service, another_service, timeout=60)
+    util.sync_execute_scenarios(first_service, duplicated_service, another_service, timeout=60)
 
 
 def test_transient_state(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
