@@ -19,19 +19,63 @@ It requires an LSM enabled orchestrator, with no ssl or authentication enabled, 
 
 This plugin is built around the remote_orchestrator fixture and the `ServiceInstance` class.
 
-Typical test cases using this fixture will look as follow:
-1. `test_full_cycle` relies on the helper function `service_full_cycle` to create, update and delete a service instance, following its progress asynchronously.  Multiple services are created by invoking the helper function multiple times.  All the coroutines created are passed to `util.execute_scenarios` which will take care of deploying all the services, and report the failures if any.  This asynchronous test case allows us to test multiple services at the same time, without a complete reset of the orchestrator.
-2. `test_transient_state` simply synchronously deploys and delete a service, and illustrates the usage of the `wait_for_state` method.
+You can easily write a test case that sends your project to a remote orchestrator, exports its service catalog, then deploy a service.  
 ```python
-import uuid
-import inmanta_lsm.model
-from pytest_inmanta import plugin
+def test_deploy_service(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    # get connection to remote_orchestrator
+    client = remote_orchestrator.client
 
-from pytest_inmanta_lsm import lsm_project, remote_orchestrator, service_instance, util
+    # setup project
+    project.compile("import quickstart")
 
-SERVICE_NAME = "vlan-assignment"
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
 
+    # verify the service is in the catalog
+    result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
+    assert result.code == 200
 
+    # Test the synchronous service instance class
+    instance = service_instance.SyncServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+
+    # Create the service instance and stop waiting in a transient state
+    created = instance.create(
+        {
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
+        wait_for_state="creating",
+        timeout=60,
+    )
+
+    # Wait for up state, we provide here the version from which we should follow the
+    # service, which is the version in which we last stopped following the service.  This
+    # guarantees that we don't "miss" the target state, in case it is a transient one, and
+    # don't confuse the start state for the target one in case it is the same one.
+    # The start version should always be the last version in which we know our service has
+    # been, BEFORE the target state we expect our service to go into.
+    instance.wait_for_state(
+        target_state="up",
+        start_version=created.version,
+        timeout=60,
+    )
+
+    # Delete the instance
+    instance.delete(wait_for_state="terminated", timeout=60)
+```
+> source: [test_quickstart.py::test_transient_state](./examples/quickstart/tests/test_quickstart.py)
+
+For a more advanced test case, you might also want to deploy multiple services.  You could either test them one by one, or, parallelize them, to:
+1. speed up the test case.
+2. test interference in between the services.
+
+In that case, the recommended way is to create an `async` helper, which follows the progress of your service, and instantiate multiple service with it, in a `sync` test case.
+```python
 async def service_full_cycle(
     remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
     router_ip: str,
@@ -111,57 +155,10 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
     )
 
     # Run all the services
-    util.execute_scenarios(first_service, another_service, timeout=60)
-
-
-def test_transient_state(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
-    # get connection to remote_orchestrator
-    client = remote_orchestrator.client
-
-    # setup project
-    project.compile("import quickstart")
-
-    # sync project and export service entities
-    remote_orchestrator.export_service_entities()
-
-    # verify the service is in the catalog
-    result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
-    assert result.code == 200
-
-    # Test the synchronous service instance class
-    instance = service_instance.SyncServiceInstance(
-        remote_orchestrator=remote_orchestrator,
-        service_entity_name=SERVICE_NAME,
-    )
-
-    # Create the service instance and stop waiting in a transient state
-    created = instance.create(
-        {
-            "router_ip": "10.1.9.17",
-            "interface_name": "eth1",
-            "address": "10.0.0.254/24",
-            "vlan_id": 14,
-        },
-        wait_for_state="creating",
-        timeout=60,
-    )
-
-    # Wait for up state, we provide here the version from which we should follow the
-    # service, which is the version in which we last stopped following the service.  This
-    # guarantees that we don't "miss" the target state, in case it is a transient one, and
-    # don't confuse the start state for the target one in case it is the same one.
-    # The start version should always be the last version in which we know our service has
-    # been, BEFORE the target state we expect our service to go into.
-    instance.wait_for_state(
-        target_state="up",
-        start_version=created.version,
-        timeout=60,
-    )
-
-    # Delete the instance
-    instance.delete(wait_for_state="terminated", timeout=60)
-
+    util.sync_execute_scenarios(first_service, another_service, timeout=60)
 ```
+> source: [test_quickstart.py::test_full_cycle](./examples/quickstart/tests/test_quickstart.py)
+
 
 ### Second case: mocking the lsm api
 
