@@ -13,7 +13,13 @@ import uuid
 import inmanta_lsm.model
 from pytest_inmanta import plugin
 
-from pytest_inmanta_lsm import lsm_project, remote_orchestrator, service_instance, util
+from pytest_inmanta_lsm import (
+    lsm_project,
+    remote_orchestrator,
+    remote_service_instance,
+    remote_service_instance_async,
+    util,
+)
 
 SERVICE_NAME = "vlan-assignment"
 
@@ -27,7 +33,7 @@ async def service_full_cycle(
     vlan_id_update: int,
 ) -> None:
     # Create an async service instance object
-    instance = service_instance.ServiceInstance(
+    instance = remote_service_instance_async.RemoteServiceInstance(
         remote_orchestrator=remote_orchestrator,
         service_entity_name=SERVICE_NAME,
     )
@@ -66,7 +72,7 @@ async def service_duplicate_rejection(
     remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
 ) -> None:
     # Create an async service instance object
-    instance = service_instance.ServiceInstance(
+    instance = remote_service_instance_async.RemoteServiceInstance(
         remote_orchestrator=remote_orchestrator,
         service_entity_name=SERVICE_NAME,
     )
@@ -158,7 +164,7 @@ def test_transient_state(project: plugin.Project, remote_orchestrator: remote_or
     assert result.code == 200
 
     # Test the synchronous service instance class
-    instance = service_instance.SyncServiceInstance(
+    instance = remote_service_instance.RemoteServiceInstance(
         remote_orchestrator=remote_orchestrator,
         service_entity_name=SERVICE_NAME,
     )

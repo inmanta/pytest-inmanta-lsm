@@ -36,7 +36,7 @@ def test_deploy_service(project: plugin.Project, remote_orchestrator: remote_orc
     assert result.code == 200
 
     # Test the synchronous service instance class
-    instance = service_instance.SyncServiceInstance(
+    instance = remote_service_instance.RemoteServiceInstance(
         remote_orchestrator=remote_orchestrator,
         service_entity_name=SERVICE_NAME,
     )
@@ -85,7 +85,7 @@ async def service_full_cycle(
     vlan_id_update: int,
 ) -> None:
     # Create an async service instance object
-    instance = service_instance.ServiceInstance(
+    instance = remote_service_instance_async.RemoteServiceInstance(
         remote_orchestrator=remote_orchestrator,
         service_entity_name=SERVICE_NAME,
     )
