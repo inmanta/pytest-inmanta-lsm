@@ -17,7 +17,7 @@ It requires an LSM enabled orchestrator, with no ssl or authentication enabled, 
 
 ### First case: using a remote orchestrator
 
-This plugin is built around the remote_orchestrator fixture and the `ServiceInstance` class.
+This plugin is built around the remote_orchestrator fixture and the `RemoteServiceInstance` class.
 
 You can easily write a test case that sends your project to a remote orchestrator, exports its service catalog, then deploy a service.  
 ```python
@@ -70,11 +70,11 @@ def test_deploy_service(project: plugin.Project, remote_orchestrator: remote_orc
 ```
 > source: [test_quickstart.py::test_transient_state](./examples/quickstart/tests/test_quickstart.py)
 
-For a more advanced test case, you might also want to deploy multiple services.  You could either test them one by one, or, parallelize them, to:
+For a more advanced test case, you might also want to deploy multiple services.  You could either test them one by one, or, parallelize them, in order to:
 1. speed up the test case.
 2. test interference in between the services.
 
-In that case, the recommended way is to create an `async` helper, which follows the progress of your service, and instantiate multiple service with it, in a `sync` test case.
+In that case, the recommended way is to create an `async` helper, which follows the progress of your service, and instantiate multiple services with it, in a `sync` test case.
 ```python
 async def service_full_cycle(
     remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
