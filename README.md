@@ -17,21 +17,16 @@ It requires an LSM enabled orchestrator, with no ssl or authentication enabled, 
 
 ### First case: using a remote orchestrator
 
-This plugin is built around the remote_orchestrator fixture.
+This plugin is built around the remote_orchestrator fixture and the `RemoteServiceInstance` class.
 
-A typical testcase using this plugin looks as follows:
+You can easily write a test case that sends your project to a remote orchestrator, exports its service catalog, then deploy a service.  
 ```python
-
-def test_full_cycle(project, remote_orchestrator):
+def test_deploy_service(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
     # get connection to remote_orchestrator
     client = remote_orchestrator.client
 
     # setup project
-    project.compile(
-        """
-        import quickstart
-        """
-    )
+    project.compile("import quickstart")
 
     # sync project and export service entities
     remote_orchestrator.export_service_entities()
@@ -40,30 +35,130 @@ def test_full_cycle(project, remote_orchestrator):
     result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
     assert result.code == 200
 
-    # get a ManagedInstance object, to simplifies interacting with a specific service instance
-    service_instance = remote_orchestrator.get_managed_instance(SERVICE_NAME)
-
-    # create an instance and wait for it to be up
-    service_instance.create(
-        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-        wait_for_state="up",
+    # Test the synchronous service instance class
+    instance = remote_service_instance.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
     )
 
-    # make validation fail by creating a duplicate
-    remote_orchestrator.get_managed_instance(SERVICE_NAME).create(
-        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-        wait_for_state="rejected",
+    # Create the service instance and stop waiting in a transient state
+    created = instance.create(
+        {
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
+        wait_for_state="creating",
+        timeout=60,
     )
 
-    service_instance.update(
-        attribute_updates={"vlan_id": 42},
-        wait_for_state="up",
+    # Wait for up state, we provide here the version from which we should follow the
+    # service, which is the version in which we last stopped following the service.  This
+    # guarantees that we don't "miss" the target state, in case it is a transient one, and
+    # don't confuse the start state for the target one in case it is the same one.
+    # The start version should always be the last version in which we know our service has
+    # been, BEFORE the target state we expect our service to go into.
+    instance.wait_for_state(
+        target_state="up",
+        start_version=created.version,
+        timeout=60,
     )
 
-    # break it down
-    service_instance.delete()
-
+    # Delete the instance
+    instance.delete(wait_for_state="terminated", timeout=60)
 ```
+> source: [test_quickstart.py::test_transient_state](./examples/quickstart/tests/test_quickstart.py)
+
+For a more advanced test case, you might also want to deploy multiple services.  You could either test them one by one, or, parallelize them, in order to:
+1. speed up the test case.
+2. test interference in between the services.
+
+In that case, the recommended way is to create an `async` helper, which follows the progress of your service, and instantiate multiple services with it, in a `sync` test case.
+```python
+async def service_full_cycle(
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    router_ip: str,
+    interface_name: str,
+    address: str,
+    vlan_id: int,
+    vlan_id_update: int,
+) -> None:
+    # Create an async service instance object
+    instance = remote_service_instance_async.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+
+    # Create the service instance on the remote orchestrator
+    await instance.create(
+        {
+            "router_ip": router_ip,
+            "interface_name": interface_name,
+            "address": address,
+            "vlan_id": vlan_id,
+        },
+        wait_for_state="up",
+        timeout=60,
+    )
+
+    # Update the vlan id
+    await instance.update(
+        [
+            inmanta_lsm.model.PatchCallEdit(
+                edit_id=str(uuid.uuid4()),
+                operation=inmanta_lsm.model.EditOperation.replace,
+                target="vlan_id",
+                value=vlan_id_update,
+            ),
+        ],
+        wait_for_state="up",
+        timeout=60,
+    )
+
+    # Delete the instance
+    await instance.delete(wait_for_state="terminated", timeout=60)
+
+
+def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    # get connection to remote_orchestrator
+    client = remote_orchestrator.client
+
+    # setup project
+    project.compile("import quickstart")
+
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
+
+    # verify the service is in the catalog
+    result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
+    assert result.code == 200
+
+    # Create a first service that should be deployed
+    first_service = service_full_cycle(
+        remote_orchestrator=remote_orchestrator,
+        router_ip="10.1.9.17",
+        interface_name="eth1",
+        address="10.0.0.254/24",
+        vlan_id=14,
+        vlan_id_update=42,
+    )
+
+    # Create another valid service
+    another_service = service_full_cycle(
+        remote_orchestrator=remote_orchestrator,
+        router_ip="10.1.9.18",
+        interface_name="eth2",
+        address="10.0.0.253/24",
+        vlan_id=15,
+        vlan_id_update=52,
+    )
+
+    # Run all the services
+    util.sync_execute_scenarios(first_service, another_service, timeout=60)
+```
+> source: [test_quickstart.py::test_full_cycle](./examples/quickstart/tests/test_quickstart.py)
+
 
 ### Second case: mocking the lsm api
 

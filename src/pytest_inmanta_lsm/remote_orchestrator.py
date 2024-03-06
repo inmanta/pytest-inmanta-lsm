@@ -19,6 +19,7 @@ from uuid import UUID
 import inmanta.data.model
 import inmanta.module
 import inmanta.protocol.endpoints
+import pydantic
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from packaging.version import Version
@@ -162,6 +163,9 @@ class OrchestratorEnvironment:
             return current_environment
 
 
+T = typing.TypeVar("T")
+
+
 class RemoteOrchestrator:
     """
     This class helps to interact with a real remote orchestrator.  Its main focus is to help
@@ -210,6 +214,7 @@ class RemoteOrchestrator:
 
         # Build the client once, it loads the config on every call
         self.client = inmanta.protocol.endpoints.SyncClient("client")
+        self.async_client = inmanta.protocol.endpoints.Client("client")
 
         # Setting up the client when the config is loaded
         self.setup_config()
@@ -257,6 +262,40 @@ class RemoteOrchestrator:
                     inmanta_config.Config.set(section, "ssl_ca_cert_file", self.ca_cert)
             if self.token:
                 inmanta_config.Config.set(section, "token", self.token)
+
+    @typing.overload
+    async def request(self, method: str, returned_type: None = None, **kwargs: object) -> None:
+        pass
+
+    @typing.overload
+    async def request(self, method: str, returned_type: type[T], **kwargs: object) -> T:
+        pass
+
+    async def request(
+        self,
+        method: str,
+        returned_type: typing.Optional[type[T]] = None,
+        **kwargs: object,
+    ) -> typing.Optional[T]:
+        """
+        Helper method to send a request to the orchestrator, which we expect to succeed with 20X code and
+        return an object of a given type.
+
+        :param method: The name of the method to execute
+        :param returned_type: The type of the object that the api should return
+        :param **kwargs: Parameters to pass to the method we are calling
+        """
+        response: Result = await getattr(self.async_client, method)(**kwargs)
+        assert response.code in range(200, 300), str(response.result)
+        if returned_type is not None:
+            assert response.result is not None, str(response)
+            try:
+                return pydantic.TypeAdapter(returned_type).validate_python(response.result["data"])
+            except AttributeError:
+                # Handle pydantic v1
+                return pydantic.parse_obj_as(returned_type, response.result["data"])
+        else:
+            return None
 
     def _get_server_version(self) -> Version:
         """

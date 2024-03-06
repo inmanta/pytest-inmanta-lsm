@@ -14,9 +14,7 @@ from uuid import UUID
 
 from inmanta_lsm.diagnose.model import FullDiagnosis
 
-from pytest_inmanta_lsm import remote_orchestrator as r_orchestrator
-from pytest_inmanta_lsm.exceptions import VersionExceededError, VersionMismatchError
-from pytest_inmanta_lsm.wait_for_state import State, WaitForState
+from pytest_inmanta_lsm import exceptions, remote_orchestrator, wait_for_state
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,7 +44,7 @@ class ManagedServiceInstance:
 
     def __init__(
         self,
-        remote_orchestrator: "r_orchestrator.RemoteOrchestrator",
+        remote_orchestrator: "remote_orchestrator.RemoteOrchestrator",
         service_entity_name: str,
         service_id: Optional[UUID] = None,
         lookback_depth: int = 1,
@@ -252,7 +250,7 @@ class ManagedServiceInstance:
 
     def get_state(
         self,
-    ) -> State:
+    ) -> wait_for_state.State:
         """Get the current state of the service instance"""
         response = self.remote_orchestrator.client.lsm_services_get(
             tid=self.remote_orchestrator.environment,
@@ -265,9 +263,9 @@ class ManagedServiceInstance:
         instance_state = response.result["data"]["state"]
         instance_version = int(response.result["data"]["version"])
 
-        return State(name=instance_state, version=instance_version)
+        return wait_for_state.State(name=instance_state, version=instance_version)
 
-    def get_states(self, after_version: int = 0) -> List[State]:
+    def get_states(self, after_version: int = 0) -> List[wait_for_state.State]:
         """
         Get all the states the managed instance went through after the given version
 
@@ -284,7 +282,9 @@ class ManagedServiceInstance:
 
         logs = response.result["data"]
 
-        return [State(name=log["state"], version=log["version"]) for log in logs if log["version"] > after_version]
+        return [
+            wait_for_state.State(name=log["state"], version=log["version"]) for log in logs if log["version"] > after_version
+        ]
 
     def wait_for_state(
         self,
@@ -332,13 +332,13 @@ class ManagedServiceInstance:
         elif version is not None and versions is not None:
             raise ValueError("Both 'version' and 'versions' arguments can not be set")
 
-        def compare_states(current_state: State, wait_for_states: List[str]) -> bool:
+        def compare_states(current_state: wait_for_state.State, wait_for_states: List[str]) -> bool:
             if current_state.name in wait_for_states:
                 if len(desired_versions) == 0:
                     # Version is not given, so version does not need to be verified
                     return True
                 elif current_state.version not in desired_versions:
-                    raise VersionMismatchError(self, desired_versions, current_state.version)
+                    raise exceptions.VersionMismatchError(self, desired_versions, current_state.version)
                 else:
                     return True
             elif (
@@ -346,16 +346,16 @@ class ManagedServiceInstance:
                 and current_state.version is not None
                 and max(desired_versions) <= current_state.version
             ):
-                raise VersionExceededError(self, desired_versions, current_state.version)
+                raise exceptions.VersionExceededError(self, desired_versions, current_state.version)
 
             return False
 
-        def check_start_state(current_state: State) -> bool:
+        def check_start_state(current_state: wait_for_state.State) -> bool:
             if start_version is None:
                 return False
             return current_state.version == start_version
 
-        def get_bad_state_error(current_state: State) -> FullDiagnosis:
+        def get_bad_state_error(current_state: wait_for_state.State) -> FullDiagnosis:
             result = self.remote_orchestrator.client.lsm_services_diagnose(
                 tid=self.remote_orchestrator.environment,
                 service_entity=self.service_entity_name,
@@ -371,7 +371,7 @@ class ManagedServiceInstance:
 
             return FullDiagnosis(**result.result["data"])
 
-        wait_for_obj = WaitForState(
+        wait_for_obj = wait_for_state.WaitForState(
             "Instance lifecycle",
             get_states_method=self.get_states,
             compare_states_method=compare_states,

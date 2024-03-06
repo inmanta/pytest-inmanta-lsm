@@ -33,7 +33,7 @@ INMANTA_LSM_MODULE_NOT_LOADED = (
 try:
     from inmanta.util import dict_path
 except ImportError:
-    from inmanta_lsm import dict_path
+    from inmanta_lsm import dict_path  # type: ignore[no-redef]
 
 
 class LsmProject:
