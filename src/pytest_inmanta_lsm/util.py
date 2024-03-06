@@ -37,6 +37,7 @@ async def execute_scenarios(
     all scenarios are done).  If multiple scenarios fail, raise a wrapper exception that
     contains them all.
 
+    :param *scenarios: A sequence of scenario to execute, sequentially or not.
     :param sequential: Execute all the scenarios sequentially instead of concurrently.
         Defaults to False, can be enabled for debugging purposes, to get cleaner logs.
     :param timeout: A global timeout to set for the execution of all scenarios.

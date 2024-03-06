@@ -113,7 +113,7 @@ class RemoteServiceInstance:
         Update the service instance with the given `attribute_updates` and wait for it to go into `wait_for_state`.
 
         :param edit: The actual edit operations to perform.
-        :param current_version: current version, defaults to None.
+        :param current_version: current version of the service, defaults to None.
         :param wait_for_state: wait for this state to be reached, if set to None, returns directly, and doesn't wait.
         :param wait_for_version: The version the service is expected to be in once we reached the target
             state.  If we reach this version but not the target state or the opposite, the state will
@@ -138,7 +138,7 @@ class RemoteServiceInstance:
         """
         Delete the service instance and wait for it to go into `wait_for_state`.
 
-        :param current_version: current version, defaults to None.
+        :param current_version: current version of the service, defaults to None.
         :param wait_for_state: wait for this state to be reached, if set to None, returns directly, and doesn't wait.
         :param wait_for_version: The version the service is expected to be in once we reached the target
             state.  If we reach this version but not the target state or the opposite, the state will
@@ -164,6 +164,8 @@ class RemoteServiceInstance:
         """
         Set the service instance to a given state, and wait for it to go into `wait_for_state`.
 
+        :param state: The state we want to set the service to.
+        :param current_version: current version of the service, defaults to None.
         :param wait_for_state: wait for this state to be reached, if set to None, returns directly, and doesn't wait.
         :param wait_for_version: The version the service is expected to be in once we reached the target
             state.  If we reach this version but not the target state or the opposite, the state will

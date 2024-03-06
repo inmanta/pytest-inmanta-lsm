@@ -72,7 +72,7 @@ class BadStateError(RemoteServiceInstanceError[T]):
     ) -> None:
         super().__init__(
             instance,
-            f"Service instance for into bad state {log.state} (version: {log.version}) " f"from bad state list: {bad_states}",
+            f"Service instance for into bad state {log.state} (version: {log.version}) from bad state list: {bad_states}",
             *args,
         )
         self.bad_states = bad_states
@@ -153,6 +153,7 @@ class RemoteServiceInstance:
     @property
     def instance_name(self) -> str:
         if self._instance_name is None:
+            # Build a default instance name if we don't have a better one to propose
             return f"{self.service_entity_name}({self.instance_id})"
         else:
             return self._instance_name
@@ -299,9 +300,9 @@ class RemoteServiceInstance:
                 # We reached the timeout, we should stop waiting and raise an exception
                 LOGGER.info(
                     "Service instance %s exceeded timeout while waiting for %s, current state is %s",
-                    self._instance_name,
-                    target_state,
-                    log.state,
+                    self.instance_name,
+                    repr(target_state),
+                    repr(last_state) if last_state is not None else "unknown",
                 )
                 raise StateTimeoutError(self, target_state, target_version, timeout)
 
@@ -363,14 +364,13 @@ class RemoteServiceInstance:
             instance_summary=False,
         )
         if service_entity.service_identity is not None:
+            # Create a nice display name for our instance, based on the identity attribute the
+            # developer already chose
             self._instance_name = (
                 f"{self.service_entity_name}"
                 f"({service_entity.service_identity}={service_instance.service_identity_attribute_value})"
             )
             LOGGER.info("Created instance has name %s", self.instance_name)
-        else:
-            # There is no service_identity_display_name, so we use the instance id
-            self._instance_name = f"{self.service_entity_name}({self.instance_id})"
 
         if wait_for_state is not None:
             # Wait for our service to reach the target state
@@ -398,7 +398,7 @@ class RemoteServiceInstance:
         Update the service instance with the given `attribute_updates` and wait for it to go into `wait_for_state`.
 
         :param edit: The actual edit operations to perform.
-        :param current_version: current version, defaults to None.
+        :param current_version: current version of the service, defaults to None.
         :param wait_for_state: wait for this state to be reached, if set to None, returns directly, and doesn't wait.
         :param wait_for_version: The version the service is expected to be in once we reached the target
             state.  If we reach this version but not the target state or the opposite, the state will
@@ -452,7 +452,7 @@ class RemoteServiceInstance:
         """
         Delete the service instance and wait for it to go into `wait_for_state`.
 
-        :param current_version: current version, defaults to None.
+        :param current_version: current version of the service, defaults to None.
         :param wait_for_state: wait for this state to be reached, if set to None, returns directly, and doesn't wait.
         :param wait_for_version: The version the service is expected to be in once we reached the target
             state.  If we reach this version but not the target state or the opposite, the state will
@@ -504,6 +504,8 @@ class RemoteServiceInstance:
         """
         Set the service instance to a given state, and wait for it to go into `wait_for_state`.
 
+        :param state: The state we want to set the service to.
+        :param current_version: current version of the service, defaults to None.
         :param wait_for_state: wait for this state to be reached, if set to None, returns directly, and doesn't wait.
         :param wait_for_version: The version the service is expected to be in once we reached the target
             state.  If we reach this version but not the target state or the opposite, the state will
