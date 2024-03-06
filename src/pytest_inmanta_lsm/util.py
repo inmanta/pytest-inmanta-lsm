@@ -24,7 +24,7 @@ else:
     # The ExceptionGroup has been introduced in python3.11, if we have
     # a recent enough version of python, we should use it.
     # https://docs.python.org/3/library/exceptions.html#ExceptionGroup
-    ExceptionGroupError = ExceptionGroup
+    ExceptionGroupError = ExceptionGroup  # noqa: F821
 
 
 async def execute_scenarios(
