@@ -220,13 +220,13 @@ class RemoteServiceInstance:
             bad_states = self.ALL_BAD_STATES
 
         def is_done(log: model.ServiceInstanceLog) -> bool:
-            if target_version is None:
-                # Check if we are in the desired state
-                return log.state == target_state
-
             # Check if we are in any of the bad states
             if log.state in bad_states:
                 raise BadStateError(self, bad_states, log)
+
+            if target_version is None:
+                # Check if we are in the desired state
+                return log.state == target_state
 
             # Check if the service version is passed the maximum value we can accept
             if log.version > target_version:
