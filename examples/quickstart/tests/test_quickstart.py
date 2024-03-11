@@ -50,7 +50,7 @@ async def service_full_cycle(
         },
         wait_for_state="up",
         timeout=60,
-        bad_states=["creating_failed", "failed"],
+        bad_states=["rejected", "failed"],
     )
     if create_fail:
         with pytest.raises(remote_service_instance_async.BadStateError):
@@ -110,6 +110,7 @@ async def service_duplicate_rejection(
         attributes,
         wait_for_state="rejected",
         timeout=60,
+        bad_states=["up"],
     )
 
     # Delete the instance
