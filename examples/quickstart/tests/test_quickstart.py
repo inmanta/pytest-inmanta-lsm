@@ -55,6 +55,7 @@ async def service_full_cycle(
     if create_fail:
         with pytest.raises(remote_service_instance_async.BadStateError):
             await creation
+        return
     else:
         await creation
 
@@ -157,11 +158,11 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
     # Create a service that will fail to deploy
     another_service = service_full_cycle(
         remote_orchestrator=remote_orchestrator,
-        router_ip="10.1.9.18",
+        router_ip="10.1.9.19",
         interface_name="fake_interface",
-        address="10.0.0.253/24",
-        vlan_id=15,
-        vlan_id_update=52,
+        address="10.0.0.252/24",
+        vlan_id=16,
+        vlan_id_update=62,
         create_fail=True,
     )
 
