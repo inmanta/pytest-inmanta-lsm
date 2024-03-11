@@ -35,6 +35,8 @@ implementation vlanAssignment for VlanAssignment:
     all = NullResource(
         name=interface_name,
         desired_value=router_ip,
+        # Make the resource fail if the interface we used is not right
+        fail=interface_name == "fake_interface",
     )
     self.resources += all
 end
