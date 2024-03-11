@@ -11,6 +11,7 @@ import datetime
 import uuid
 
 import inmanta_lsm.model
+import pytest
 from pytest_inmanta import plugin
 
 from pytest_inmanta_lsm import (
@@ -31,6 +32,7 @@ async def service_full_cycle(
     address: str,
     vlan_id: int,
     vlan_id_update: int,
+    create_fail: bool = False,
 ) -> None:
     # Create an async service instance object
     instance = remote_service_instance_async.RemoteServiceInstance(
@@ -39,7 +41,7 @@ async def service_full_cycle(
     )
 
     # Create the service instance on the remote orchestrator
-    await instance.create(
+    creation = instance.create(
         {
             "router_ip": router_ip,
             "interface_name": interface_name,
@@ -48,7 +50,13 @@ async def service_full_cycle(
         },
         wait_for_state="up",
         timeout=60,
+        bad_states=["creating_failed", "failed"],
     )
+    if create_fail:
+        with pytest.raises(remote_service_instance_async.BadStateError):
+            await creation
+    else:
+        await creation
 
     # Update the vlan id
     await instance.update(
@@ -61,6 +69,7 @@ async def service_full_cycle(
             ),
         ],
         wait_for_state="up",
+        bad_states=["update_rejected", "update_failed"],
         timeout=60,
     )
 
@@ -143,6 +152,17 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
         address="10.0.0.253/24",
         vlan_id=15,
         vlan_id_update=52,
+    )
+
+    # Create a service that will fail to deploy
+    another_service = service_full_cycle(
+        remote_orchestrator=remote_orchestrator,
+        router_ip="10.1.9.18",
+        interface_name="fake_interface",
+        address="10.0.0.253/24",
+        vlan_id=15,
+        vlan_id_update=52,
+        create_fail=True,
     )
 
     # Run all the services
