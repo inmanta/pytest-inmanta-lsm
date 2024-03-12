@@ -326,7 +326,11 @@ def remote_orchestrator_shared(
     )
 
     # Make sure we start our test suite with a clean environment
+    result = remote_orchestrator.client.halt_environment(remote_orchestrator.environment)
+    assert result.code in range(200, 300), str(result.result)
     remote_orchestrator.clear_environment()
+    result = remote_orchestrator.client.resume_environment(remote_orchestrator.environment)
+    assert result.code in range(200, 300), str(result.result)
 
     # Get the former cached modules back into the project to speed up
     # subsequent test cases
@@ -340,16 +344,16 @@ def remote_orchestrator_shared(
     # Configure the client once more, to make sure we can cleanup everything behind us
     remote_orchestrator.setup_config()
 
-    # If --lsm-no-clean is used, leave the orchestrator as it is, with all its
-    # file, otherwise cleanup the project
-    if not remote_orchestrator_no_clean:
-        remote_orchestrator.clear_environment()
-
     # If --lsm-no-halt is used, leave the orchestrator running at the end of the
     # test suite.  Otherwise the environment is halted.
     if not remote_orchestrator_no_halt:
         result = remote_orchestrator.client.halt_environment(remote_orchestrator.environment)
         assert result.code in range(200, 300), str(result.result)
+
+    # If --lsm-no-clean is used, leave the orchestrator as it is, with all its
+    # file, otherwise cleanup the project
+    if not remote_orchestrator_no_clean:
+        remote_orchestrator.clear_environment()
 
 
 @pytest.fixture(scope="session")
