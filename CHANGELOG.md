@@ -2,6 +2,7 @@
 Changes in this release:
 - Better logs when `docker-compose` in not installed
 - Add async RemoteServiceInstance class, for async service testing.
+- Make sure to first halt the environment before clearing it.
 
 # v 3.2.0 (2024-02-20)
 Changes in this release:
