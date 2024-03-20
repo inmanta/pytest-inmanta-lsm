@@ -215,6 +215,9 @@ def test_transient_state(project: plugin.Project, remote_orchestrator: remote_or
 
 
 def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+    # Export the service entities
+    lsm_project.export_service_entities("import quickstart")
+
     service = inmanta_lsm.model.ServiceInstance(
         id=uuid.uuid4(),
         environment=lsm_project.environment,
@@ -238,13 +241,11 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
         service_identity_attribute_value=None,
     )
 
+    # Add a service to our inventory
     lsm_project.add_service(service)
 
-    # Export the service entities
-    lsm_project.export_service_entities("import quickstart")
-
     # Do a first validation compile, and add all default values to our candidate attributes
-    lsm_project.compile("import quickstart", service_id=service.id, validation=True, add_defaults=True)
+    lsm_project.compile(service_id=service.id, validation=True, add_defaults=True)
 
     # Assert that the default value has been added to our attributes
     assert "value_with_default" in service.candidate_attributes
@@ -255,4 +256,4 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     service.state = "creating"
 
     # Do a second compile, in the non-validating creating state
-    lsm_project.compile("import quickstart", service_id=service.id)
+    lsm_project.compile(service_id=service.id)

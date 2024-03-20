@@ -60,7 +60,8 @@ class LsmProject:
         self.project = project
         self.monkeypatch = monkeypatch
         self.partial_compile = partial_compile
-        self.service_entities: dict[str, inmanta_lsm.model.ServiceEntity] = {}
+        self.service_entities: typing.Optional[dict[str, inmanta_lsm.model.ServiceEntity]] = None
+        self.model: typing.Optional[str] = None
 
         # We monkeypatch the client and the global cache now so that the project.compile
         # method can still be used normally, to perform "global" compiles (not specific to
@@ -281,6 +282,9 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during export of the
         service entities.
         """
+        assert self.service_entities is not None, "Bad usage!!"
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
         if service_entity not in self.service_entities:
             return inmanta.protocol.common.Result(code=404)
 
@@ -305,6 +309,9 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during export of the
         service entities.
         """
+        assert self.service_entities is not None, "Bad usage!!"
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
         # Don't do any validation, just save the service in the catalog
         self.service_entities[service_entity_definition.name] = service_entity_definition
         return self.lsm_service_catalog_get_entity(tid, service_entity_definition.name)
@@ -320,6 +327,9 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during export of the
         service entities.
         """
+        assert self.service_entities is not None, "Bad usage!!"
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
         # Just the same as doing a create, we overwrite whatever value was already there
         return self.lsm_service_catalog_create_entity(tid, service_entity_definition)
 
@@ -353,6 +363,10 @@ class LsmProject:
             for binding in ["lsm::ServiceEntityBinding", "lsm::ServiceEntityBindingV2"]
         }
 
+        # Save the model used in the export, and reset the service entity catalog
+        self.model = model
+        self.service_entities = {}
+
         with self.monkeypatch.context() as m:
             # Monkey patch the sync client constructor call, so that the object
             # constructed inside of the lsm function has the patches we want it to have
@@ -374,12 +388,20 @@ class LsmProject:
         if str(service.id) in self.services:
             raise ValueError("There is already a service with that id in this environment")
 
+        if self.service_entities is not None:
+            # Check that the service we created is part of our catalog
+            if service.service_entity not in self.service_entities:
+                raise ValueError(
+                    f"Unknown service entity {service.service_entity} for service instance {service.id}.  "
+                    f"Supported services are: {list(self.service_entities.keys())}."
+                )
+
         self.services[str(service.id)] = service
 
     def compile(
         self,
-        model: str,
-        service_id: uuid.UUID,
+        model: typing.Optional[str] = None,
+        service_id: typing.Optional[uuid.UUID] = None,
         validation: bool = True,
         add_defaults: bool = False,
     ) -> None:
@@ -388,9 +410,12 @@ class LsmProject:
         set will be selected based on the current state of the service.  If some allocation is
         involved, the attributes of the service will be updated accordingly.
 
-        :param model: The model to compile (passed to project.compile)
+        :param model: The model to compile (passed to project.compile).  If no model is specified,
+            default to the model that was exported (in export_service_entities).  If no model was
+            exported, raise a ValueError.
         :param service_id: The id of the service that should be compiled, the service must have
-            been added to the set of services prior to the compile.
+            been added to the set of services prior to the compile.  If no service_id is provided,
+            do a normal, full-compile.
         :param validation: Whether this is a validation compile or not.
         :param add_defaults: Whether the service attribute should be updated to automatically
             add all the default values defined in the model, similarly to what the lsm api does.
@@ -398,14 +423,44 @@ class LsmProject:
             1.  This is the initial validation compile, all the attributes are set in the candidate set.
             2.  You have called self.export_service_entities prior to calling this method.
         """
-        service = self.services[str(service_id)]
-
-        if add_defaults and not validation:
+        # Make sure we have a model to compile
+        if model is not None:
+            pass
+        elif self.model is not None:
+            model = self.model
+        else:
             raise ValueError(
-                "Bad usage, defaults can only be set on the initial validation compile but validation is disabled."
+                "No model to compile, please provide a model in argument or "
+                "run the export_service_entities method, with the model that "
+                "should be used for all later compiles."
             )
 
+        if service_id is None:
+            # This is not a service-specific compile, we can just run the compile
+            # without setting any environment variables
+            self.project.compile(model, no_dedent=False)
+            return
+
+        if str(service_id) not in self.services:
+            raise ValueError(
+                f"Can not find any service with id {service_id} in our inventory.  "
+                "Did you add it using the add_service method?"
+            )
+
+        service = self.services[str(service_id)]
+
         if add_defaults:
+
+            if not validation:
+                raise ValueError(
+                    "Bad usage, defaults can only be set on the initial validation compile but validation is disabled."
+                )
+
+            if self.service_entities is None:
+                raise ValueError(
+                    "Bad usage, defaults can only be applied when the corresponding service entity has been exported."
+                )
+
             # Make sure we have the service entity in our catalog
             if service.service_entity not in self.service_entities:
                 raise RuntimeError(
