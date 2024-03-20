@@ -193,8 +193,20 @@ def test_model(lsm_project: lsm_project.LsmProject) -> None:
     # for EACH compile
     lsm_project.add_service(service)
 
-    # Run a compile, with central focus the service we just created
+    # Export the service entities
+    lsm_project.export_service_entities("import quickstart")
+
+    # Do a first validation compile, and add all default values to our candidate attributes
+    lsm_project.compile("import quickstart", service_id=service.id, validation=True, add_defaults=True)
+
+    # The first validation compile went fine, move to the next state
+    pytest_inmanta_lsm.lsm_project.promote(service)
+    service.version += 1
+    service.state = "creating"
+
+    # Do a second compile, in the non-validating creating state
     lsm_project.compile("import quickstart", service_id=service.id)
+
 ```
 
 ## Options and environment variables

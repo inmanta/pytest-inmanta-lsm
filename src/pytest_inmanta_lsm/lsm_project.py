@@ -36,6 +36,17 @@ except ImportError:
     from inmanta_lsm import dict_path  # type: ignore[no-redef,attr-defined]
 
 
+def promote(service: inmanta_lsm.model.ServiceInstance) -> None:
+    """
+    Helper to perform the promote operation on the attribute sets of a service.
+
+    :param service: The service that should be promoted.
+    """
+    service.rollback_attributes = service.active_attributes
+    service.active_attributes = service.candidate_attributes
+    service.candidate_attributes = None
+
+
 class LsmProject:
     def __init__(
         self,
