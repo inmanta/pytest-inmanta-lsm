@@ -376,13 +376,18 @@ class LsmProject:
         :param model: The model to compile (passed to project.compile)
         :param service_id: The id of the service that should be compiled, the service must have
             been added to the set of services prior to the compile.
-        :param validation_compile: Whether this is a validation compile or not.
+        :param validation: Whether this is a validation compile or not.
+        :param add_defaults: Whether the service attribute should be updated to automatically
+            add all the default values defined in the model, similarly to what the lsm api does.
+            This can only be set to True if the following conditions are met:
+            1.  This is the initial validation compile, all the attributes are set in the candidate set.
+            2.  You have called self.export_service_entities prior to calling this method.
         """
         service = self.services[str(service_id)]
 
         if add_defaults and not validation:
             raise ValueError(
-                "Bad usage, defaults can only be set on the initial validation compile " "but validation is disabled."
+                "Bad usage, defaults can only be set on the initial validation compile but validation is disabled."
             )
 
         if add_defaults:
