@@ -222,7 +222,12 @@ def test_model(lsm_project: lsm_project.LsmProject) -> None:
         version=1,
         config={},
         state="start",
-        candidate_attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
+        candidate_attributes={
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
         active_attributes=None,
         rollback_attributes=None,
         created_at=datetime.datetime.now(),
@@ -235,8 +240,11 @@ def test_model(lsm_project: lsm_project.LsmProject) -> None:
 
     lsm_project.add_service(service)
 
+    # Export the service entities
+    lsm_project.export_service_entities("import quickstart")
+
     # Do a first compile, everything should go fine
-    lsm_project.compile("import quickstart", service_id=service.id)
+    lsm_project.compile("import quickstart", service_id=service.id, validation=True, add_defaults=True)
 
     # Do a second compile, everything should go fine
     lsm_project.compile("import quickstart", service_id=service.id)
