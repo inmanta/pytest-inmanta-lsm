@@ -141,13 +141,6 @@ class LsmProject:
             raising=False,
         )
 
-        self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
-            "lsm_service_catalog_update_entity",
-            self.lsm_service_catalog_update_entity,
-            raising=False,
-        )
-
     def lsm_global_cache_reset(self, original_global_cache_reset_method: typing.Callable[[], None]) -> None:
         """
         This is a placeholder for the lsm global_cache reset method.  First it calls the original method,
@@ -298,20 +291,6 @@ class LsmProject:
         self.service_entities[service_entity_definition.name] = service_entity_definition
         return inmanta.protocol.common.Result(code=200)
 
-    def lsm_service_catalog_update_entity(
-        self,
-        tid: uuid.UUID,
-        service_entity: str,
-        service_entity_definition: inmanta_lsm.model.ServiceEntity,
-        allow_instance_updates: bool = False,
-    ) -> inmanta.protocol.common.Result:
-        """
-        This is a mock for the lsm api, this method is called during export of the
-        service entities.
-        """
-        # We don't do any validation so we can simply reuse the create method
-        return self.lsm_service_catalog_create_entity(tid, service_entity_definition)
-
     def export_service_entities(self, model: str) -> None:
         """
         Export the service entities, and save the resulting objects in this object.
@@ -326,8 +305,9 @@ class LsmProject:
         except ImportError as e:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
 
-        # Empty the service catalog and perform a compile
-        with self.monkeypatch.setattr(self, "services", {}):
+        # Make a compile without any services in the catalog
+        with self.monkeypatch.context() as m:
+            m.setattr(self, "services", {})
             self.project.compile(model, no_dedent=False)
 
         # Get the exporter, it should have been set during the compile
