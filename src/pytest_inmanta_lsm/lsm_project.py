@@ -15,8 +15,8 @@ import warnings
 import inmanta.config
 import inmanta.protocol.common
 import inmanta.util
-import inmanta_lsm.const
-import inmanta_lsm.model
+import inmanta_lsm.const  # type: ignore[import-not-found]
+import inmanta_lsm.model  # type: ignore[import-not-found]
 import pydantic.types
 import pytest
 import pytest_inmanta.plugin
@@ -33,7 +33,7 @@ INMANTA_LSM_MODULE_NOT_LOADED = (
 try:
     from inmanta.util import dict_path
 except ImportError:
-    from inmanta_lsm import dict_path  # type: ignore[no-redef]
+    from inmanta_lsm import dict_path  # type: ignore[no-redef,attr-defined]
 
 
 class LsmProject:
@@ -138,6 +138,13 @@ class LsmProject:
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_service_catalog_create_entity",
             self.lsm_service_catalog_create_entity,
+            raising=False,
+        )
+
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_service_catalog_update_entity",
+            self.lsm_service_catalog_update_entity,
             raising=False,
         )
 
@@ -263,20 +270,20 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during export of the
         service entities.
         """
-        if service_entity in self.service_entities:
-            return inmanta.protocol.common.Result(
-                code=200,
-                result={
-                    "data": json.loads(
-                        json.dumps(
-                            self.service_entities[service_entity],
-                            default=inmanta.util.api_boundary_json_encoder,
-                        ),
-                    ),
-                },
-            )
+        if service_entity not in self.service_entities:
+            return inmanta.protocol.common.Result(code=404)
 
-        return inmanta.protocol.common.Result(code=404)
+        return inmanta.protocol.common.Result(
+            code=200,
+            result={
+                "data": json.loads(
+                    json.dumps(
+                        self.service_entities[service_entity],
+                        default=inmanta.util.api_boundary_json_encoder,
+                    ),
+                ),
+            },
+        )
 
     def lsm_service_catalog_create_entity(
         self,
@@ -289,7 +296,21 @@ class LsmProject:
         """
         # Don't do any validation, just save the service in the catalog
         self.service_entities[service_entity_definition.name] = service_entity_definition
-        return inmanta.protocol.common.Result(code=200)
+        return self.lsm_service_catalog_get_entity(tid, service_entity_definition.name)
+
+    def lsm_service_catalog_update_entity(
+        self,
+        tid: uuid.UUID,
+        service_entity: str,
+        service_entity_definition: inmanta_lsm.model.ServiceEntity,
+        **kwargs: object,
+    ) -> inmanta.protocol.common.Result:
+        """
+        This is a mock for the lsm api, this method is called during export of the
+        service entities.
+        """
+        # Just the same as doing a create, we overwrite whatever value was already there
+        return self.lsm_service_catalog_create_entity(tid, service_entity_definition)
 
     def export_service_entities(self, model: str) -> None:
         """
@@ -321,15 +342,18 @@ class LsmProject:
             for binding in ["lsm::ServiceEntityBinding", "lsm::ServiceEntityBindingV2"]
         }
 
-        # Reset the service entities dict
-        self.service_entities = {}
+        with self.monkeypatch.context() as m:
+            # Monkey patch the sync client constructor call, so that the object
+            # constructed inside of the lsm function has the patches we want it to have
+            sync_client = inmanta_plugins.lsm.global_cache.get_client()
+            m.setattr(inmanta.protocol.endpoints, "SyncClient", lambda _: sync_client)
 
-        # Delegate the rest of the logic to the appropriate function in lsm module
-        inmanta_plugins.lsm.do_export_service_entities(
-            exporter,
-            types,
-            False,
-        )
+            # Delegate the proper export to the existing logic in lsm module
+            inmanta_plugins.lsm.do_export_service_entities(
+                exporter,
+                types,
+                False,
+            )
 
     def add_service(self, service: inmanta_lsm.model.ServiceInstance) -> None:
         """
