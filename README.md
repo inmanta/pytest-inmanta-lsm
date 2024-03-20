@@ -202,9 +202,6 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     # Do a first validation compile, and add all default values to our candidate attributes
     lsm_project.compile(service_id=service.id, validation=True, add_defaults=True)
 
-    # Assert that the default value has been added to our attributes
-    assert "value_with_default" in service.candidate_attributes
-
     # The first validation compile went fine, move to the next state
     pytest_inmanta_lsm.lsm_project.promote(service)
     service.version += 1
