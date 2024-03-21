@@ -282,7 +282,9 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during export of the
         service entities.
         """
-        assert self.service_entities is not None, "Bad usage!!"
+        assert (
+            self.service_entities is not None
+        ), "The service catalog has not been initialized, please call self.export_service_entities"
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
 
         if service_entity not in self.service_entities:
@@ -309,7 +311,9 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during export of the
         service entities.
         """
-        assert self.service_entities is not None, "Bad usage!!"
+        assert (
+            self.service_entities is not None
+        ), "The service catalog has not been initialized, please call self.export_service_entities"
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
 
         # Don't do any validation, just save the service in the catalog
@@ -327,7 +331,9 @@ class LsmProject:
         This is a mock for the lsm api, this method is called during export of the
         service entities.
         """
-        assert self.service_entities is not None, "Bad usage!!"
+        assert (
+            self.service_entities is not None
+        ), "The service catalog has not been initialized, please call self.export_service_entities"
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
 
         # Just the same as doing a create, we overwrite whatever value was already there
@@ -393,7 +399,7 @@ class LsmProject:
             if service.service_entity not in self.service_entities:
                 raise ValueError(
                     f"Unknown service entity {service.service_entity} for service instance {service.id}.  "
-                    f"Supported services are: {list(self.service_entities.keys())}."
+                    f"Known services are: {list(self.service_entities.keys())}."
                 )
 
         self.services[str(service.id)] = service
@@ -450,19 +456,14 @@ class LsmProject:
         service = self.services[str(service_id)]
 
         if add_defaults:
-
+            # The developer requested to fill in all the defaults in the service
             if not validation:
                 raise ValueError(
                     "Bad usage, defaults can only be set on the initial validation compile but validation is disabled."
                 )
 
-            if self.service_entities is None:
-                raise ValueError(
-                    "Bad usage, defaults can only be applied when the corresponding service entity has been exported."
-                )
-
             # Make sure we have the service entity in our catalog
-            if service.service_entity not in self.service_entities:
+            if self.service_entities is None or service.service_entity not in self.service_entities:
                 raise RuntimeError(
                     f"Can not add defaults value for service {service_id} ({service.service_entity}) "
                     f"because its service entity definition has not been exported yet.  "
