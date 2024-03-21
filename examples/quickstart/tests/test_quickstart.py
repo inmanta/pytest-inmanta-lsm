@@ -14,8 +14,8 @@ import inmanta_lsm.model
 import pytest
 from pytest_inmanta import plugin
 
+import pytest_inmanta_lsm.lsm_project
 from pytest_inmanta_lsm import (
-    lsm_project,
     remote_orchestrator,
     remote_service_instance,
     remote_service_instance_async,
@@ -214,7 +214,10 @@ def test_transient_state(project: plugin.Project, remote_orchestrator: remote_or
     instance.delete(wait_for_state="terminated", timeout=60)
 
 
-def test_model(lsm_project: lsm_project.LsmProject) -> None:
+def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+    # Export the service entities
+    lsm_project.export_service_entities("import quickstart")
+
     service = inmanta_lsm.model.ServiceInstance(
         id=uuid.uuid4(),
         environment=lsm_project.environment,
@@ -222,7 +225,12 @@ def test_model(lsm_project: lsm_project.LsmProject) -> None:
         version=1,
         config={},
         state="start",
-        candidate_attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
+        candidate_attributes={
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
         active_attributes=None,
         rollback_attributes=None,
         created_at=datetime.datetime.now(),
@@ -233,10 +241,17 @@ def test_model(lsm_project: lsm_project.LsmProject) -> None:
         service_identity_attribute_value=None,
     )
 
-    lsm_project.add_service(service)
+    # Add a service to our inventory, do a first validation compile, and add all
+    # default values to our candidate attributes
+    lsm_project.add_service(service, validate=True)
 
-    # Do a first compile, everything should go fine
-    lsm_project.compile("import quickstart", service_id=service.id)
+    # Assert that the default value has been added to our attributes
+    assert "value_with_default" in service.candidate_attributes
 
-    # Do a second compile, everything should go fine
-    lsm_project.compile("import quickstart", service_id=service.id)
+    # The first validation compile went fine, move to the next state
+    pytest_inmanta_lsm.lsm_project.promote(service)
+    service.version += 1
+    service.state = "creating"
+
+    # Do a second compile, in the non-validating creating state
+    lsm_project.compile(service_id=service.id)

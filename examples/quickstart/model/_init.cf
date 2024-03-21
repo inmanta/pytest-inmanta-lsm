@@ -24,6 +24,10 @@ entity VlanAssignment extends lsm::ServiceEntity:
     net::vlan_id vlan_id
     string vlan_id__description="The VLAN ID to assign to the given interface."
     lsm::attribute_modifier vlan_id__modifier="rw+"
+
+    string value_with_default = "default"
+    string value_with_default__description = "This value has no use but has a default"
+    lsm::attribute_modifier value_with_default__modifier = "rw+"
 end
 
 index VlanAssignment(router_ip, interface_name, vlan_id)
@@ -54,6 +58,7 @@ for assignment in lsm::all(binding):
         interface_name=assignment["attributes"]["interface_name"],
         address=assignment["attributes"]["address"],
         vlan_id=assignment["attributes"]["vlan_id"],
+        value_with_default=assignment["attributes"]["value_with_default"],
         entity_binding=binding,
     )
 end

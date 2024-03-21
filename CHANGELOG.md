@@ -2,6 +2,9 @@
 Changes in this release:
 - Better logs when `docker-compose` in not installed
 - Add async RemoteServiceInstance class, for async service testing.
+- Add `export_service_entities` helper to `LsmProject` class.  Allowing to test the definition of a service, and update the attributes of a new service with its default, in the initial validation compile.  (#352)
+- Allow to easily reuse model used in `export_service_entities` for all later compiles.
+- Validate that any service added to the `LsmProject` object using `add_service` method is part of one of the exported services. (#354)
 
 # v 3.2.0 (2024-02-20)
 Changes in this release:

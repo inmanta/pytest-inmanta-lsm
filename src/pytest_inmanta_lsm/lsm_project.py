@@ -15,8 +15,8 @@ import warnings
 import inmanta.config
 import inmanta.protocol.common
 import inmanta.util
-import inmanta_lsm.const
-import inmanta_lsm.model
+import inmanta_lsm.const  # type: ignore[import-not-found]
+import inmanta_lsm.model  # type: ignore[import-not-found]
 import pydantic.types
 import pytest
 import pytest_inmanta.plugin
@@ -33,7 +33,18 @@ INMANTA_LSM_MODULE_NOT_LOADED = (
 try:
     from inmanta.util import dict_path
 except ImportError:
-    from inmanta_lsm import dict_path  # type: ignore[no-redef]
+    from inmanta_lsm import dict_path  # type: ignore[no-redef,attr-defined]
+
+
+def promote(service: inmanta_lsm.model.ServiceInstance) -> None:
+    """
+    Helper to perform the promote operation on the attribute sets of a service.
+
+    :param service: The service that should be promoted.
+    """
+    service.rollback_attributes = service.active_attributes
+    service.active_attributes = service.candidate_attributes
+    service.candidate_attributes = None
 
 
 class LsmProject:
@@ -45,10 +56,12 @@ class LsmProject:
         partial_compile: bool,
     ) -> None:
         inmanta.config.Config.set("config", "environment", str(environment))
-        self.services: typing.Dict[str, inmanta_lsm.model.ServiceInstance] = {}
+        self.services: dict[str, inmanta_lsm.model.ServiceInstance] = {}
         self.project = project
         self.monkeypatch = monkeypatch
         self.partial_compile = partial_compile
+        self.service_entities: typing.Optional[dict[str, inmanta_lsm.model.ServiceEntity]] = None
+        self.model: typing.Optional[str] = None
 
         # We monkeypatch the client and the global cache now so that the project.compile
         # method can still be used normally, to perform "global" compiles (not specific to
@@ -123,6 +136,27 @@ class LsmProject:
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_update_attributes_v2",
             self.lsm_services_update_attributes_v2,
+            raising=False,
+        )
+
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_service_catalog_get_entity",
+            self.lsm_service_catalog_get_entity,
+            raising=False,
+        )
+
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_service_catalog_create_entity",
+            self.lsm_service_catalog_create_entity,
+            raising=False,
+        )
+
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_service_catalog_update_entity",
+            self.lsm_service_catalog_update_entity,
             raising=False,
         )
 
@@ -239,33 +273,222 @@ class LsmProject:
 
         return inmanta.protocol.common.Result(code=200, result={})
 
-    def add_service(self, service: inmanta_lsm.model.ServiceInstance) -> None:
+    def lsm_service_catalog_get_entity(
+        self,
+        tid: uuid.UUID,
+        service_entity: str,
+    ) -> inmanta.protocol.common.Result:
+        """
+        This is a mock for the lsm api, this method is called during export of the
+        service entities.
+        """
+        assert (
+            self.service_entities is not None
+        ), "The service catalog has not been initialized, please call self.export_service_entities"
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
+        if service_entity not in self.service_entities:
+            return inmanta.protocol.common.Result(code=404)
+
+        return inmanta.protocol.common.Result(
+            code=200,
+            result={
+                "data": json.loads(
+                    json.dumps(
+                        self.service_entities[service_entity],
+                        default=inmanta.util.api_boundary_json_encoder,
+                    ),
+                ),
+            },
+        )
+
+    def lsm_service_catalog_create_entity(
+        self,
+        tid: uuid.UUID,
+        service_entity_definition: inmanta_lsm.model.ServiceEntity,
+    ) -> inmanta.protocol.common.Result:
+        """
+        This is a mock for the lsm api, this method is called during export of the
+        service entities.
+        """
+        assert (
+            self.service_entities is not None
+        ), "The service catalog has not been initialized, please call self.export_service_entities"
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
+        # Don't do any validation, just save the service in the catalog
+        self.service_entities[service_entity_definition.name] = service_entity_definition
+        return self.lsm_service_catalog_get_entity(tid, service_entity_definition.name)
+
+    def lsm_service_catalog_update_entity(
+        self,
+        tid: uuid.UUID,
+        service_entity: str,
+        service_entity_definition: inmanta_lsm.model.ServiceEntity,
+        **kwargs: object,
+    ) -> inmanta.protocol.common.Result:
+        """
+        This is a mock for the lsm api, this method is called during export of the
+        service entities.
+        """
+        assert (
+            self.service_entities is not None
+        ), "The service catalog has not been initialized, please call self.export_service_entities"
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
+        # Just the same as doing a create, we overwrite whatever value was already there
+        return self.lsm_service_catalog_create_entity(tid, service_entity_definition)
+
+    def export_service_entities(self, model: str) -> None:
+        """
+        Export the service entities, and save the resulting objects in this object.
+        We don't try to do any validation against any existing services in our mock
+        inventory.
+
+        :param model: The model to compile, which defines the services to export
+        """
+        try:
+            # Import lsm module in function scope for usage with v1 modules
+            import inmanta_plugins.lsm  # type: ignore
+        except ImportError as e:
+            raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
+
+        # Make a compile without any services in the catalog
+        with self.monkeypatch.context() as m:
+            m.setattr(self, "services", {})
+            self.project.compile(model, no_dedent=False)
+
+        # Get the exporter, it should have been set during the compile
+        # above
+        exporter = self.project._exporter
+        assert exporter is not None
+
+        # Find all instances of all entity bindings
+        types = {
+            binding: self.project.get_instances(binding)
+            for binding in ["lsm::ServiceEntityBinding", "lsm::ServiceEntityBindingV2"]
+        }
+
+        # Save the model used in the export, and reset the service entity catalog
+        self.model = model
+        self.service_entities = {}
+
+        with self.monkeypatch.context() as m:
+            # Monkey patch the sync client constructor call, so that the object
+            # constructed inside of the lsm function has the patches we want it to have
+            sync_client = inmanta_plugins.lsm.global_cache.get_client()
+            m.setattr(inmanta.protocol.endpoints, "SyncClient", lambda _: sync_client)
+
+            # Delegate the proper export to the existing logic in lsm module
+            inmanta_plugins.lsm.do_export_service_entities(
+                exporter,
+                types,
+                False,
+            )
+
+    def add_service(
+        self,
+        service: inmanta_lsm.model.ServiceInstance,
+        *,
+        validate: bool = False,
+    ) -> None:
         """
         Add a service to the simulated environment, it will be from then one taken into account
         in any compile.
+
+        :param service: The service to add to the service inventory.
+        :param validate: When set to true, also trigger the initial validation compile
+            on this service, and prefill all the defaults.  This requires you to have
+            called self.export_service_entities prior to calling this method.
         """
         if str(service.id) in self.services:
             raise ValueError("There is already a service with that id in this environment")
 
+        if self.service_entities is not None:
+            # Check that the service we created is part of our catalog
+            if service.service_entity not in self.service_entities:
+                raise ValueError(
+                    f"Unknown service entity {service.service_entity} for service instance {service.id}.  "
+                    f"Known services are: {list(self.service_entities.keys())}."
+                )
+
         self.services[str(service.id)] = service
+
+        if validate:
+            # If validate is set, trigger the initial compile immediately, and fill in all
+            # the default values.
+            self.compile(model=None, service_id=service.id, validation=True, add_defaults=True)
 
     def compile(
         self,
-        model: str,
-        service_id: uuid.UUID,
+        model: typing.Optional[str] = None,
+        service_id: typing.Optional[uuid.UUID] = None,
         validation: bool = True,
+        add_defaults: bool = False,
     ) -> None:
         """
         Perform a compile for the service whose id is passed in argument.  The correct attribute
         set will be selected based on the current state of the service.  If some allocation is
         involved, the attributes of the service will be updated accordingly.
 
-        :param model: The model to compile (passed to project.compile)
+        :param model: The model to compile (passed to project.compile).  If no model is specified,
+            default to the model that was exported (in export_service_entities).  If no model was
+            exported, raise a ValueError.
         :param service_id: The id of the service that should be compiled, the service must have
-            been added to the set of services prior to the compile.
-        :param validation_compile: Whether this is a validation compile or not.
+            been added to the set of services prior to the compile.  If no service_id is provided,
+            do a normal, full-compile.
+        :param validation: Whether this is a validation compile or not.
+        :param add_defaults: Whether the service attribute should be updated to automatically
+            add all the default values defined in the model, similarly to what the lsm api does.
+            This can only be set to True if the following conditions are met:
+            1.  This is the initial validation compile, all the attributes are set in the candidate set.
+            2.  You have called self.export_service_entities prior to calling this method.
         """
+        # Make sure we have a model to compile
+        if model is not None:
+            pass
+        elif self.model is not None:
+            model = self.model
+        else:
+            raise ValueError(
+                "No model to compile, please provide a model in argument or "
+                "run the export_service_entities method, with the model that "
+                "should be used for all later compiles."
+            )
+
+        if service_id is None:
+            # This is not a service-specific compile, we can just run the compile
+            # without setting any environment variables
+            self.project.compile(model, no_dedent=False)
+            return
+
+        if str(service_id) not in self.services:
+            raise ValueError(
+                f"Can not find any service with id {service_id} in our inventory.  "
+                "Did you add it using the add_service method?"
+            )
+
         service = self.services[str(service_id)]
+
+        if add_defaults:
+            # The developer requested to fill in all the defaults in the service
+            if not validation:
+                raise ValueError(
+                    "Bad usage, defaults can only be set on the initial validation compile but validation is disabled."
+                )
+
+            # Make sure we have the service entity in our catalog
+            if self.service_entities is None or service.service_entity not in self.service_entities:
+                raise RuntimeError(
+                    f"Can not add defaults value for service {service_id} ({service.service_entity}) "
+                    f"because its service entity definition has not been exported yet.  "
+                    "Please call self.export_service_entities before validating this service."
+                )
+
+            # Update our candidate_attributes with the service defaults
+            service_entity = self.service_entities[service.service_entity]
+            assert service.candidate_attributes is not None, "Defaults can only be added to the candidate attributes set"
+            service.candidate_attributes = service_entity.add_defaults(service.candidate_attributes)
 
         with self.monkeypatch.context() as m:
             m.setenv(inmanta_lsm.const.ENV_INSTANCE_ID, str(service_id))

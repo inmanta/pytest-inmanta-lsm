@@ -169,8 +169,10 @@ This toolbox comes with one more fixture: `lsm_project`.  This fixture allows to
 
 A simple usage would be as follow:
 ```python
-def test_model(lsm_project: lsm_project.LsmProject) -> None:
-    # Create a service object, you can modify it as you wish, depending on what you are trying to test
+def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+    # Export the service entities
+    lsm_project.export_service_entities("import quickstart")
+
     service = inmanta_lsm.model.ServiceInstance(
         id=uuid.uuid4(),
         environment=lsm_project.environment,
@@ -178,7 +180,12 @@ def test_model(lsm_project: lsm_project.LsmProject) -> None:
         version=1,
         config={},
         state="start",
-        candidate_attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
+        candidate_attributes={
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
         active_attributes=None,
         rollback_attributes=None,
         created_at=datetime.datetime.now(),
@@ -189,12 +196,18 @@ def test_model(lsm_project: lsm_project.LsmProject) -> None:
         service_identity_attribute_value=None,
     )
 
-    # Add the service to the mocked server.  From now on it will be taken into account
-    # for EACH compile
-    lsm_project.add_service(service)
+    # Add a service to our inventory, do a first validation compile, and add all
+    # default values to our candidate attributes
+    lsm_project.add_service(service, validate=True)
 
-    # Run a compile, with central focus the service we just created
-    lsm_project.compile("import quickstart", service_id=service.id)
+    # The first validation compile went fine, move to the next state
+    pytest_inmanta_lsm.lsm_project.promote(service)
+    service.version += 1
+    service.state = "creating"
+
+    # Do a second compile, in the non-validating creating state
+    lsm_project.compile(service_id=service.id)
+
 ```
 
 ## Options and environment variables
