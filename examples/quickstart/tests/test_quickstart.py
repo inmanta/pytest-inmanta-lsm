@@ -241,11 +241,9 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
         service_identity_attribute_value=None,
     )
 
-    # Add a service to our inventory
-    lsm_project.add_service(service)
-
-    # Do a first validation compile, and add all default values to our candidate attributes
-    lsm_project.compile(service_id=service.id, validation=True, add_defaults=True)
+    # Add a service to our inventory, do a first validation compile, and add all
+    # default values to our candidate attributes
+    lsm_project.add_service(service, validate=True)
 
     # Assert that the default value has been added to our attributes
     assert "value_with_default" in service.candidate_attributes

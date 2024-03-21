@@ -386,10 +386,20 @@ class LsmProject:
                 False,
             )
 
-    def add_service(self, service: inmanta_lsm.model.ServiceInstance) -> None:
+    def add_service(
+        self,
+        service: inmanta_lsm.model.ServiceInstance,
+        *,
+        validate: bool = False,
+    ) -> None:
         """
         Add a service to the simulated environment, it will be from then one taken into account
         in any compile.
+
+        :param service: The service to add to the service inventory.
+        :param validate: When set to true, also trigger the initial validation compile
+            on this service, and prefill all the defaults.  This requires you to have
+            called self.export_service_entities prior to calling this method.
         """
         if str(service.id) in self.services:
             raise ValueError("There is already a service with that id in this environment")
@@ -403,6 +413,11 @@ class LsmProject:
                 )
 
         self.services[str(service.id)] = service
+
+        if validate:
+            # If validate is set, trigger the initial compile immediately, and fill in all
+            # the default values.
+            self.compile(model=None, service_id=service.id, validation=True, add_defaults=True)
 
     def compile(
         self,
