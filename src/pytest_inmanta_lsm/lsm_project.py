@@ -617,7 +617,7 @@ class LsmProject:
 
         if service_entity_name not in self.service_entities:
             raise LookupError(
-                f"Unknown service entity {service_entity_name}.  " f"Known services are: {list(self.service_entities.keys())}."
+                f"Unknown service entity {service_entity_name}.  Known services are: {list(self.service_entities.keys())}."
             )
 
         return self.service_entities[service_entity_name]
