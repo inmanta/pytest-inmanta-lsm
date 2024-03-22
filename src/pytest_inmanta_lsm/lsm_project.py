@@ -635,7 +635,8 @@ class LsmProject:
         service = self.get_service(service_id)
         service_entity = self.get_service_entity(service.service_entity)
 
-        # Get the next auto transfer
+        # Get the next auto transfer, this raises a KeyError is no AUTO transfer is defined
+        # for the current state
         transfer = service_entity.lifecycle.get_transfer(
             from_state=service.state,
             transfer_type=inmanta_lsm.const.TransferTrigger.AUTO,
@@ -651,6 +652,7 @@ class LsmProject:
             if service.state == state:
                 return
 
+            service.last_updated = datetime.datetime.now()
             service.version += 1
             service.state = state
 
@@ -695,9 +697,8 @@ class LsmProject:
         :param auto_transfer: Whether to automatically go through the first auto transfers, triggering
             one compile for each state we pass by.
         """
-        # Resolve the initial state for our service
+        # Resolve the initial state for our service and resolve attributes defaults
         service_entity = self.get_service_entity(service_entity_name)
-        initial_state = service_entity.lifecycle.initial_state
 
         # Create the service instance object
         service = inmanta_lsm.model.ServiceInstance(
@@ -706,8 +707,8 @@ class LsmProject:
             service_entity=service_entity_name,
             version=1,
             config={},
-            state=initial_state,
-            candidate_attributes=attributes,
+            state=service_entity.lifecycle.initial_state,
+            candidate_attributes=service_entity.add_defaults(attributes),
             active_attributes=None,
             rollback_attributes=None,
             created_at=datetime.datetime.now(),
@@ -717,9 +718,6 @@ class LsmProject:
             deployment_progress=None,
             service_identity_attribute_value=None,
         )
-
-        # Add the defaults to the provided attributes
-        service.candidate_attributes = service_entity.add_defaults(service.candidate_attributes)
 
         # Add the service to our inventory
         self.add_service(service)
@@ -772,6 +770,7 @@ class LsmProject:
 
         # Update the candidate attributes and apply all the defaults to them
         service.candidate_attributes = service_entity.add_defaults(attributes)
+        service.last_updated = datetime.datetime.now()
 
         if not auto_transfer:
             # Nothing more to do
