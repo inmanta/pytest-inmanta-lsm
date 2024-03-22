@@ -56,6 +56,73 @@ def promote(service: inmanta_lsm.model.ServiceInstance) -> None:
     service.candidate_attributes = None
 
 
+def rollback(service: inmanta_lsm.model.ServiceInstance) -> None:
+    """
+    Helper to perform the rollback operation on the attribute sets of a service.
+
+    :param service: The service that should be rolled back.
+    """
+    service.candidate_attributes = service.active_attributes
+    service.active_attributes = service.rollback_attributes
+    service.rollback_attributes = None
+
+
+def clear_candidate(service: inmanta_lsm.model.ServiceInstance) -> None:
+    """
+    Helper to perform the clear candidate operation on the attribute sets of a service.
+
+    :param service: The service for which we should clear the candidate attributes
+    """
+    service.candidate_attributes = None
+
+
+def clear_active(service: inmanta_lsm.model.ServiceInstance) -> None:
+    """
+    Helper to perform the clear active operation on the attribute sets of a service.
+
+    :param service: The service for which we should clear the active attributes
+    """
+    service.active_attributes = None
+
+
+def clear_rollback(service: inmanta_lsm.model.ServiceInstance) -> None:
+    """
+    Helper to perform the clear rollback operation on the attribute sets of a service.
+
+    :param service: The service for which we should clear the rollback attributes
+    """
+    service.rollback_attributes = None
+
+
+def perform_attribute_operation(
+    service: inmanta_lsm.model.ServiceInstance,
+    operation: typing.Optional[inmanta_lsm.model.AttributeOperation],
+) -> None:
+    """
+    Perform an attribute operation on a service's attributes.  This is an operation that the
+    lsm will do, depending on the result of some state transfers.  We implement this manual
+    logic here as we can not reuse it directly from the lsm code, because all these operations
+    are implemented directly in the database.
+
+    :param service: The service to apply the operation on
+    :param operation: The operation to apply
+    """
+    if operation is None:
+        return
+    if operation == inmanta_lsm.model.AttributeOperation.PROMOTE:
+        return promote(service)
+    if operation == inmanta_lsm.model.AttributeOperation.ROLLBACK:
+        return rollback(service)
+    if operation == inmanta_lsm.model.AttributeOperation.CLEAR_CANDIDATE:
+        return clear_candidate(service)
+    if operation == inmanta_lsm.model.AttributeOperation.CLEAR_ACTIVE:
+        return clear_active(service)
+    if operation == inmanta_lsm.model.AttributeOperation.CLEAR_ROLLBACK:
+        return clear_rollback(service)
+
+    raise ValueError(f"Unsupported attribute operation: {operation}")
+
+
 def get_resource_sets(
     project: pytest_inmanta.plugin.Project,
 ) -> dict[str, list[inmanta.resources.Id]]:
@@ -519,20 +586,215 @@ class LsmProject:
                 False,
             )
 
+    def get_service(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
+        """
+        Get the service with the given id from our inventory.  If no such service exists,
+        raise a LookupError.
+
+        :param service_id: The id of the service we are looking for
+        """
+        if str(service_id) not in self.services:
+            raise LookupError(
+                f"Can not find any service with id {service_id} in our inventory.  "
+                "Did you add it using the add_service method?"
+            )
+
+        return self.services[str(service_id)]
+
+    def get_service_entity(self, service_entity_name: str) -> inmanta_lsm.model.ServiceEntity:
+        """
+        Get the service entity with the given name from our service catalog.  If no such service
+        entity exists, raise a LookupError.  If the service catalog has not been exported yet,
+        raise a RuntimeError.
+
+        :param service_entity_name: The name of the service entity we are looking for
+        """
+        if self.service_entities is None:
+            raise RuntimeError(
+                "Can not get any service entity as they have not been exported yet.  "
+                "Please call self.export_service_entities."
+            )
+
+        if service_entity_name not in self.service_entities:
+            raise LookupError(
+                f"Unknown service entity {service_entity_name}.  " f"Known services are: {list(self.service_entities.keys())}."
+            )
+
+        return self.service_entities[service_entity_name]
+
+    def auto_transfer(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
+        """
+        Mock the logic of an auto transfer.  This can be used to automatically perform validation
+        compiles in a given state and do the promote/rollback operations resulting from it, as well
+        as moving to the next state.  If there is no auto transfer from the service's current state,
+        raise a KeyError.
+
+        :param service_id: The id of the service for which we should follow the next auto transfer.
+        """
+        # Get the service and its service entity definition
+        service = self.get_service(service_id)
+        service_entity = self.get_service_entity(service.service_entity)
+
+        # Get the next auto transfer
+        transfer = service_entity.lifecycle.get_transfer(
+            from_state=service.state,
+            transfer_type=inmanta_lsm.const.TransferTrigger.AUTO,
+        )
+
+        def next_state(state: str) -> None:
+            """
+            Apply this state to our service, if it is different from the current
+            state, also increment the version
+
+            :param state: The new state to apply
+            """
+            if service.state == state:
+                return
+
+            service.version += 1
+            service.state = state
+
+        try:
+            # Trigger a compile for the transition
+            LOGGER.info(
+                "Triggering compile on state %s before auto transfer (%s) for service %s (%s)",
+                service.state,
+                transfer.description,
+                service.id,
+                service.service_entity,
+            )
+            self.compile(
+                service_id=service.id,
+                validation=transfer.validate_,
+            )
+            perform_attribute_operation(service, transfer.target_operation)
+            next_state(transfer.target)
+        except Exception:
+            perform_attribute_operation(service, transfer.error_operation)
+            next_state(transfer.error)
+            raise
+
+    def create_service(
+        self,
+        service_entity_name: str,
+        attributes: dict,
+        *,
+        auto_transfer: bool = True,
+    ) -> inmanta_lsm.model.ServiceInstance:
+        """
+        Helper method to create an instance of the given service entity and set the
+        given attributes as initial candidate attributes.  The service is automatically
+        added to our inventory.  If auto_transfer is set, go through the first n lifecycle
+        state transfers marked with auto, triggering a compile for each, and apply the
+        corresponding attribute operations.
+
+        :param service_entity_name: The name of the service entity for which we want to create
+            a new instance.
+        :param attributes: The attributes to create the instance with, defaults values will be
+            automatically added to it.
+        :param auto_transfer: Whether to automatically go through the first auto transfers, triggering
+            one compile for each state we pass by.
+        """
+        # Resolve the initial state for our service
+        service_entity = self.get_service_entity(service_entity_name)
+        initial_state = service_entity.lifecycle.initial_state
+
+        # Create the service instance object
+        service = inmanta_lsm.model.ServiceInstance(
+            id=uuid.uuid4(),
+            environment=uuid.UUID(self.environment),
+            service_entity=service_entity_name,
+            version=1,
+            config={},
+            state=initial_state,
+            candidate_attributes=attributes,
+            active_attributes=None,
+            rollback_attributes=None,
+            created_at=datetime.datetime.now(),
+            last_updated=datetime.datetime.now(),
+            callback=[],
+            deleted=False,
+            deployment_progress=None,
+            service_identity_attribute_value=None,
+        )
+
+        # Add the defaults to the provided attributes
+        service.candidate_attributes = service_entity.add_defaults(service.candidate_attributes)
+
+        # Add the service to our inventory
+        self.add_service(service)
+
+        if not auto_transfer:
+            # Nothing more to do
+            return service
+
+        # Go through all the auto transfers, validate and promote the service when
+        # it is required
+        while True:
+            try:
+                self.auto_transfer(service.id)
+            except KeyError:
+                # No more auto transfer to follow
+                return service
+
+    def update_service(
+        self,
+        service_id: uuid.UUID,
+        attributes: dict,
+        *,
+        auto_transfer: bool = True,
+    ) -> inmanta_lsm.model.ServiceInstance:
+        """
+        Update a service in our inventory, by providing the given new attributes.  The service must be
+        in a state which defines an update state transfer.  The attributes will automatically updated
+        with the defaults defined in the service entity definition.  If auto_transfer is set, go through
+        the first n lifecycle state transfers marked with auto, triggering a compile for each, and apply the
+        corresponding attribute operations.
+
+        :param service_id: The id of the service we wish to update.
+        :param attributes: The attributes to create the instance with, defaults values will be
+            automatically added to it.
+        :param auto_transfer: Whether to automatically go through the first auto transfers, triggering
+            one compile for each state we pass by.
+        """
+        # Get the service and its corresponding service entity
+        service = self.get_service(service_id)
+        service_entity = self.get_service_entity(service.service_entity)
+
+        # Go into the update state
+        try:
+            service.state = service_entity.lifecycle.get_transfer(
+                from_state=service.state,
+                transfer_type=inmanta_lsm.const.TransferTrigger.ON_UPDATE,
+            ).target
+        except KeyError:
+            raise RuntimeError(f"Service {service.id} can not be updated from state {service.state}")
+
+        # Update the candidate attributes and apply all the defaults to them
+        service.candidate_attributes = service_entity.add_defaults(attributes)
+
+        if not auto_transfer:
+            # Nothing more to do
+            return service
+
+        # Go through all the auto transfers, validate and promote the service when
+        # it is required
+        while True:
+            try:
+                self.auto_transfer(service.id)
+            except KeyError:
+                # No more auto transfer to follow
+                return service
+
     def add_service(
         self,
         service: inmanta_lsm.model.ServiceInstance,
-        *,
-        validate: bool = False,
     ) -> None:
         """
         Add a service to the simulated environment, it will be from then one taken into account
         in any compile.
 
         :param service: The service to add to the service inventory.
-        :param validate: When set to true, also trigger the initial validation compile
-            on this service, and prefill all the defaults.  This requires you to have
-            called self.export_service_entities prior to calling this method.
         """
         if str(service.id) in self.services:
             raise ValueError("There is already a service with that id in this environment")
@@ -547,17 +809,11 @@ class LsmProject:
 
         self.services[str(service.id)] = service
 
-        if validate:
-            # If validate is set, trigger the initial compile immediately, and fill in all
-            # the default values.
-            self.compile(model=None, service_id=service.id, validation=True, add_defaults=True)
-
     def compile(
         self,
         model: typing.Optional[str] = None,
         service_id: typing.Optional[uuid.UUID] = None,
         validation: bool = True,
-        add_defaults: bool = False,
     ) -> None:
         """
         Perform a compile for the service whose id is passed in argument.  The correct attribute
@@ -571,11 +827,6 @@ class LsmProject:
             been added to the set of services prior to the compile.  If no service_id is provided,
             do a normal, full-compile.
         :param validation: Whether this is a validation compile or not.
-        :param add_defaults: Whether the service attribute should be updated to automatically
-            add all the default values defined in the model, similarly to what the lsm api does.
-            This can only be set to True if the following conditions are met:
-            1.  This is the initial validation compile, all the attributes are set in the candidate set.
-            2.  You have called self.export_service_entities prior to calling this method.
         """
         # Make sure we have a model to compile
         if model is not None:
@@ -595,50 +846,34 @@ class LsmProject:
             self.project.compile(model, no_dedent=False)
             return
 
-        if str(service_id) not in self.services:
-            raise ValueError(
-                f"Can not find any service with id {service_id} in our inventory.  "
-                "Did you add it using the add_service method?"
-            )
+        # Get the service targeted by the compile
+        service = self.get_service(service_id)
 
-        service = self.services[str(service_id)]
+        env: dict[str, str] = {}
+        env[inmanta_lsm.const.ENV_INSTANCE_ID] = str(service_id)
+        env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
 
-        if add_defaults:
-            # The developer requested to fill in all the defaults in the service
-            if not validation:
-                raise ValueError(
-                    "Bad usage, defaults can only be set on the initial validation compile but validation is disabled."
-                )
+        try:
+            env[inmanta_lsm.const.ENV_PARTIAL_COMPILE] = str(self.partial_compile)
+        except AttributeError:
+            # This attribute only exists for iso5+, iso4 doesn't support partial compile.
+            # We then simply don't set the value.
+            if self.partial_compile:
+                warnings.warn("Partial compile is enabled but it is not supported, it will be ignored.")
 
-            # Make sure we have the service entity in our catalog
-            if self.service_entities is None or service.service_entity not in self.service_entities:
-                raise RuntimeError(
-                    f"Can not add defaults value for service {service_id} ({service.service_entity}) "
-                    f"because its service entity definition has not been exported yet.  "
-                    "Please call self.export_service_entities before validating this service."
-                )
+        if validation:
+            # If we have a validation compile, we need to set an additional env var
+            env[inmanta_lsm.const.ENV_MODEL_STATE] = inmanta_lsm.model.ModelState.candidate
 
-            # Update our candidate_attributes with the service defaults
-            service_entity = self.service_entities[service.service_entity]
-            assert service.candidate_attributes is not None, "Defaults can only be added to the candidate attributes set"
-            service.candidate_attributes = service_entity.add_defaults(service.candidate_attributes)
-
+        LOGGER.debug(
+            "Triggering compile for service %s (%s) with the following environment variables: %s",
+            service.id,
+            service.service_entity,
+            env,
+        )
         with self.monkeypatch.context() as m:
-            m.setenv(inmanta_lsm.const.ENV_INSTANCE_ID, str(service_id))
-            m.setenv(inmanta_lsm.const.ENV_INSTANCE_VERSION, str(service.version))
-
-            try:
-                m.setenv(inmanta_lsm.const.ENV_PARTIAL_COMPILE, str(self.partial_compile))
-            except AttributeError:
-                # This attribute only exists for iso5+, iso4 doesn't support partial compile.
-                # We then simply don't set the value.
-                if self.partial_compile:
-                    warnings.warn("Partial compile is enabled but it is not supported, it will be ignored.")
-
-            if validation:
-                # If we have a validation compile, we need to set an additional env var
-                m.setenv(inmanta_lsm.const.ENV_MODEL_STATE, inmanta_lsm.model.ModelState.candidate)
-
+            for k, v in env.items():
+                m.setenv(k, v)
             self.project.compile(model, no_dedent=False)
 
     def post_partial_compile_validation(
