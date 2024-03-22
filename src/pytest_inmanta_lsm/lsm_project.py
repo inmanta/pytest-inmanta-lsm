@@ -690,9 +690,12 @@ class LsmProject:
         shared_resource_set_validation(self.project, self.shared_resource_set)
 
         # Check that we did export shared resource (at least agent configs should be in there)
-        assert len(self.shared_resource_set) > 0, (
-            "The shared set of resource should never be empty.  " "At least agent configs should be in there."
-        )
+        # Allow to skip this check if we really don't have any shared resources (case of a basic
+        # service without any side-effect)
+        if len(shared_resource_patterns) > 0:
+            assert len(self.shared_resource_set) > 0, (
+                "The shared set of resource should never be empty.  At least agent configs should be in there."
+            )
 
         # Get the previously compiled model and perform a full compile, this should work at any stage
         model = pathlib.Path(self.project._test_project_dir, "main.cf").read_text()
