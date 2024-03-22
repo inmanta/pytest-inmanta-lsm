@@ -173,37 +173,23 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     # Export the service entities
     lsm_project.export_service_entities("import quickstart")
 
-    service = inmanta_lsm.model.ServiceInstance(
-        id=uuid.uuid4(),
-        environment=lsm_project.environment,
-        service_entity="vlan-assignment",
-        version=1,
-        config={},
-        state="start",
-        candidate_attributes={
+    # Create a service
+    service = lsm_project.create_service(
+        service_entity_name="vlan-assignment",
+        attributes={
             "router_ip": "10.1.9.17",
             "interface_name": "eth1",
             "address": "10.0.0.254/24",
             "vlan_id": 14,
         },
-        active_attributes=None,
-        rollback_attributes=None,
-        created_at=datetime.datetime.now(),
-        last_updated=datetime.datetime.now(),
-        callback=[],
-        deleted=False,
-        deployment_progress=None,
-        service_identity_attribute_value=None,
+        auto_transfer=True,
     )
 
-    # Add a service to our inventory, do a first validation compile, and add all
-    # default values to our candidate attributes
-    lsm_project.add_service(service, validate=True)
+    # Assert that the service has been created and is not in creating state
+    assert service.state == "creating"
 
-    # The first validation compile went fine, move to the next state
-    pytest_inmanta_lsm.lsm_project.promote(service)
-    service.version += 1
-    service.state = "creating"
+    # Assert that the default value has been added to our attributes
+    assert "value_with_default" in service.active_attributes
 
     # Do a second compile, in the non-validating creating state
     lsm_project.compile(service_id=service.id)
