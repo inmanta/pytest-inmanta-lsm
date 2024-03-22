@@ -644,8 +644,8 @@ class LsmProject:
     def post_partial_compile_validation(
         self,
         service_id: uuid.UUID,
-        shared_resource_patterns: list[re.Pattern],
-        owned_resource_patterns: list[re.Pattern],
+        shared_resource_patterns: list[re.Pattern[str]],
+        owned_resource_patterns: list[re.Pattern[str]],
     ) -> None:
         """
         Perform a check on the export result of a partial compile.  It makes sure that:
@@ -673,6 +673,12 @@ class LsmProject:
             expects_shared = find_matching_pattern(str(resource_id), shared_resource_patterns)
             expects_owned = find_matching_pattern(str(resource_id), owned_resource_patterns)
 
+            if expects_owned is not None and expects_shared is not None:
+                raise ValueError(
+                    f"Resource {resource_id} has been matched by the patterns of the "
+                    f"shared ({expects_shared}) and the owned ({expects_owned}) sets"
+                )
+
             actually_owned = resource_id in owned_resources
             if actually_owned and expects_owned is None:
                 assert False, f"{resource_id} is owned but doesn't match any pattern in {owned_resource_patterns}."
@@ -688,14 +694,6 @@ class LsmProject:
 
         # Check that the shared resource set doesn't contain any illegal modification
         shared_resource_set_validation(self.project, self.shared_resource_set)
-
-        # Check that we did export shared resource (at least agent configs should be in there)
-        # Allow to skip this check if we really don't have any shared resources (case of a basic
-        # service without any side-effect)
-        if len(shared_resource_patterns) > 0:
-            assert len(self.shared_resource_set) > 0, (
-                "The shared set of resource should never be empty.  At least agent configs should be in there."
-            )
 
         # Get the previously compiled model and perform a full compile, this should work at any stage
         model = pathlib.Path(self.project._test_project_dir, "main.cf").read_text()
