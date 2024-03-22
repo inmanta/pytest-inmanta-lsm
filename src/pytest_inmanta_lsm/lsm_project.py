@@ -4,16 +4,22 @@
     :license: Inmanta EULA
 """
 
+import collections
 import copy
 import datetime
 import functools
+import hashlib
 import json
+import logging
+import pathlib
+import re
 import typing
 import uuid
 import warnings
 
 import inmanta.config
 import inmanta.protocol.common
+import inmanta.resources
 import inmanta.util
 import inmanta_lsm.const  # type: ignore[import-not-found]
 import inmanta_lsm.model  # type: ignore[import-not-found]
@@ -36,6 +42,9 @@ except ImportError:
     from inmanta_lsm import dict_path  # type: ignore[no-redef,attr-defined]
 
 
+LOGGER = logging.getLogger()
+
+
 def promote(service: inmanta_lsm.model.ServiceInstance) -> None:
     """
     Helper to perform the promote operation on the attribute sets of a service.
@@ -45,6 +54,122 @@ def promote(service: inmanta_lsm.model.ServiceInstance) -> None:
     service.rollback_attributes = service.active_attributes
     service.active_attributes = service.candidate_attributes
     service.candidate_attributes = None
+
+
+def get_resource_sets(
+    project: pytest_inmanta.plugin.Project,
+) -> dict[str, list[inmanta.resources.Id]]:
+    """
+    Get all resource sets and the resources they contain.
+    Returns a dict containing as keys all the resource sets present in the model and
+    as value the list of resources the set contains.
+
+    :param project: The project object that was used in for last compile.
+    """
+    resource_sets: dict[str, list[inmanta.resources.Id]] = collections.defaultdict(list)
+    assert project._exporter is not None
+    for res, setkey in project._exporter._resource_sets.items():
+        assert setkey is not None
+        resource_sets[setkey].append(inmanta.resources.Id.parse_id(res, version=0))  # type: ignore
+
+    for key, resources in resource_sets.items():
+        LOGGER.debug("Resource set %s has resources %s", repr(key), str(resources))
+
+    return resource_sets
+
+
+def get_shared_resources(
+    project: pytest_inmanta.plugin.Project,
+) -> list[inmanta.resources.Id]:
+    """
+    Get all the resources which are not part of any resource set
+
+    :param project: The project object that was used in for last compile.
+    """
+    # Get all the resources that are owned by a resource set
+    owned_resources = {resource for _, resources in get_resource_sets(project).items() for resource in resources}
+
+    # Shared resources are all resources which are not owned
+    shared_resources = list(project.resources.keys() - owned_resources)
+    LOGGER.debug("Shared resources are: %s", str(shared_resources))
+
+    return shared_resources
+
+
+def resource_attributes_hash(resource: inmanta.resources.Resource) -> str:
+    """
+    Logic copied from here:
+    https://github.com/inmanta/inmanta-core/blob/418638b4d473a08b31f092657f9e88935b272565/src/inmanta/data/__init__.py#L4458
+    This is what is used to detect changes in shared resources in the inmanta orchestrator.
+
+    :param resource: The resource for which we want to calculate a hash.
+    """
+    character = json.dumps(
+        {k: v for k, v in resource.serialize().items() if k not in ["requires", "provides", "version"]},
+        default=inmanta.protocol.common.custom_json_encoder,
+        sort_keys=True,  # sort the keys for stable hashes when using dicts, see #5306
+    )
+    m = hashlib.md5()
+    m.update(str(resource.id).encode("utf-8"))
+    m.update(character.encode("utf-8"))
+    return m.hexdigest()
+
+
+def find_matching_pattern(value: str, patterns: typing.Iterable[re.Pattern[str]]) -> typing.Optional[str]:
+    """
+    Check if the given resource id matches any of expected members pattern.
+
+    :param resource_id: The resource id that needs to be compared for patterns in the set
+    :param set_members: A set of pattern to try to match the resource id
+    """
+    for pattern in patterns:
+        if pattern.fullmatch(value):
+            return pattern.pattern
+
+    return None
+
+
+def shared_resource_set_validation(
+    project: pytest_inmanta.plugin.Project,
+    shared_set: dict[inmanta.resources.Id, inmanta.resources.Resource],
+) -> None:
+    """
+    Make sure that any shared resource in the last resource export has an unmodified
+    desired state compared to the previous export.  Also add those resources to the shared
+    set for further checks.
+
+    :param project: The project that was used to compile (and export) the resources.
+    :param shared_set: The set of shared resources that already have been exported and
+        should be updated with any new shared resource.
+    """
+    for resource_id in get_shared_resources(project):
+        assert resource_id.version == 0, (
+            "For this check to work as expected, the version may not vary.  " f"But the version of {resource_id} is not 0."
+        )
+
+        resource = project.resources[resource_id]
+        if resource_id not in shared_set:
+            # If the resource is not in the set, we can simply add it
+            shared_set[resource_id] = resource
+            continue
+
+        # Validate that the version of the resource already in the set (from previous compile)
+        # and the resource we are exporting now are identical
+        previous_resource = shared_set[resource_id]
+        previous_hash = resource_attributes_hash(previous_resource)
+        current_hash = resource_attributes_hash(resource)
+        if previous_hash != current_hash:
+            error = f"The resource hash of {resource_id} has changed: {previous_hash} != {current_hash}"
+            assert previous_resource.serialize() == resource.serialize(), error
+            assert False, error  # Just in case the assertion is not triggered above
+
+    # Check that resources in the different resource sets never were part of the
+    # shared resource set
+    for set, resources in get_resource_sets(project).items():
+        for resource_id in resources:
+            assert resource_id not in shared_set, (
+                f"The resource {resource} is present in resource set {set} " "but was also part of the shared resource set."
+            )
 
 
 class LsmProject:
@@ -61,7 +186,15 @@ class LsmProject:
         self.monkeypatch = monkeypatch
         self.partial_compile = partial_compile
         self.service_entities: typing.Optional[dict[str, inmanta_lsm.model.ServiceEntity]] = None
+
+        # If `self.export_service_entities` is ever called, we will save the model
+        # used for the export in this attribute so that we can reuse it for the next
+        # compiles.
         self.model: typing.Optional[str] = None
+
+        # A dict holding all the previously exported shared resources, this is populated
+        # and updated in each call to `self.post_partial_compile_validation`
+        self.shared_resource_set: dict[inmanta.resources.Id, inmanta.resources.Resource] = {}
 
         # We monkeypatch the client and the global cache now so that the project.compile
         # method can still be used normally, to perform "global" compiles (not specific to
@@ -507,3 +640,70 @@ class LsmProject:
                 m.setenv(inmanta_lsm.const.ENV_MODEL_STATE, inmanta_lsm.model.ModelState.candidate)
 
             self.project.compile(model, no_dedent=False)
+
+    def post_partial_compile_validation(
+        self,
+        service_id: uuid.UUID,
+        shared_resource_patterns: list[re.Pattern],
+        owned_resource_patterns: list[re.Pattern],
+    ) -> None:
+        """
+        Perform a check on the export result of a partial compile.  It makes sure that:
+        1. The only resource set that is present is the service resource set
+        2. The resource in the resource set are the expected ones
+        3. The resource in the shared resource set are the expected ones
+        4. Resources sent to the shared resource set are never modified
+        5. A full compile for the previously compiled mode still works
+
+        :param lsm_project: The LsmProject object that was used to perform the partial compile
+        :param service_id: The id of the service which performed the partial compile
+        :param shared_resource_patterns: A list of patterns that can be used to identified the
+            resources which are expected to be part of the shared resource set.
+        :param owned_resource_patterns: A list of patterns that can be used to identified the
+            resources which are expected to be part of the service's resource set.
+        """
+        # Check that the only resource set emitted is the one of this service
+        resource_sets = get_resource_sets(self.project)
+        assert resource_sets.keys() == {str(service_id)}
+
+        # Extract the set of owned resources
+        _, owned_resources = resource_sets.popitem()
+
+        for resource_id in self.project.resources.keys():
+            expects_shared = find_matching_pattern(str(resource_id), shared_resource_patterns)
+            expects_owned = find_matching_pattern(str(resource_id), owned_resource_patterns)
+
+            actually_owned = resource_id in owned_resources
+            if actually_owned and expects_owned is None:
+                assert False, f"{resource_id} is owned but doesn't match any pattern in {owned_resource_patterns}."
+
+            if not actually_owned and expects_shared is None:
+                assert False, f"{resource_id} is shared but doesn't match any pattern in {shared_resource_patterns}"
+
+            if expects_shared is not None and expects_owned is not None:
+                assert False, (
+                    f"{resource_id} is expected to be both shared ({expects_shared}) "
+                    f"and owned ({owned_resources}).  This is wrong."
+                )
+
+        # Check that the shared resource set doesn't contain any illegal modification
+        shared_resource_set_validation(self.project, self.shared_resource_set)
+
+        # Check that we did export shared resource (at least agent configs should be in there)
+        assert len(self.shared_resource_set) > 0, (
+            "The shared set of resource should never be empty.  " "At least agent configs should be in there."
+        )
+
+        # Get the previously compiled model and perform a full compile, this should work at any stage
+        model = pathlib.Path(self.project._test_project_dir, "main.cf").read_text()
+        self.project.compile(model)
+
+        # Check that we have as many resource sets as there are services
+        assert get_resource_sets(self.project).keys() == {
+            str(srv.id) for srv in self.services.values() if not srv.deleted and not srv.state == "ordered"
+        }
+
+        # Check that the shared resource set doesn't contain any illegal modification
+        # For classic full compiles (no config update), the shared set shouldn't be
+        # modified.
+        shared_resource_set_validation(self.project, self.shared_resource_set)
