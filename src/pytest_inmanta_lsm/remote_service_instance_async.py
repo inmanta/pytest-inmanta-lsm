@@ -13,8 +13,8 @@ import typing
 import uuid
 
 import devtools
-from inmanta_lsm import model
-from inmanta_lsm.diagnose.model import FullDiagnosis
+from inmanta_lsm import model  # type: ignore
+from inmanta_lsm.diagnose.model import FullDiagnosis  # type: ignore
 
 from pytest_inmanta_lsm import remote_orchestrator
 
@@ -91,17 +91,26 @@ class StateTimeoutError(RemoteServiceInstanceError[T], TimeoutError):
         target_state: str,
         target_version: typing.Optional[int],
         timeout: float,
+        last_state: typing.Optional[str],
+        last_version: int,
         *args: object,
     ) -> None:
+        msg = (
+            f"Timeout of {timeout} seconds reached while waiting for service instance to "
+            f"go into state {target_state} (version: {target_version if target_version is not None else 'any'})."
+        )
+        if last_state is not None:
+            msg += f"  Current state: {last_state} (version: {last_version})"
         super().__init__(
             instance,
-            f"Timeout of {timeout} seconds reached while waiting for service instance to "
-            f"go into state {target_state} (version: {target_version if target_version is not None else 'any'})",
+            msg,
             *args,
         )
         self.target_state = target_state
         self.target_version = target_version
         self.timeout = timeout
+        self.last_state = last_state
+        self.last_version = last_version
 
 
 class RemoteServiceInstance:
@@ -186,6 +195,24 @@ class RemoteServiceInstance:
             filter={"version": f"ge:{since_version}"},
         )
 
+    async def diagnose(self, *, version: int) -> FullDiagnosis:
+        """
+        Get a diagnosis of the service recent errors/failures, if any.
+
+        :param version: The version of the service at which we are looking for
+            failures or errors.
+        """
+        return await self.remote_orchestrator.request(
+            "lsm_services_diagnose",
+            FullDiagnosis,
+            tid=self.remote_orchestrator.environment,
+            service_entity=self.service_entity_name,
+            service_id=self.instance_id,
+            version=version,
+            rejection_lookbehind=self._lookback - 1,
+            failure_lookbehind=self._lookback,
+        )
+
     async def wait_for_state(
         self,
         target_state: str,
@@ -265,16 +292,7 @@ class RemoteServiceInstance:
                         return await self.get()
                 except BadStateError:
                     # We encountered a bad state, print the diagnosis then quit
-                    diagnosis = await self.remote_orchestrator.request(
-                        "lsm_services_diagnose",
-                        FullDiagnosis,
-                        tid=self.remote_orchestrator.environment,
-                        service_entity=self.service_entity_name,
-                        service_id=self.instance_id,
-                        version=log.version,
-                        rejection_lookbehind=self._lookback - 1,
-                        failure_lookbehind=self._lookback,
-                    )
+                    diagnosis = await self.diagnose(version=log.version)
                     LOGGER.info(
                         "Service instance %s reached bad state %s: \n%s",
                         self.instance_name,
@@ -298,13 +316,15 @@ class RemoteServiceInstance:
 
             if time.time() - start > timeout:
                 # We reached the timeout, we should stop waiting and raise an exception
+                diagnosis = await self.diagnose(version=log.version)
                 LOGGER.info(
-                    "Service instance %s exceeded timeout while waiting for %s, current state is %s",
+                    "Service instance %s exceeded timeout while waiting for %s, current state is %s.  %s",
                     self.instance_name,
                     repr(target_state),
                     repr(last_state) if last_state is not None else "unknown",
+                    devtools.debug.format(diagnosis),
                 )
-                raise StateTimeoutError(self, target_state, target_version, timeout)
+                raise StateTimeoutError(self, target_state, target_version, timeout, last_state, last_version)
 
             # Wait then try again
             await asyncio.sleep(self.RETRY_INTERVAL)
