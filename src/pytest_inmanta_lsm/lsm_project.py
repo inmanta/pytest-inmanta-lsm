@@ -182,7 +182,7 @@ def resource_attributes_hash(resource: inmanta.resources.Resource) -> str:
     return m.hexdigest()
 
 
-def find_matching_pattern(value: str, patterns: typing.Iterable[re.Pattern[str]]) -> typing.Optional[str]:
+def find_matching_pattern(value: str, patterns: typing.Iterable[str]) -> typing.Optional[str]:
     """
     Check if the given resource id matches any of expected members pattern.
 
@@ -190,8 +190,8 @@ def find_matching_pattern(value: str, patterns: typing.Iterable[re.Pattern[str]]
     :param set_members: A set of pattern to try to match the resource id
     """
     for pattern in patterns:
-        if pattern.fullmatch(value):
-            return pattern.pattern
+        if re.compile(pattern).fullmatch(value):
+            return pattern
 
     return None
 
@@ -878,8 +878,8 @@ class LsmProject:
     def post_partial_compile_validation(
         self,
         service_id: uuid.UUID,
-        shared_resource_patterns: list[re.Pattern[str]],
-        owned_resource_patterns: list[re.Pattern[str]],
+        shared_resource_patterns: typing.Sequence[str],
+        owned_resource_patterns: typing.Sequence[str],
     ) -> None:
         """
         Perform a check on the export result of a partial compile.  It makes sure that:
@@ -896,13 +896,20 @@ class LsmProject:
         :param owned_resource_patterns: A list of patterns that can be used to identified the
             resources which are expected to be part of the service's resource set.
         """
-        # Check that the only resource set emitted is the one of this service
+        # Get the service
+        service = self.get_service(service_id)
+
         resource_sets = get_resource_sets(self.project)
-        assert resource_sets.keys() == {str(service_id)}
+        if not service.deleted:
+            # Check that the only resource set emitted is the one of this service
+            assert resource_sets.keys() == {str(service_id)}
+            _, owned_resources = resource_sets.popitem()
+        else:
+            # Check that no resource set is emitted
+            assert resource_sets.keys() == set()
+            owned_resources = []
 
-        # Extract the set of owned resources
-        _, owned_resources = resource_sets.popitem()
-
+        # Check that each resource that is emitted belongs to the expected resource set
         for resource_id in self.project.resources.keys():
             expects_shared = find_matching_pattern(str(resource_id), shared_resource_patterns)
             expects_owned = find_matching_pattern(str(resource_id), owned_resource_patterns)

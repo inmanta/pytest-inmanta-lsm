@@ -43,6 +43,7 @@ implementation vlanAssignment for VlanAssignment:
         fail=interface_name == "fake_interface",
     )
     self.resources += all
+    self.owned_resources += all
 end
 
 binding = lsm::ServiceEntityBindingV2(
