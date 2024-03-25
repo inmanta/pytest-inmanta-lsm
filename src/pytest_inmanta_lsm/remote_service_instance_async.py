@@ -13,8 +13,8 @@ import typing
 import uuid
 
 import devtools
-from inmanta_lsm import model
-from inmanta_lsm.diagnose.model import FullDiagnosis
+from inmanta_lsm import model  # type: ignore
+from inmanta_lsm.diagnose.model import FullDiagnosis  # type: ignore
 
 from pytest_inmanta_lsm import remote_orchestrator
 
