@@ -194,7 +194,7 @@ class RemoteServiceInstance:
             service_id=self.instance_id,
             filter={"version": f"ge:{since_version}"},
         )
-    
+
     async def diagnose(self, *, version: int) -> FullDiagnosis:
         """
         Get a diagnosis of the service recent errors/failures, if any.
