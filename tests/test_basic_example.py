@@ -9,8 +9,6 @@
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
 
 import utils
-import versions
-from packaging import version
 
 
 def test_deployment_failure(testdir):
