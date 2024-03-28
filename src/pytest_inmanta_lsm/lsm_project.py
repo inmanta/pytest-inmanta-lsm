@@ -327,6 +327,13 @@ class LsmProject:
 
         self.monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_services_get_by_id",
+            self.lsm_services_get_by_id,
+            raising=False,
+        )
+
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_update_attributes",
             self.lsm_services_update_attributes,
             raising=False,
@@ -395,6 +402,35 @@ class LsmProject:
                     for srv in self.services.values()
                     if srv.service_entity == service_entity
                 ],
+            },
+        )
+
+    def lsm_services_get_by_id(
+        self,
+        tid: uuid.UUID,
+        service_id: uuid.UUID,
+    ) -> inmanta.protocol.common.Result:
+        """
+        This is a mock for the lsm api, this method is called during partial compile
+        selection.
+        """
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
+        if str(service_id) not in self.services:
+            return inmanta.protocol.common.Result(
+                code=404,
+                result={},
+            )
+
+        return inmanta.protocol.common.Result(
+            code=200,
+            result={
+                "data": json.loads(
+                    json.dumps(
+                        self.services[str(service_id)],
+                        default=inmanta.util.api_boundary_json_encoder,
+                    ),
+                ),
             },
         )
 
