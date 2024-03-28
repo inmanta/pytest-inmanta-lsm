@@ -3,6 +3,7 @@ import uuid
 
 from _typeshed import Incomplete
 from inmanta_lsm import model
+from inmanta_lsm.diagnose.model import FullDiagnosis
 
 from pytest_inmanta_lsm import remote_orchestrator as remote_orchestrator
 
@@ -44,6 +45,14 @@ class RemoteServiceInstance:
         Get the service instance history, since the specified version (included).
 
         :param since_version: The version (included) starting from which we should gather the logs.
+        """
+
+    def diagnose(self, *, version: int) -> FullDiagnosis:
+        """
+        Get a diagnosis of the service recent errors/failures, if any.
+
+        :param version: The version of the service at which we are looking for
+            failures or errors.
         """
 
     def wait_for_state(
