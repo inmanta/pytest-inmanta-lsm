@@ -11,6 +11,7 @@ Changes in this release:
     - Determine initial state automatically.
     - Follow the first "auto" state transfers, running the corresponding compiles, and applying the corresponding attribute operations.
 - Extend `LsmProject` mocking capability to allow partial compile selection testing.
+- Reset `autostart_agent_map` environment setting when cleaning up the environment in between tests.
 
 # v 3.2.0 (2024-02-20)
 Changes in this release:
