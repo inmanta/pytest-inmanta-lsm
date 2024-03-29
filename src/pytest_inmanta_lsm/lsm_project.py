@@ -979,10 +979,21 @@ class LsmProject:
         model = pathlib.Path(self.project._test_project_dir, "main.cf").read_text()
         self.project.compile(model)
 
-        # Check that we have as many resource sets as there are services
-        assert get_resource_sets(self.project).keys() == {
-            str(srv.id) for srv in self.services.values() if not srv.deleted and not srv.state == "ordered"
+        # Check each service in the inventory has its own resource set
+        all_resource_sets = get_resource_sets(self.project).keys()
+        all_running_services = {
+            str(srv.id)
+            for srv in self.services.values()
+            if not srv.deleted and self.get_service_entity(srv.service_entity).lifecycle.get_state(srv.state).export_resources
         }
+        stopped_services = self.services.keys() - all_running_services
+        assert (
+            not all_running_services - all_resource_sets
+        ), f"Some services didn't export any resource set: {all_running_services - all_resource_sets}"
+        assert not stopped_services & all_resource_sets, (
+            "Some services that shouldn't have been included in the compile have emitted a resource set: "
+            f"{stopped_services & all_resource_sets}"
+        )
 
         # Check that the shared resource set doesn't contain any illegal modification
         # For classic full compiles (no config update), the shared set shouldn't be
