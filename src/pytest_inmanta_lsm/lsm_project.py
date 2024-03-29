@@ -9,6 +9,7 @@ import copy
 import datetime
 import functools
 import hashlib
+import itertools
 import json
 import logging
 import pathlib
@@ -938,12 +939,14 @@ class LsmProject:
         resource_sets = get_resource_sets(self.project)
         if not service.deleted:
             # Check that the only resource set emitted is the one of this service
-            assert resource_sets.keys() == {str(service_id)}
-            _, owned_resources = resource_sets.popitem()
+            assert str(service_id) in resource_sets.keys()
         else:
             # Check that no resource set is emitted
-            assert resource_sets.keys() == set()
-            owned_resources = []
+            assert str(service_id) not in resource_sets.keys()
+
+        # Get all the owned resources, also the ones from other services we
+        # pulled down in our partial selection
+        owned_resources = list(itertools.chain(*resource_sets.values()))
 
         # Check that each resource that is emitted belongs to the expected resource set
         for resource_id in self.project.resources.keys():
