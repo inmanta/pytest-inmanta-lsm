@@ -402,6 +402,9 @@ def remote_orchestrator(
         "autostart_agent_deploy_interval": 600,
         "autostart_agent_repair_splay_time": 600,
         "autostart_agent_repair_interval": 0,
+        "autostart_agent_map": {
+            "internal": "local:",
+        },
         "lsm_partial_compile": remote_orchestrator_partial,
     }
     settings.update(remote_orchestrator_settings)
