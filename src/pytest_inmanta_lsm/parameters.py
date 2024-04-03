@@ -33,6 +33,20 @@ inm_lsm_srv_port = IntegerTestParameter(
     group=param_group,
 )
 
+inm_lsm_remote_shell = StringTestParameter(
+    argument="--lsm-rsh",
+    environment_variable="INMANTA_LSM_REMOTE_SHELL",
+    usage="A command opening a remote shell on the orchestrator.",
+    group=param_group,
+)
+
+inm_lsm_remote_host = StringTestParameter(
+    argument="--lsm-rh",
+    environment_variable="INMANTA_LSM_REMOTE_HOST",
+    usage="The name of the host that we should try to open the remote shell on.",
+    group=param_group,
+)
+
 inm_lsm_ssh_user = StringTestParameter(
     argument="--lsm-ssh-user",
     environment_variable="INMANTA_LSM_SSH_USER",

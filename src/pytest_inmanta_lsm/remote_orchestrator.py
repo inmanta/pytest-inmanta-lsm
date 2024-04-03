@@ -180,12 +180,14 @@ class RemoteOrchestrator:
         *,
         host: str = "localhost",
         port: int = 8888,
-        ssh_user: str = "inmanta",
-        ssh_port: int = 22,
+        ssh_user: typing.Optional[str] = "inmanta",
+        ssh_port: typing.Optional[int] = 22,
         token: typing.Optional[str] = None,
         ssl: bool = False,
         ca_cert: typing.Optional[str] = None,
         container_env: bool = False,
+        remote_shell: typing.Optional[list[str]] = None,
+        remote_host: typing.Optional[str] = None,
     ) -> None:
         """
         :param environment: The environment that should be configured on the remote orchestrator
@@ -199,6 +201,7 @@ class RemoteOrchestrator:
         :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
         :param ca_cert: Certificate used for authentication
         :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
+        :param remote_shell: A command which allows us to start a shell on the remote orchestrator.
         """
         self.orchestrator_environment = orchestrator_environment
         self.environment = self.orchestrator_environment.id
@@ -211,6 +214,26 @@ class RemoteOrchestrator:
         self.token = token
         self.ca_cert = ca_cert
         self.container_env = container_env
+
+        if remote_shell is not None:
+            # We got a remote shell command, allowing us to access the remote orchestrator
+            self.remote_shell = remote_shell
+        elif ssh_user is None or ssh_port is None:
+            # No remote shell command and not ssh user and port, we have no
+            # way of accessing the remote orchestrator
+            raise ValueError("Either the remote shell or the ssh access should be provided")
+        else:
+            # Compose the remote shell command based on the ssh user and port
+            self.remote_shell = [
+                *SSH_CMD,
+                "-p",
+                str(ssh_port),
+                f"{ssh_user}@{self.host}",
+            ]
+
+        # Allow to change the remote host, as the access to the remote shell or to the
+        # remote api might be different (i.e. podman exec -i <container-name> vs curl <container-ip>)
+        self.remote_host = remote_host if remote_host is not None else host
 
         # Build the client once, it loads the config on every call
         self.client = inmanta.protocol.endpoints.SyncClient("client")
@@ -355,7 +378,7 @@ class RemoteOrchestrator:
             cmd = shlex.join(["bash", "-l", "-c", cmd])
 
         # If we need to change user, prefix the command with a sudo
-        if self.ssh_user != user:
+        if self.ssh_user is not None and self.ssh_user != user:
             # Make sure the user is a safe value to use
             user = shlex.quote(user)
             cmd = f"sudo --login --user={user} -- {cmd}"
@@ -363,13 +386,7 @@ class RemoteOrchestrator:
         LOGGER.debug("Running command on remote orchestrator: %s", cmd)
         try:
             return subprocess.check_output(
-                SSH_CMD
-                + [
-                    "-p",
-                    str(self.ssh_port),
-                    f"{self.ssh_user}@{self.host}",
-                    cmd,
-                ],
+                self.remote_shell + [self.remote_host, *shlex.split(cmd)],
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
             )
@@ -463,7 +480,7 @@ class RemoteOrchestrator:
         :param excludes: A list of exclude values to provide to rsync.
         :param user: The user that should own the file on the remote orchestrator.
         """
-        if self.ssh_user != user:
+        if self.ssh_user is not None and self.ssh_user != user:
             # Syncing the folder would not give us the correct permission on the folder
             # So we sync the folder in a temporary location, then move it
             temporary_remote_folder = pathlib.Path(f"/tmp/{self.environment}/tmp-{remote_folder.name}")
@@ -498,10 +515,10 @@ class RemoteOrchestrator:
             *[f"--exclude={exc}" for exc in excludes],
             "--delete",
             "-e",
-            " ".join(SSH_CMD + [f"-p {self.ssh_port}"]),
+            shlex.join(self.remote_shell),
             "-rl",
             f"{local_folder}/",
-            f"{self.ssh_user}@{self.host}:{remote_folder}/",
+            f"{self.remote_host}:{remote_folder}/",
         ]
         gitignore = local_folder / ".gitignore"
         if not gitignore.exists():

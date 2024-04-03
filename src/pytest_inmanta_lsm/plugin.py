@@ -8,6 +8,7 @@
 
 import logging
 import os
+import shlex
 import shutil
 import textwrap
 import time
@@ -48,6 +49,8 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_no_halt,
     inm_lsm_partial_compile,
     inm_lsm_project_name,
+    inm_lsm_remote_host,
+    inm_lsm_remote_shell,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
     inm_lsm_ssh_user,
@@ -276,18 +279,28 @@ def remote_orchestrator_shared(
 
     host, port = remote_orchestrator_host
 
+    def get_optional_option(option: StringTestParameter) -> Optional[str]:
+        try:
+            return option.resolve(request.config)
+        except ParameterNotSetException:
+            return None
+
     if remote_orchestrator_container is None:
-        ssh_user = inm_lsm_ssh_user.resolve(request.config)
-        ssh_port = inm_lsm_ssh_port.resolve(request.config)
         container_env = inm_lsm_container_env.resolve(request.config)
+        remote_shell = get_optional_option(inm_lsm_remote_shell)
+        remote_host = get_optional_option(inm_lsm_remote_host)
+        ssh_user = get_optional_option(inm_lsm_ssh_user) if remote_shell is None else None
+        ssh_port = get_optional_option(inm_lsm_ssh_port) if remote_shell is None else None
     else:
         # If the orchestrator is running in a container we deployed ourself, we overwrite
         # a few configuration parameters with what matches the deployed orchestrator
         # If the container image behaves differently than assume, those value won't work,
         # no mechanism exists currently to work around this.
-        ssh_user = "inmanta"
-        ssh_port = 22
+        ssh_user = None
+        ssh_port = None
         container_env = True
+        remote_shell = "docker exec -w /var/lib/inmanta -u inmanta -i"
+        remote_host = remote_orchestrator_container.orchestrator["name"]
 
     ssl = inm_lsm_ssl.resolve(request.config)
     ca_cert: Optional[str] = None
@@ -298,12 +311,6 @@ def remote_orchestrator_shared(
             and remote_orchestrator_container.compose_file == inm_lsm_ctr_compose.default
         ):
             LOGGER.warning("SSL currently doesn't work with the default docker-compose file.")
-
-    def get_optional_option(option: StringTestParameter) -> Optional[str]:
-        try:
-            return option.resolve(request.config)
-        except ParameterNotSetException:
-            return None
 
     token = get_optional_option(inm_lsm_token)
     environment_name = get_optional_option(inm_lsm_env_name)
@@ -323,6 +330,8 @@ def remote_orchestrator_shared(
         token=token,
         ca_cert=ca_cert,
         container_env=container_env,
+        remote_shell=shlex.split(remote_shell) if remote_shell is not None else None,
+        remote_host=remote_host,
     )
 
     # Make sure we start our test suite with a clean environment
