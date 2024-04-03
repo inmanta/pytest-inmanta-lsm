@@ -228,7 +228,8 @@ class RemoteOrchestrator:
                 *SSH_CMD,
                 "-p",
                 str(ssh_port),
-                f"{ssh_user}@{self.host}",
+                "-o",
+                f"User={ssh_user}",
             ]
 
         # Allow to change the remote host, as the access to the remote shell or to the
