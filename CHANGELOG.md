@@ -11,6 +11,7 @@ Changes in this release:
     - Determine initial state automatically.
     - Follow the first "auto" state transfers, running the corresponding compiles, and applying the corresponding attribute operations.
 - Extend `LsmProject` mocking capability to allow partial compile selection testing.
+- Add `--lsm-rsh` and `--lsm-rh` to support remote access to a local container without ssh.
 
 # v 3.2.0 (2024-02-20)
 Changes in this release:

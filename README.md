@@ -286,6 +286,10 @@ pytest-inmanta-lsm:
   --lsm-srv-port
                         Port the orchestrator api is listening to (overrides
                         INMANTA_LSM_SRV_PORT, defaults to 8888)
+  --lsm-rsh=LSM_RSH     A command opening a remote shell on the orchestrator. (overrides
+                        INMANTA_LSM_REMOTE_SHELL)
+  --lsm-rh=LSM_RH       The name of the host that we should try to open the remote shell on.
+                        (overrides INMANTA_LSM_REMOTE_HOST)
   --lsm-ssh-port
                         Port to use to ssh to the remote orchestrator (overrides
                         INMANTA_LSM_SSH_PORT, defaults to 22)
