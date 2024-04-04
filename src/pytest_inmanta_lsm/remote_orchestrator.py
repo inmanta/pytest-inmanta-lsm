@@ -228,8 +228,8 @@ class RemoteOrchestrator:
                 *SSH_CMD,
                 "-p",
                 str(ssh_port),
-                "-o",
-                f"User={ssh_user}",
+                "-l",
+                ssh_user,
             ]
 
         # Allow to change the remote host, as the access to the remote shell or to the
@@ -366,6 +366,7 @@ class RemoteOrchestrator:
 
         # If required, add env var prefix to the command
         if env is not None:
+            shell = True
             env_prefix = [f"{k}={shlex.quote(v)}" for k, v in env.items()]
             cmd = " ".join(env_prefix + [cmd])
 
@@ -384,11 +385,17 @@ class RemoteOrchestrator:
             user = shlex.quote(user)
             cmd = shlex.join(["sudo", "--login", f"--user={user}", "--", *shlex.split(cmd)])
 
-        full_cmd = [*self.remote_shell, self.remote_host, *shlex.split(cmd)]
         LOGGER.debug("Running command on remote orchestrator: %s", cmd)
         try:
+            # The command we execute on the remote host is always "sh", and we provide
+            # the desired command to run as input.  We do this because 'ssh' and 'docker exec'
+            # don't expect the same format of argument for the command to execute on the
+            # remote host.  The former expects the command and its arguments as a single string.
+            # The latter expects the command and its arguments to be space-separated arguments to
+            # the exec command.
             return subprocess.check_output(
-                full_cmd,
+                [*self.remote_shell, self.remote_host, "sh"],
+                input=cmd,
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
             )
