@@ -23,7 +23,11 @@ import requests
 from inmanta import module
 from packaging import version
 from pytest_inmanta.plugin import Project
-from pytest_inmanta.test_parameter import ParameterNotSetException, StringTestParameter
+from pytest_inmanta.test_parameter import (
+    ParameterNotSetException,
+    ParameterType,
+    TestParameter,
+)
 
 from pytest_inmanta_lsm import lsm_project
 from pytest_inmanta_lsm.orchestrator_container import (
@@ -279,7 +283,7 @@ def remote_orchestrator_shared(
 
     host, port = remote_orchestrator_host
 
-    def get_optional_option(option: StringTestParameter) -> Optional[str]:
+    def get_optional_option(option: TestParameter[ParameterType]) -> Optional[ParameterType]:
         try:
             return option.resolve(request.config)
         except ParameterNotSetException:

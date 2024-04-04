@@ -471,7 +471,7 @@ class RemoteOrchestrator:
             # The command we received should be run in a shell
             cmd = shlex.join(["bash", "-l", "-c", cmd])
 
-        return self.run_command(args=[base_cmd + " " + cmd], shell=True, user=self.ssh_user)
+        return self.run_command(args=[base_cmd + " " + cmd], shell=True, user=self.ssh_user or "inmanta")
 
     def sync_local_folder(
         self,
