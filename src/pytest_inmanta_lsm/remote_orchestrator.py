@@ -201,7 +201,11 @@ class RemoteOrchestrator:
         :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
         :param ca_cert: Certificate used for authentication
         :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
-        :param remote_shell: A command which allows us to start a shell on the remote orchestrator.
+        :param remote_shell: A command which allows us to start a shell on the remote orchestrator or send file to it.
+            When sending files, this value will be passed to the `-e` argument of rsync.  When running a command, we will
+            append the host name and `sh` to this value, and pass the command to execute as input to the open remote shell.
+        :param remote_host: The name of the remote host we can execute command on or send files to.  Defaults
+            to the value of the host parameter.
         """
         self.orchestrator_environment = orchestrator_environment
         self.environment = self.orchestrator_environment.id
