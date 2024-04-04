@@ -382,12 +382,13 @@ class RemoteOrchestrator:
         if self.ssh_user is not None and self.ssh_user != user:
             # Make sure the user is a safe value to use
             user = shlex.quote(user)
-            cmd = f"sudo --login --user={user} -- {cmd}"
+            cmd = shlex.join(["sudo", "--login", f"--user={user}", "--", *shlex.split(cmd)])
 
+        full_cmd = [*self.remote_shell, self.remote_host, *shlex.split(cmd)]
         LOGGER.debug("Running command on remote orchestrator: %s", cmd)
         try:
             return subprocess.check_output(
-                self.remote_shell + [self.remote_host, *shlex.split(cmd)],
+                full_cmd,
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
             )
