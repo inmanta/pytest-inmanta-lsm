@@ -300,7 +300,7 @@ def remote_orchestrator_shared(
         ssh_port = None
         container_env = True
         remote_shell = "docker exec -w /var/lib/inmanta -u inmanta -i"
-        remote_host = remote_orchestrator_container.orchestrator["Name"]
+        remote_host = remote_orchestrator_container.orchestrator["Config"]["Hostname"]
 
     ssl = inm_lsm_ssl.resolve(request.config)
     ca_cert: Optional[str] = None
