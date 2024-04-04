@@ -36,7 +36,11 @@ inm_lsm_srv_port = IntegerTestParameter(
 inm_lsm_remote_shell = StringTestParameter(
     argument="--lsm-rsh",
     environment_variable="INMANTA_LSM_REMOTE_SHELL",
-    usage="A command opening a remote shell on the orchestrator.",
+    usage=(
+        "A command which allows us to start a shell on the remote orchestrator or send file to it.  "
+        "When sending files, this value will be passed to the `-e` argument of rsync.  When running a command, we will "
+        "append the host name and `sh` to this value, and pass the command to execute as input to the open remote shell."
+    ),
     group=param_group,
 )
 
