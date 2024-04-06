@@ -349,7 +349,7 @@ class RemoteOrchestrator:
         shell to change within the lifecycle of this remote orchestrator object.
         """
         if self._whoami is None:
-            self._whoami = self.run_command(["whoami"], user=None).strip()
+            self._whoami = self.run_command(["whoami"], user=None, stderr=subprocess.PIPE).strip()
             LOGGER.debug("Remote user at %s (accessed via %s) is %s", self.remote_host, self.remote_shell, repr(self._whoami))
         return self._whoami
 
@@ -361,6 +361,7 @@ class RemoteOrchestrator:
         cwd: typing.Optional[str] = None,
         env: typing.Optional[typing.Mapping[str, str]] = None,
         user: typing.Optional[str] = "inmanta",
+        stderr: int = subprocess.STDOUT,
     ) -> str:
         """
         Helper method to execute a command on the remote orchestrator host as the specified user.
@@ -376,6 +377,8 @@ class RemoteOrchestrator:
             running on the remote orchestrator.
         :param user: The user that should be running the process on the remote orchestrator.  If set to
             None, keep whichever user is used when opening the remote shell on the orchestrator.
+        :param stderr: The file descriptor number where stderr for the given command should be sent to.
+            Defaults to stdout, which is returned by this command.
         """
         if shell:
             assert len(args) == 1, "When running command in a shell, only one arg should be provided"
@@ -414,7 +417,7 @@ class RemoteOrchestrator:
             return subprocess.check_output(
                 [*self.remote_shell, self.remote_host, "sh"],
                 input=cmd,
-                stderr=subprocess.STDOUT,
+                stderr=stderr,
                 universal_newlines=True,
             )
         except subprocess.CalledProcessError as e:
@@ -522,7 +525,7 @@ class RemoteOrchestrator:
                 f"mkdir -p {tmp_folder_parent} && "
                 f"sudo rm -rf {tmp_folder} && "
                 f"sudo mv {src_folder} {tmp_folder} && "
-                f"sudo chown -R {self.remote_user}:{self.remote_user} {tmp_folder}"
+                f"sudo chown -R {shlex.quote(self.remote_user)}:{shlex.quote(self.remote_user)} {tmp_folder}"
             )
             self.run_command([move_folder_to_tmp], shell=True, user=None)
 
@@ -530,7 +533,9 @@ class RemoteOrchestrator:
             self.sync_local_folder(local_folder, temporary_remote_folder, excludes=excludes, user=None)
 
             # Move the temporary folder back into its original location
-            move_tmp_to_folder = f"sudo chown -R {user}:{user} {tmp_folder} && sudo mv {tmp_folder} {src_folder}"
+            move_tmp_to_folder = (
+                f"sudo chown -R {shlex.quote(user)}:{shlex.quote(user)} {tmp_folder} && sudo mv {tmp_folder} {src_folder}"
+            )
             self.run_command([move_tmp_to_folder], shell=True, user=None)
             return
 
