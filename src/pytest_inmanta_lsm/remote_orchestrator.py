@@ -236,6 +236,9 @@ class RemoteOrchestrator:
                 ssh_user,
             ]
 
+        # Cached value of the name of the user we have on the remote orchestrator
+        self._whoami: typing.Optional[str] = None
+
         # Allow to change the remote host, as the access to the remote shell or to the
         # remote api might be different (i.e. podman exec -i <container-name> vs curl <container-ip>)
         self.remote_host = remote_host if remote_host is not None else host
@@ -338,6 +341,18 @@ class RemoteOrchestrator:
         except (KeyError, TypeError):
             raise Exception(f"Unexpected response for server status API call: {server_status.result}")
 
+    @property
+    def remote_user(self) -> str:
+        """
+        Execute the whoami command in the remote shell, to discover which user we have access to
+        in this shell and returns its name.  The result is cached, as we don't expect the remote
+        shell to change within the lifecycle of this remote orchestrator object.
+        """
+        if self._whoami is None:
+            self._whoami = self.run_command(["whoami"], user=None).strip()
+            LOGGER.debug("Remote user at %s (accessed via %s) is %s", self.remote_host, self.remote_shell, repr(self._whoami))
+        return self._whoami
+
     def run_command(
         self,
         args: typing.Sequence[str],
@@ -345,7 +360,7 @@ class RemoteOrchestrator:
         shell: bool = False,
         cwd: typing.Optional[str] = None,
         env: typing.Optional[typing.Mapping[str, str]] = None,
-        user: str = "inmanta",
+        user: typing.Optional[str] = "inmanta",
     ) -> str:
         """
         Helper method to execute a command on the remote orchestrator host as the specified user.
@@ -359,7 +374,8 @@ class RemoteOrchestrator:
         :param cwd: The directory on the remote orchestrator in which the command should be executed.
         :param env: A mapping of environment variables that should be available to the process
             running on the remote orchestrator.
-        :param user: The user that should be running the process on the remote orchestrator.
+        :param user: The user that should be running the process on the remote orchestrator.  If set to
+            None, keep whichever user is used when opening the remote shell on the orchestrator.
         """
         if shell:
             assert len(args) == 1, "When running command in a shell, only one arg should be provided"
@@ -383,11 +399,9 @@ class RemoteOrchestrator:
             # The command we received should be run in a shell
             cmd = shlex.join(["bash", "-l", "-c", cmd])
 
-        # If we need to change user, prefix the command with a sudo
-        if self.ssh_user is not None and self.ssh_user != user:
-            # Make sure the user is a safe value to use
-            user = shlex.quote(user)
-            cmd = shlex.join(["sudo", "--login", f"--user={user}", "--", *shlex.split(cmd)])
+        if user is not None and user != self.remote_user:
+            # If we need to change user, prefix the command with a sudo
+            cmd = shlex.join(["sudo", "--login", "--user", user, "--", *shlex.split(cmd)])
 
         LOGGER.debug("Running command on remote orchestrator: %s", cmd)
         try:
@@ -471,7 +485,7 @@ class RemoteOrchestrator:
             # The command we received should be run in a shell
             cmd = shlex.join(["bash", "-l", "-c", cmd])
 
-        return self.run_command(args=[base_cmd + " " + cmd], shell=True, user=self.ssh_user or "inmanta")
+        return self.run_command(args=[base_cmd + " " + cmd], shell=True, user=None)
 
     def sync_local_folder(
         self,
@@ -479,7 +493,7 @@ class RemoteOrchestrator:
         remote_folder: pathlib.Path,
         *,
         excludes: typing.Sequence[str],
-        user: str = "inmanta",
+        user: typing.Optional[str] = "inmanta",
     ) -> None:
         """
         Sync a local folder with a remote orchestrator folder, exclude the provided sub folder
@@ -491,9 +505,10 @@ class RemoteOrchestrator:
         :param remote_folder: The folder on the remote orchestrator that should contain our
             local folder content after the sync.
         :param excludes: A list of exclude values to provide to rsync.
-        :param user: The user that should own the file on the remote orchestrator.
+        :param user: The user that should own the file on the remote orchestrator.  If set to None,
+            keep whichever user is used when opening the remote shell on the orchestrator.
         """
-        if self.ssh_user is not None and self.ssh_user != user:
+        if user is not None and user != self.remote_user:
             # Syncing the folder would not give us the correct permission on the folder
             # So we sync the folder in a temporary location, then move it
             temporary_remote_folder = pathlib.Path(f"/tmp/{self.environment}/tmp-{remote_folder.name}")
@@ -507,20 +522,20 @@ class RemoteOrchestrator:
                 f"mkdir -p {tmp_folder_parent} && "
                 f"sudo rm -rf {tmp_folder} && "
                 f"sudo mv {src_folder} {tmp_folder} && "
-                f"sudo chown -R {self.ssh_user}:{self.ssh_user} {tmp_folder}"
+                f"sudo chown -R {self.remote_user}:{self.remote_user} {tmp_folder}"
             )
-            self.run_command([move_folder_to_tmp], shell=True, user=self.ssh_user)
+            self.run_command([move_folder_to_tmp], shell=True, user=None)
 
             # Do the sync with the temporary folder
-            self.sync_local_folder(local_folder, temporary_remote_folder, excludes=excludes, user=self.ssh_user)
+            self.sync_local_folder(local_folder, temporary_remote_folder, excludes=excludes, user=None)
 
             # Move the temporary folder back into its original location
             move_tmp_to_folder = f"sudo chown -R {user}:{user} {tmp_folder} && sudo mv {tmp_folder} {src_folder}"
-            self.run_command([move_tmp_to_folder], shell=True, user=self.ssh_user)
+            self.run_command([move_tmp_to_folder], shell=True, user=None)
             return
 
-        # Make sure target dir exists
-        self.run_command(["mkdir", "-p", str(remote_folder)])
+        # Make sure target dir exists and it belongs to the user that will be used for the sync
+        self.run_command(["mkdir", "-p", str(remote_folder)], user=None)
 
         cmd = [
             "rsync",
