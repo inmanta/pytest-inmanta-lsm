@@ -277,9 +277,11 @@ pytest-inmanta-lsm:
                         The environment to use on the remote server (is created
                         if it doesn't exist) (overrides INMANTA_LSM_ENVIRONMENT,
                         defaults to 719c7ad5-6657-444b-b536-a27174cb7498)
-  --lsm-host=LSM_HOST   Remote orchestrator to use for the remote_inmanta
-                        fixture (overrides INMANTA_LSM_HOST, defaults to
-                        127.0.0.1)
+  --lsm-host=LSM_HOST   IP address or domain name of the remote orchestrator api we
+                        wish to use in our test. It will be picked up and used by the
+                        remote_orchestrator fixture.  This is also the default remote
+                        hostname, if it is not specified in the --lsm-rh option.
+                        (overrides INMANTA_LSM_HOST, defaults to 127.0.0.1)
   --lsm-no-clean        Don't cleanup the orchestrator after tests (for
                         debugging purposes) (overrides INMANTA_LSM_NO_CLEAN,
                         defaults to False)
@@ -292,8 +294,11 @@ pytest-inmanta-lsm:
                         command, we will append the host name and `sh` to this value,
                         and pass the command to execute as input to the open remote
                         shell. (overrides INMANTA_LSM_REMOTE_SHELL)
-  --lsm-rh=LSM_RH       The name of the host that we should try to open the remote shell
-                        on. (overrides INMANTA_LSM_REMOTE_HOST)
+  --lsm-rh=LSM_RH       The name of the host that we should try to open the remote
+                        shell on, as recognized by the remote shell command.  This
+                        doesn't have to strictly be a hostname, as long as it is a
+                        valid host identifier to the chosen rsh protocol. (overrides
+                        INMANTA_LSM_REMOTE_HOST)
   --lsm-ssh-port
                         Port to use to ssh to the remote orchestrator (overrides
                         INMANTA_LSM_SSH_PORT, defaults to 22)
