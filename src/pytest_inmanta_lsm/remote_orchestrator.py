@@ -186,7 +186,7 @@ class RemoteOrchestrator:
         ssl: bool = False,
         ca_cert: typing.Optional[str] = None,
         container_env: bool = False,
-        remote_shell: typing.Optional[list[str]] = None,
+        remote_shell: typing.Optional[typing.Sequence[str]] = None,
         remote_host: typing.Optional[str] = None,
     ) -> None:
         """
@@ -219,11 +219,12 @@ class RemoteOrchestrator:
         self.ca_cert = ca_cert
         self.container_env = container_env
 
+        self.remote_shell: typing.Sequence[str]
         if remote_shell is not None:
             # We got a remote shell command, allowing us to access the remote orchestrator
             self.remote_shell = remote_shell
         elif ssh_user is None or ssh_port is None:
-            # No remote shell command and not ssh user and port, we have no
+            # No remote shell command and no ssh user and port, we have no
             # way of accessing the remote orchestrator
             raise ValueError("Either the remote shell or the ssh access should be provided")
         else:
