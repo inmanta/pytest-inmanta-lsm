@@ -275,6 +275,18 @@ class LsmProject:
     def environment(self) -> str:
         return str(inmanta.config.Config.get("config", "environment"))
 
+    @property
+    def exporting_services(self) -> dict[str, inmanta_lsm.model.ServiceInstance]:
+        """
+        Get a dict containing all the services which are in an exporting state, and are therefore
+        expected to emit resources.
+        """
+        return {
+            id: srv
+            for id, srv in self.services.items()
+            if not srv.deleted and self.get_service_entity(srv.service_entity).lifecycle.get_state(srv.state).export_resources
+        }
+
     def monkeypatch_lsm_global_cache_reset(self) -> None:
         """
         This helper method monkeypatches the reset method of the global_cache of the lsm module.
@@ -925,6 +937,12 @@ class LsmProject:
         4. Resources sent to the shared resource set are never modified
         5. A full compile for the previously compiled mode still works
 
+        This method only works with basic services, which don't need any other service to be
+        present in the partial compile with them and don't share their owned resources set with
+        any other service.
+        For more advanced use cases, the user is expected to implement its own similar validation
+        logic.
+
         :param lsm_project: The LsmProject object that was used to perform the partial compile
         :param service_id: The id of the service which performed the partial compile
         :param shared_resource_patterns: A list of patterns that can be used to identified the
@@ -977,9 +995,7 @@ class LsmProject:
         self.project.compile(model)
 
         # Check that we have as many resource sets as there are services
-        assert get_resource_sets(self.project).keys() == {
-            str(srv.id) for srv in self.services.values() if not srv.deleted and not srv.state == "ordered"
-        }
+        assert get_resource_sets(self.project).keys() == self.exporting_services.keys()
 
         # Check that the shared resource set doesn't contain any illegal modification
         # For classic full compiles (no config update), the shared set shouldn't be
