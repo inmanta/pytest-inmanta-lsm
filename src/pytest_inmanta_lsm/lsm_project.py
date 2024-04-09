@@ -989,9 +989,7 @@ class LsmProject:
         self.project.compile(model)
 
         # Check that we have as many resource sets as there are services
-        assert get_resource_sets(self.project).keys() == {
-            str(srv.id) for srv in self.services.values() if not srv.deleted and not srv.state == "ordered"
-        }
+        assert get_resource_sets(self.project).keys() == self.exporting_services.keys()
 
         # Check that the shared resource set doesn't contain any illegal modification
         # For classic full compiles (no config update), the shared set shouldn't be
