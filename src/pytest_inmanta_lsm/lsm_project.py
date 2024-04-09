@@ -276,6 +276,18 @@ class LsmProject:
     def environment(self) -> str:
         return str(inmanta.config.Config.get("config", "environment"))
 
+    @property
+    def exporting_services(self) -> dict[str, inmanta_lsm.model.ServiceInstance]:
+        """
+        Get a dict containing all the services which are in an exporting state, and are therefore
+        expected to emit resources.
+        """
+        return {
+            id: srv
+            for id, srv in self.services.items()
+            if not srv.deleted and self.get_service_entity(srv.service_entity).lifecycle.get_state(srv.state).export_resources
+        }
+
     def monkeypatch_lsm_global_cache_reset(self) -> None:
         """
         This helper method monkeypatches the reset method of the global_cache of the lsm module.
