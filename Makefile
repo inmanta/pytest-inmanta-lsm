@@ -8,8 +8,7 @@ flake8 = flake8 src tests examples *.py
 .PHONY: install
 install:
 	pip install -U setuptools pip
-	pip install -U -r requirements.dev.txt
-	pip install -U -c requirements.txt . 
+	pip install -U --upgrade-strategy=eager -r requirements.dev.txt -c requirements.txt -e .
 
 .PHONY: format
 format:
