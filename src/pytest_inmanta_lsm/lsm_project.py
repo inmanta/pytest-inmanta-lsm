@@ -937,6 +937,12 @@ class LsmProject:
         4. Resources sent to the shared resource set are never modified
         5. A full compile for the previously compiled mode still works
 
+        This method only works with basic services, which don't need any other service to be
+        present in the partial compile with them and don't share their owned resources set with
+        any other service.
+        For more advanced use cases, the user is expected to implement its own similar validation
+        logic.
+
         :param lsm_project: The LsmProject object that was used to perform the partial compile
         :param service_id: The id of the service which performed the partial compile
         :param shared_resource_patterns: A list of patterns that can be used to identified the
