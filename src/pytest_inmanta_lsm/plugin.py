@@ -260,25 +260,18 @@ def verify_v2_editable_install() -> None:
 
 
 @pytest.fixture(scope="session")
-def remote_orchestrator_shared(
+def remote_orchestrator_access(
     request: pytest.FixtureRequest,
     project_shared: Project,
     remote_orchestrator_container: Optional[OrchestratorContainer],
     remote_orchestrator_environment: str,
-    remote_orchestrator_no_clean: bool,
-    remote_orchestrator_no_halt: bool,
-    remote_orchestrator_host: Tuple[str, int],
-) -> Iterator[RemoteOrchestrator]:
+    remote_orchestrator_host: tuple[str, int],
+) -> RemoteOrchestrator:
     """
-    Session fixture to setup the `RemoteOrchestrator` object that will be used to sync our project
-    to the remote orchestrator environment.  This fixture also makes sure that if the module being
-    tested is v2, it is installed in editable mode, as it is required to send it to the remote
-    orchestrator.
+    This fixture allows to get the remote orchestrator object, without any of the initial cleanup.
+    This allows to easily build helper tests that simply sync a remote environment with our local
+    project, without clearing its service inventory.
     """
-    # no need to do anything if this version of inmanta does not support v2 modules
-    if hasattr(module, "ModuleV2"):
-        verify_v2_editable_install()
-
     LOGGER.info("Setting up remote orchestrator")
 
     host, port = remote_orchestrator_host
@@ -320,7 +313,7 @@ def remote_orchestrator_shared(
     environment_name = get_optional_option(inm_lsm_env_name)
     project_name = get_optional_option(inm_lsm_project_name)
 
-    remote_orchestrator = RemoteOrchestrator(
+    return RemoteOrchestrator(
         OrchestratorEnvironment(
             id=UUID(remote_orchestrator_environment),
             name=environment_name,
@@ -337,6 +330,27 @@ def remote_orchestrator_shared(
         remote_shell=shlex.split(remote_shell) if remote_shell is not None else None,
         remote_host=remote_host,
     )
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_shared(
+    request: pytest.FixtureRequest,
+    project_shared: Project,
+    remote_orchestrator_access: RemoteOrchestrator,
+    remote_orchestrator_no_clean: bool,
+    remote_orchestrator_no_halt: bool,
+) -> Iterator[RemoteOrchestrator]:
+    """
+    Session fixture to setup the `RemoteOrchestrator` object that will be used to sync our project
+    to the remote orchestrator environment.  This fixture also makes sure that if the module being
+    tested is v2, it is installed in editable mode, as it is required to send it to the remote
+    orchestrator.
+    """
+    # no need to do anything if this version of inmanta does not support v2 modules
+    if hasattr(module, "ModuleV2"):
+        verify_v2_editable_install()
+
+    remote_orchestrator = remote_orchestrator_access
 
     # Make sure we start our test suite with a clean environment
     remote_orchestrator.clear_environment()
