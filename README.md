@@ -1,5 +1,7 @@
 # pytest-inmanta-lsm
 
+[![pypi version](https://img.shields.io/pypi/v/pytest-inmanta-lsm.svg)](https://pypi.python.org/pypi/pytest-inmanta-lsm/)
+
 A pytest plugin to test inmanta modules that use lsm, it is built on top of `pytest-inmanta` and `pytest-inmanta-extensions`
 
 ## Installation
