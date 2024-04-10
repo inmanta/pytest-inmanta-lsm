@@ -217,6 +217,37 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
 
 ```
 
+### Third case: development on an active environment.
+
+In some cases, (i.e. PoC) you might want to update the code of your module that is currently deployed in an environment.
+You can either start a new test case with pytest-inmanta-lsm's `remote_orchestrator` fixture, which will clear up everything
+and allow you to start from scratch.  Or you can use the similar `remote_orchestrator_access` fixture, which gives you the
+same handy `RemoteOrchestrator` object, but doesn't clear the environment of any existing services, or resources.  This allows
+you for example to re-export the service catalog, or re-synchronize your module's source code and keep all the existing services.
+
+To do so, simply create a test case using the `remote_orchestrator_access` fixture, and the same cli/env var options as used for
+normal pytest-inmanta-lsm test cases.
+```python
+def test_update_existing_environment(
+    project: plugin.Project,
+    remote_orchestrator_access: remote_orchestrator.RemoteOrchestrator,
+) -> None:
+    """
+    Make sure that it is possible to simply run a compile and export service entities,
+    without initially cleaning up the environment.
+    """
+
+    # Setup the compiler config
+    remote_orchestrator_access.setup_config()
+
+    # Do a local compile of our model
+    project.compile("import quickstart")
+
+    # Export service entities (and update the project)
+    remote_orchestrator_access.export_service_entities()
+
+```
+
 ## Options and environment variables
 
 The following options are available, each with a corresponding environment variable.
