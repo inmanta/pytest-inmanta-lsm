@@ -30,4 +30,4 @@ def test_basic_example(testdir):
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest("tests/test_quickstart.py")
-    result.assert_outcomes(passed=4)
+    result.assert_outcomes(passed=5)
