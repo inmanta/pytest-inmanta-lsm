@@ -1,5 +1,7 @@
 # pytest-inmanta-lsm
 
+[![pypi version](https://img.shields.io/pypi/v/pytest-inmanta-lsm.svg)](https://pypi.python.org/pypi/pytest-inmanta-lsm/)
+
 A pytest plugin to test inmanta modules that use lsm, it is built on top of `pytest-inmanta` and `pytest-inmanta-extensions`
 
 ## Installation
@@ -217,6 +219,37 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
 
 ```
 
+### Third case: development on an active environment.
+
+In some cases, (i.e. PoC) you might want to update the code of your module that is currently deployed in an environment.
+You can either start a new test case with pytest-inmanta-lsm's `remote_orchestrator` fixture, which will clear up everything
+and allow you to start from scratch.  Or you can use the similar `remote_orchestrator_access` fixture, which gives you the
+same handy `RemoteOrchestrator` object, but doesn't clear the environment of any existing services, or resources.  This allows
+you for example to re-export the service catalog, or re-synchronize your module's source code and keep all the existing services.
+
+To do so, simply create a test case using the `remote_orchestrator_access` fixture, and the same cli/env var options as used for
+normal pytest-inmanta-lsm test cases.
+```python
+def test_update_existing_environment(
+    project: plugin.Project,
+    remote_orchestrator_access: remote_orchestrator.RemoteOrchestrator,
+) -> None:
+    """
+    Make sure that it is possible to simply run a compile and export service entities,
+    without initially cleaning up the environment.
+    """
+
+    # Setup the compiler config
+    remote_orchestrator_access.setup_config()
+
+    # Do a local compile of our model
+    project.compile("import quickstart")
+
+    # Export service entities (and update the project)
+    remote_orchestrator_access.export_service_entities()
+
+```
+
 ## Options and environment variables
 
 The following options are available, each with a corresponding environment variable.
@@ -277,15 +310,28 @@ pytest-inmanta-lsm:
                         The environment to use on the remote server (is created
                         if it doesn't exist) (overrides INMANTA_LSM_ENVIRONMENT,
                         defaults to 719c7ad5-6657-444b-b536-a27174cb7498)
-  --lsm-host=LSM_HOST   Remote orchestrator to use for the remote_inmanta
-                        fixture (overrides INMANTA_LSM_HOST, defaults to
-                        127.0.0.1)
+  --lsm-host=LSM_HOST   IP address or domain name of the remote orchestrator api we
+                        wish to use in our test. It will be picked up and used by the
+                        remote_orchestrator fixture.  This is also the default remote
+                        hostname, if it is not specified in the --lsm-rh option.
+                        (overrides INMANTA_LSM_HOST, defaults to 127.0.0.1)
   --lsm-no-clean        Don't cleanup the orchestrator after tests (for
                         debugging purposes) (overrides INMANTA_LSM_NO_CLEAN,
                         defaults to False)
   --lsm-srv-port
                         Port the orchestrator api is listening to (overrides
                         INMANTA_LSM_SRV_PORT, defaults to 8888)
+  --lsm-rsh=LSM_RSH     A command which allows us to start a shell on the remote
+                        orchestrator or send file to it.  When sending files, this value
+                        will be passed to the `-e` argument of rsync.  When running a
+                        command, we will append the host name and `sh` to this value,
+                        and pass the command to execute as input to the open remote
+                        shell. (overrides INMANTA_LSM_REMOTE_SHELL)
+  --lsm-rh=LSM_RH       The name of the host that we should try to open the remote
+                        shell on, as recognized by the remote shell command.  This
+                        doesn't have to strictly be a hostname, as long as it is a
+                        valid host identifier to the chosen rsh protocol. (overrides
+                        INMANTA_LSM_REMOTE_HOST)
   --lsm-ssh-port
                         Port to use to ssh to the remote orchestrator (overrides
                         INMANTA_LSM_SSH_PORT, defaults to 22)
