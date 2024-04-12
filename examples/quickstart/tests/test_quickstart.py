@@ -323,3 +323,22 @@ def test_partial_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject)
     service.version += 1
     lsm_project.compile(service_id=service.id)
     lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
+
+
+def test_update_existing_environment(
+    project: plugin.Project,
+    remote_orchestrator_access: remote_orchestrator.RemoteOrchestrator,
+) -> None:
+    """
+    Make sure that it is possible to simply run a compile and export service entities,
+    without initially cleaning up the environment.
+    """
+
+    # Setup the compiler config
+    remote_orchestrator_access.setup_config()
+
+    # Do a local compile of our model
+    project.compile("import quickstart")
+
+    # Export service entities (and update the project)
+    remote_orchestrator_access.export_service_entities()

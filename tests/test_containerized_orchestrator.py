@@ -79,4 +79,4 @@ def test_basic_example(testdir: Testdir):
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest("tests/test_quickstart.py", "--lsm-ctr")
-    result.assert_outcomes(passed=4)
+    result.assert_outcomes(passed=5)

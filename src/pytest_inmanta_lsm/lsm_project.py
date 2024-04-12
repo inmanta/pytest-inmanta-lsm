@@ -721,8 +721,11 @@ class LsmProject:
             next_state(transfer.target)
         except Exception:
             perform_attribute_operation(service, transfer.error_operation)
-            next_state(transfer.error)
+            if transfer.error is not None:
+                next_state(transfer.error)
             raise
+
+        return service
 
     def create_service(
         self,
@@ -756,7 +759,7 @@ class LsmProject:
             version=1,
             config={},
             state=service_entity.lifecycle.initial_state,
-            candidate_attributes=service_entity.add_defaults(attributes),
+            candidate_attributes=service_entity.add_defaults(attributes),  # type: ignore
             active_attributes=None,
             rollback_attributes=None,
             created_at=datetime.datetime.now(),
@@ -817,7 +820,7 @@ class LsmProject:
             raise RuntimeError(f"Service {service.id} can not be updated from state {service.state}")
 
         # Update the candidate attributes and apply all the defaults to them
-        service.candidate_attributes = service_entity.add_defaults(attributes)
+        service.candidate_attributes = service_entity.add_defaults(attributes)  # type: ignore
         service.last_updated = datetime.datetime.now()
 
         if not auto_transfer:
