@@ -1,3 +1,5 @@
 inmanta-lsm
 pytest-inmanta
 devtools
+inmanta-module-restbase
+requests_toolbelt
