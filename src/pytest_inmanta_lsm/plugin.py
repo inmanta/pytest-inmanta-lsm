@@ -429,12 +429,20 @@ def remote_orchestrator(
         "autostart_agent_deploy_interval": 600,
         "autostart_agent_repair_splay_time": 600,
         "autostart_agent_repair_interval": 0,
-        "autostart_agent_map": {
-            "internal": "local:",
-        },
         "lsm_partial_compile": remote_orchestrator_partial,
     }
     settings.update(remote_orchestrator_settings)
+
+    # Get server version and check if the server has the patch which safely allows to reset
+    # the agent map
+    # https://github.com/inmanta/inmanta-core/issues/7448
+    orchestrator_version = version.Version(remote_orchestrator_shared.status.version)
+    good_iso7 = orchestrator_version > version.Version("7.1.0.dev")
+    good_iso6 = version.Version("7.dev") > orchestrator_version > version.Version("6.5.0.dev")
+    if good_iso6 or good_iso7:
+        settings["autostart_agent_map"] = {
+            "internal": "local:",
+        }
 
     # Update the settings on the orchestrator
     for k, v in settings.items():
