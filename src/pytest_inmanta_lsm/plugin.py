@@ -228,7 +228,7 @@ def verify_v2_editable_install() -> None:
     # Generic message to help fix any of the problems reported below
     how_to_fix = (
         "To ensure the remote orchestrator uses the same code as the local project, please install the module"
-        " with `inmanta module install -e .` before running the tests."
+        " with `pip install -e .` before running the tests."
     )
 
     if installed is None:
