@@ -6,7 +6,6 @@
     :license: Inmanta EULA
 """
 
-import asyncio
 import dataclasses
 import logging
 import pathlib
@@ -17,7 +16,6 @@ import uuid
 from pprint import pformat
 from uuid import UUID
 
-import devtools.debug
 import inmanta.data.model
 import inmanta.module
 import inmanta.protocol.endpoints
@@ -331,22 +329,18 @@ class RemoteOrchestrator:
         else:
             return None
 
-    @property
-    def status(self) -> inmanta.data.model.StatusResponse:
-        """
-        Get the server status, including the version of the different components.  The result is cached, as we don't
-        expect the status to change within the lifecycle of this remote orchestrator object.
-        """
-        if self._status is None:
-            self._status = asyncio.run(self.request("get_server_status", inmanta.data.model.StatusResponse))
-            LOGGER.debug("Status of remote orchestrator is %s", devtools.debug.format(self._status))
-        return self._status
-
     def _get_server_version(self) -> Version:
         """
         Get the version of the remote orchestrator
         """
-        return Version(self.status.version)
+        server_status: Result = self.client.get_server_status()
+        if server_status.code != 200:
+            raise Exception(f"Failed to get server status for {self.host}")
+        try:
+            assert server_status.result is not None
+            return Version(server_status.result["data"]["version"])
+        except (KeyError, TypeError):
+            raise Exception(f"Unexpected response for server status API call: {server_status.result}")
 
     @property
     def remote_user(self) -> str:
