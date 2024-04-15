@@ -19,7 +19,6 @@ from uuid import UUID
 
 import devtools.debug
 import inmanta.data.model
-import inmanta.model
 import inmanta.module
 import inmanta.protocol.endpoints
 import pydantic
@@ -240,9 +239,6 @@ class RemoteOrchestrator:
                 ssh_user,
             ]
 
-        # Cached value of the status of the remote orchestrator
-        self._status: typing.Optional[inmanta.data.model.StatusResponse] = None
-
         # Cached value of the name of the user we have on the remote orchestrator
         self._whoami: typing.Optional[str] = None
 
@@ -344,7 +340,6 @@ class RemoteOrchestrator:
         if self._status is None:
             self._status = asyncio.run(self.request("get_server_status", inmanta.data.model.StatusResponse))
             LOGGER.debug("Status of remote orchestrator is %s", devtools.debug.format(self._status))
-            assert self._status is not None, "Failed to get status from the orchestrator"
         return self._status
 
     def _get_server_version(self) -> Version:
