@@ -8,6 +8,7 @@
 
 import logging
 import os
+import shlex
 import shutil
 import textwrap
 import time
@@ -22,7 +23,11 @@ import requests
 from inmanta import module
 from packaging import version
 from pytest_inmanta.plugin import Project
-from pytest_inmanta.test_parameter import ParameterNotSetException, StringTestParameter
+from pytest_inmanta.test_parameter import (
+    ParameterNotSetException,
+    ParameterType,
+    TestParameter,
+)
 
 from pytest_inmanta_lsm import lsm_project
 from pytest_inmanta_lsm.orchestrator_container import (
@@ -48,6 +53,8 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_no_halt,
     inm_lsm_partial_compile,
     inm_lsm_project_name,
+    inm_lsm_remote_host,
+    inm_lsm_remote_shell,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
     inm_lsm_ssh_user,
@@ -221,7 +228,7 @@ def verify_v2_editable_install() -> None:
     # Generic message to help fix any of the problems reported below
     how_to_fix = (
         "To ensure the remote orchestrator uses the same code as the local project, please install the module"
-        " with `inmanta module install -e .` before running the tests."
+        " with `pip install -e .` before running the tests."
     )
 
     if installed is None:
@@ -253,41 +260,44 @@ def verify_v2_editable_install() -> None:
 
 
 @pytest.fixture(scope="session")
-def remote_orchestrator_shared(
+def remote_orchestrator_access(
     request: pytest.FixtureRequest,
     project_shared: Project,
     remote_orchestrator_container: Optional[OrchestratorContainer],
     remote_orchestrator_environment: str,
-    remote_orchestrator_no_clean: bool,
-    remote_orchestrator_no_halt: bool,
-    remote_orchestrator_host: Tuple[str, int],
-) -> Iterator[RemoteOrchestrator]:
+    remote_orchestrator_host: tuple[str, int],
+) -> RemoteOrchestrator:
     """
-    Session fixture to setup the `RemoteOrchestrator` object that will be used to sync our project
-    to the remote orchestrator environment.  This fixture also makes sure that if the module being
-    tested is v2, it is installed in editable mode, as it is required to send it to the remote
-    orchestrator.
+    This fixture allows to get the remote orchestrator object, without any of the initial cleanup.
+    This allows to easily build helper tests that simply sync a remote environment with our local
+    project, without clearing its service inventory.
     """
-    # no need to do anything if this version of inmanta does not support v2 modules
-    if hasattr(module, "ModuleV2"):
-        verify_v2_editable_install()
-
     LOGGER.info("Setting up remote orchestrator")
 
     host, port = remote_orchestrator_host
 
+    def get_optional_option(option: TestParameter[ParameterType]) -> Optional[ParameterType]:
+        try:
+            return option.resolve(request.config)
+        except ParameterNotSetException:
+            return None
+
     if remote_orchestrator_container is None:
-        ssh_user = inm_lsm_ssh_user.resolve(request.config)
-        ssh_port = inm_lsm_ssh_port.resolve(request.config)
         container_env = inm_lsm_container_env.resolve(request.config)
+        remote_shell = get_optional_option(inm_lsm_remote_shell)
+        remote_host = get_optional_option(inm_lsm_remote_host)
+        ssh_user = get_optional_option(inm_lsm_ssh_user) if remote_shell is None else None
+        ssh_port = get_optional_option(inm_lsm_ssh_port) if remote_shell is None else None
     else:
         # If the orchestrator is running in a container we deployed ourself, we overwrite
         # a few configuration parameters with what matches the deployed orchestrator
         # If the container image behaves differently than assume, those value won't work,
         # no mechanism exists currently to work around this.
-        ssh_user = "inmanta"
-        ssh_port = 22
+        ssh_user = None
+        ssh_port = None
         container_env = True
+        remote_shell = "docker exec -w /var/lib/inmanta -u inmanta -i"
+        remote_host = remote_orchestrator_container.orchestrator["Config"]["Hostname"]
 
     ssl = inm_lsm_ssl.resolve(request.config)
     ca_cert: Optional[str] = None
@@ -299,17 +309,11 @@ def remote_orchestrator_shared(
         ):
             LOGGER.warning("SSL currently doesn't work with the default docker-compose file.")
 
-    def get_optional_option(option: StringTestParameter) -> Optional[str]:
-        try:
-            return option.resolve(request.config)
-        except ParameterNotSetException:
-            return None
-
     token = get_optional_option(inm_lsm_token)
     environment_name = get_optional_option(inm_lsm_env_name)
     project_name = get_optional_option(inm_lsm_project_name)
 
-    remote_orchestrator = RemoteOrchestrator(
+    return RemoteOrchestrator(
         OrchestratorEnvironment(
             id=UUID(remote_orchestrator_environment),
             name=environment_name,
@@ -323,7 +327,30 @@ def remote_orchestrator_shared(
         token=token,
         ca_cert=ca_cert,
         container_env=container_env,
+        remote_shell=shlex.split(remote_shell) if remote_shell is not None else None,
+        remote_host=remote_host,
     )
+
+
+@pytest.fixture(scope="session")
+def remote_orchestrator_shared(
+    request: pytest.FixtureRequest,
+    project_shared: Project,
+    remote_orchestrator_access: RemoteOrchestrator,
+    remote_orchestrator_no_clean: bool,
+    remote_orchestrator_no_halt: bool,
+) -> Iterator[RemoteOrchestrator]:
+    """
+    Session fixture to setup the `RemoteOrchestrator` object that will be used to sync our project
+    to the remote orchestrator environment.  This fixture also makes sure that if the module being
+    tested is v2, it is installed in editable mode, as it is required to send it to the remote
+    orchestrator.
+    """
+    # no need to do anything if this version of inmanta does not support v2 modules
+    if hasattr(module, "ModuleV2"):
+        verify_v2_editable_install()
+
+    remote_orchestrator = remote_orchestrator_access
 
     # Make sure we start our test suite with a clean environment
     remote_orchestrator.clear_environment()

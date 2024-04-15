@@ -1,3 +1,19 @@
+# v 3.3.0 (2024-04-15)
+Changes in this release:
+- Better logs when `docker-compose` in not installed
+- Add async `RemoteServiceInstance` class, for async service testing.
+- Add `export_service_entities` helper to `LsmProject` class.  Allowing to test the definition of a service.  (#352)
+- Allow to easily reuse model used in `export_service_entities` for all later compiles.
+- Validate that any service added to the `LsmProject` object using `add_service` method is part of one of the exported services. (#354)
+- Add `LsmProject` helpers to facilitate partial compile testing (#380)
+- Add `LsmProject` helpers to facilitate service creation and update:
+    - Fill in default attribute values.
+    - Determine initial state automatically.
+    - Follow the first "auto" state transfers, running the corresponding compiles, and applying the corresponding attribute operations.
+- Extend `LsmProject` mocking capability to allow partial compile selection testing.
+- Add `--lsm-rsh` and `--lsm-rh` to support remote access to a local container without ssh.
+- Add `remote_orchestrator_access` fixture, which sets up a remote orchestrator object allowing us to interact with the remote environment, but doesn't do any cleanup on its own.
+
 # v 3.2.0 (2024-02-20)
 Changes in this release:
 - Update default tags of ISO and postgres containers

@@ -20,7 +20,11 @@ param_group = "pytest-inmanta-lsm"
 inm_lsm_host = StringTestParameter(
     argument="--lsm-host",
     environment_variable="INMANTA_LSM_HOST",
-    usage="Remote orchestrator to use for the remote_inmanta fixture",
+    usage=(
+        "IP address or domain name of the remote orchestrator api we wish to use in our test. It "
+        "will be picked up and used by the remote_orchestrator fixture.  This is also the default "
+        "remote hostname, if it is not specified in the --lsm-rh option."
+    ),
     default="127.0.0.1",
     group=param_group,
 )
@@ -30,6 +34,28 @@ inm_lsm_srv_port = IntegerTestParameter(
     environment_variable="INMANTA_LSM_SRV_PORT",
     usage="Port the orchestrator api is listening to",
     default=8888,
+    group=param_group,
+)
+
+inm_lsm_remote_shell = StringTestParameter(
+    argument="--lsm-rsh",
+    environment_variable="INMANTA_LSM_REMOTE_SHELL",
+    usage=(
+        "A command which allows us to start a shell on the remote orchestrator or send file to it.  "
+        "When sending files, this value will be passed to the `-e` argument of rsync.  When running a command, we will "
+        "append the host name and `sh` to this value, and pass the command to execute as input to the open remote shell."
+    ),
+    group=param_group,
+)
+
+inm_lsm_remote_host = StringTestParameter(
+    argument="--lsm-rh",
+    environment_variable="INMANTA_LSM_REMOTE_HOST",
+    usage=(
+        "The name of the host that we should try to open the remote shell on, "
+        "as recognized by the remote shell command.  This doesn't have to strictly be "
+        "a hostname, as long as it is a valid host identifier to the chosen rsh protocol."
+    ),
     group=param_group,
 )
 

@@ -19,6 +19,7 @@ from uuid import UUID
 import inmanta.data.model
 import inmanta.module
 import inmanta.protocol.endpoints
+import pydantic
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from packaging.version import Version
@@ -162,6 +163,9 @@ class OrchestratorEnvironment:
             return current_environment
 
 
+T = typing.TypeVar("T")
+
+
 class RemoteOrchestrator:
     """
     This class helps to interact with a real remote orchestrator.  Its main focus is to help
@@ -176,12 +180,14 @@ class RemoteOrchestrator:
         *,
         host: str = "localhost",
         port: int = 8888,
-        ssh_user: str = "inmanta",
-        ssh_port: int = 22,
+        ssh_user: typing.Optional[str] = "inmanta",
+        ssh_port: typing.Optional[int] = 22,
         token: typing.Optional[str] = None,
         ssl: bool = False,
         ca_cert: typing.Optional[str] = None,
         container_env: bool = False,
+        remote_shell: typing.Optional[typing.Sequence[str]] = None,
+        remote_host: typing.Optional[str] = None,
     ) -> None:
         """
         :param environment: The environment that should be configured on the remote orchestrator
@@ -195,6 +201,11 @@ class RemoteOrchestrator:
         :param ssl: Option to indicate whether SSL should be used or not. Defaults to false
         :param ca_cert: Certificate used for authentication
         :param container_env: Whether the remote orchestrator is running in a container, without a systemd init process.
+        :param remote_shell: A command which allows us to start a shell on the remote orchestrator or send file to it.
+            When sending files, this value will be passed to the `-e` argument of rsync.  When running a command, we will
+            append the host name and `sh` to this value, and pass the command to execute as input to the open remote shell.
+        :param remote_host: The name of the remote host we can execute command on or send files to.  Defaults
+            to the value of the host parameter.
         """
         self.orchestrator_environment = orchestrator_environment
         self.environment = self.orchestrator_environment.id
@@ -208,8 +219,34 @@ class RemoteOrchestrator:
         self.ca_cert = ca_cert
         self.container_env = container_env
 
+        self.remote_shell: typing.Sequence[str]
+        if remote_shell is not None:
+            # We got a remote shell command, allowing us to access the remote orchestrator
+            self.remote_shell = remote_shell
+        elif ssh_user is None or ssh_port is None:
+            # No remote shell command and no ssh user and port, we have no
+            # way of accessing the remote orchestrator
+            raise ValueError("Either the remote shell or the ssh access should be provided")
+        else:
+            # Compose the remote shell command based on the ssh user and port
+            self.remote_shell = [
+                *SSH_CMD,
+                "-p",
+                str(ssh_port),
+                "-l",
+                ssh_user,
+            ]
+
+        # Cached value of the name of the user we have on the remote orchestrator
+        self._whoami: typing.Optional[str] = None
+
+        # Allow to change the remote host, as the access to the remote shell or to the
+        # remote api might be different (i.e. podman exec -i <container-name> vs curl <container-ip>)
+        self.remote_host = remote_host if remote_host is not None else host
+
         # Build the client once, it loads the config on every call
         self.client = inmanta.protocol.endpoints.SyncClient("client")
+        self.async_client = inmanta.protocol.endpoints.Client("client")
 
         # Setting up the client when the config is loaded
         self.setup_config()
@@ -258,6 +295,40 @@ class RemoteOrchestrator:
             if self.token:
                 inmanta_config.Config.set(section, "token", self.token)
 
+    @typing.overload
+    async def request(self, method: str, returned_type: None = None, **kwargs: object) -> None:
+        pass
+
+    @typing.overload
+    async def request(self, method: str, returned_type: type[T], **kwargs: object) -> T:
+        pass
+
+    async def request(
+        self,
+        method: str,
+        returned_type: typing.Optional[type[T]] = None,
+        **kwargs: object,
+    ) -> typing.Optional[T]:
+        """
+        Helper method to send a request to the orchestrator, which we expect to succeed with 20X code and
+        return an object of a given type.
+
+        :param method: The name of the method to execute
+        :param returned_type: The type of the object that the api should return
+        :param **kwargs: Parameters to pass to the method we are calling
+        """
+        response: Result = await getattr(self.async_client, method)(**kwargs)
+        assert response.code in range(200, 300), str(response.result)
+        if returned_type is not None:
+            assert response.result is not None, str(response)
+            try:
+                return pydantic.TypeAdapter(returned_type).validate_python(response.result["data"])
+            except AttributeError:
+                # Handle pydantic v1
+                return pydantic.parse_obj_as(returned_type, response.result["data"])
+        else:
+            return None
+
     def _get_server_version(self) -> Version:
         """
         Get the version of the remote orchestrator
@@ -271,6 +342,18 @@ class RemoteOrchestrator:
         except (KeyError, TypeError):
             raise Exception(f"Unexpected response for server status API call: {server_status.result}")
 
+    @property
+    def remote_user(self) -> str:
+        """
+        Execute the whoami command in the remote shell, to discover which user we have access to
+        in this shell and returns its name.  The result is cached, as we don't expect the remote
+        shell to change within the lifecycle of this remote orchestrator object.
+        """
+        if self._whoami is None:
+            self._whoami = self.run_command(["whoami"], user=None, stderr=subprocess.PIPE).strip()
+            LOGGER.debug("Remote user at %s (accessed via %s) is %s", self.remote_host, self.remote_shell, repr(self._whoami))
+        return self._whoami
+
     def run_command(
         self,
         args: typing.Sequence[str],
@@ -278,7 +361,8 @@ class RemoteOrchestrator:
         shell: bool = False,
         cwd: typing.Optional[str] = None,
         env: typing.Optional[typing.Mapping[str, str]] = None,
-        user: str = "inmanta",
+        user: typing.Optional[str] = "inmanta",
+        stderr: int = subprocess.STDOUT,
     ) -> str:
         """
         Helper method to execute a command on the remote orchestrator host as the specified user.
@@ -292,7 +376,10 @@ class RemoteOrchestrator:
         :param cwd: The directory on the remote orchestrator in which the command should be executed.
         :param env: A mapping of environment variables that should be available to the process
             running on the remote orchestrator.
-        :param user: The user that should be running the process on the remote orchestrator.
+        :param user: The user that should be running the process on the remote orchestrator.  If set to
+            None, keep whichever user is used when opening the remote shell on the orchestrator.
+        :param stderr: The file descriptor number where stderr for the given command should be sent to.
+            Defaults to stdout, which is returned by this command.
         """
         if shell:
             assert len(args) == 1, "When running command in a shell, only one arg should be provided"
@@ -303,6 +390,7 @@ class RemoteOrchestrator:
 
         # If required, add env var prefix to the command
         if env is not None:
+            shell = True
             env_prefix = [f"{k}={shlex.quote(v)}" for k, v in env.items()]
             cmd = " ".join(env_prefix + [cmd])
 
@@ -315,23 +403,22 @@ class RemoteOrchestrator:
             # The command we received should be run in a shell
             cmd = shlex.join(["bash", "-l", "-c", cmd])
 
-        # If we need to change user, prefix the command with a sudo
-        if self.ssh_user != user:
-            # Make sure the user is a safe value to use
-            user = shlex.quote(user)
-            cmd = f"sudo --login --user={user} -- {cmd}"
+        if user is not None and user != self.remote_user:
+            # If we need to change user, prefix the command with a sudo
+            cmd = shlex.join(["sudo", "--login", "--user", user, "--", *shlex.split(cmd)])
 
         LOGGER.debug("Running command on remote orchestrator: %s", cmd)
         try:
+            # The command we execute on the remote host is always "sh", and we provide
+            # the desired command to run as input.  We do this because 'ssh' and 'docker exec'
+            # don't expect the same format of argument for the command to execute on the
+            # remote host.  The former expects the command and its arguments as a single string.
+            # The latter expects the command and its arguments to be space-separated arguments to
+            # the exec command.
             return subprocess.check_output(
-                SSH_CMD
-                + [
-                    "-p",
-                    str(self.ssh_port),
-                    f"{self.ssh_user}@{self.host}",
-                    cmd,
-                ],
-                stderr=subprocess.STDOUT,
+                [*self.remote_shell, self.remote_host, "sh"],
+                input=cmd,
+                stderr=stderr,
                 universal_newlines=True,
             )
         except subprocess.CalledProcessError as e:
@@ -402,7 +489,7 @@ class RemoteOrchestrator:
             # The command we received should be run in a shell
             cmd = shlex.join(["bash", "-l", "-c", cmd])
 
-        return self.run_command(args=[base_cmd + " " + cmd], shell=True, user=self.ssh_user)
+        return self.run_command(args=[base_cmd + " " + cmd], shell=True, user=None)
 
     def sync_local_folder(
         self,
@@ -410,7 +497,7 @@ class RemoteOrchestrator:
         remote_folder: pathlib.Path,
         *,
         excludes: typing.Sequence[str],
-        user: str = "inmanta",
+        user: typing.Optional[str] = "inmanta",
     ) -> None:
         """
         Sync a local folder with a remote orchestrator folder, exclude the provided sub folder
@@ -422,9 +509,10 @@ class RemoteOrchestrator:
         :param remote_folder: The folder on the remote orchestrator that should contain our
             local folder content after the sync.
         :param excludes: A list of exclude values to provide to rsync.
-        :param user: The user that should own the file on the remote orchestrator.
+        :param user: The user that should own the file on the remote orchestrator.  If set to None,
+            keep whichever user is used when opening the remote shell on the orchestrator.
         """
-        if self.ssh_user != user:
+        if user is not None and user != self.remote_user:
             # Syncing the folder would not give us the correct permission on the folder
             # So we sync the folder in a temporary location, then move it
             temporary_remote_folder = pathlib.Path(f"/tmp/{self.environment}/tmp-{remote_folder.name}")
@@ -438,20 +526,22 @@ class RemoteOrchestrator:
                 f"mkdir -p {tmp_folder_parent} && "
                 f"sudo rm -rf {tmp_folder} && "
                 f"sudo mv {src_folder} {tmp_folder} && "
-                f"sudo chown -R {self.ssh_user}:{self.ssh_user} {tmp_folder}"
+                f"sudo chown -R {shlex.quote(self.remote_user)}:{shlex.quote(self.remote_user)} {tmp_folder}"
             )
-            self.run_command([move_folder_to_tmp], shell=True, user=self.ssh_user)
+            self.run_command([move_folder_to_tmp], shell=True, user=None)
 
             # Do the sync with the temporary folder
-            self.sync_local_folder(local_folder, temporary_remote_folder, excludes=excludes, user=self.ssh_user)
+            self.sync_local_folder(local_folder, temporary_remote_folder, excludes=excludes, user=None)
 
             # Move the temporary folder back into its original location
-            move_tmp_to_folder = f"sudo chown -R {user}:{user} {tmp_folder} && sudo mv {tmp_folder} {src_folder}"
-            self.run_command([move_tmp_to_folder], shell=True, user=self.ssh_user)
+            move_tmp_to_folder = (
+                f"sudo chown -R {shlex.quote(user)}:{shlex.quote(user)} {tmp_folder} && sudo mv {tmp_folder} {src_folder}"
+            )
+            self.run_command([move_tmp_to_folder], shell=True, user=None)
             return
 
-        # Make sure target dir exists
-        self.run_command(["mkdir", "-p", str(remote_folder)])
+        # Make sure target dir exists and it belongs to the user that will be used for the sync
+        self.run_command(["mkdir", "-p", str(remote_folder)], user=None)
 
         cmd = [
             "rsync",
@@ -459,10 +549,10 @@ class RemoteOrchestrator:
             *[f"--exclude={exc}" for exc in excludes],
             "--delete",
             "-e",
-            " ".join(SSH_CMD + [f"-p {self.ssh_port}"]),
+            shlex.join(self.remote_shell),
             "-rl",
             f"{local_folder}/",
-            f"{self.ssh_user}@{self.host}:{remote_folder}/",
+            f"{self.remote_host}:{remote_folder}/",
         ]
         gitignore = local_folder / ".gitignore"
         if not gitignore.exists():

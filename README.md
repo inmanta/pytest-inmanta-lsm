@@ -1,5 +1,7 @@
 # pytest-inmanta-lsm
 
+[![pypi version](https://img.shields.io/pypi/v/pytest-inmanta-lsm.svg)](https://pypi.python.org/pypi/pytest-inmanta-lsm/)
+
 A pytest plugin to test inmanta modules that use lsm, it is built on top of `pytest-inmanta` and `pytest-inmanta-extensions`
 
 ## Installation
@@ -17,21 +19,16 @@ It requires an LSM enabled orchestrator, with no ssl or authentication enabled, 
 
 ### First case: using a remote orchestrator
 
-This plugin is built around the remote_orchestrator fixture.
+This plugin is built around the remote_orchestrator fixture and the `RemoteServiceInstance` class.
 
-A typical testcase using this plugin looks as follows:
+You can easily write a test case that sends your project to a remote orchestrator, exports its service catalog, then deploy a service.  
 ```python
-
-def test_full_cycle(project, remote_orchestrator):
+def test_deploy_service(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
     # get connection to remote_orchestrator
     client = remote_orchestrator.client
 
     # setup project
-    project.compile(
-        """
-        import quickstart
-        """
-    )
+    project.compile("import quickstart")
 
     # sync project and export service entities
     remote_orchestrator.export_service_entities()
@@ -40,30 +37,130 @@ def test_full_cycle(project, remote_orchestrator):
     result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
     assert result.code == 200
 
-    # get a ManagedInstance object, to simplifies interacting with a specific service instance
-    service_instance = remote_orchestrator.get_managed_instance(SERVICE_NAME)
-
-    # create an instance and wait for it to be up
-    service_instance.create(
-        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-        wait_for_state="up",
+    # Test the synchronous service instance class
+    instance = remote_service_instance.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
     )
 
-    # make validation fail by creating a duplicate
-    remote_orchestrator.get_managed_instance(SERVICE_NAME).create(
-        attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-        wait_for_state="rejected",
+    # Create the service instance and stop waiting in a transient state
+    created = instance.create(
+        {
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
+        wait_for_state="creating",
+        timeout=60,
     )
 
-    service_instance.update(
-        attribute_updates={"vlan_id": 42},
-        wait_for_state="up",
+    # Wait for up state, we provide here the version from which we should follow the
+    # service, which is the version in which we last stopped following the service.  This
+    # guarantees that we don't "miss" the target state, in case it is a transient one, and
+    # don't confuse the start state for the target one in case it is the same one.
+    # The start version should always be the last version in which we know our service has
+    # been, BEFORE the target state we expect our service to go into.
+    instance.wait_for_state(
+        target_state="up",
+        start_version=created.version,
+        timeout=60,
     )
 
-    # break it down
-    service_instance.delete()
-
+    # Delete the instance
+    instance.delete(wait_for_state="terminated", timeout=60)
 ```
+> source: [test_quickstart.py::test_transient_state](./examples/quickstart/tests/test_quickstart.py)
+
+For a more advanced test case, you might also want to deploy multiple services.  You could either test them one by one, or, parallelize them, in order to:
+1. speed up the test case.
+2. test interference in between the services.
+
+In that case, the recommended way is to create an `async` helper, which follows the progress of your service, and instantiate multiple services with it, in a `sync` test case.
+```python
+async def service_full_cycle(
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    router_ip: str,
+    interface_name: str,
+    address: str,
+    vlan_id: int,
+    vlan_id_update: int,
+) -> None:
+    # Create an async service instance object
+    instance = remote_service_instance_async.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+
+    # Create the service instance on the remote orchestrator
+    await instance.create(
+        {
+            "router_ip": router_ip,
+            "interface_name": interface_name,
+            "address": address,
+            "vlan_id": vlan_id,
+        },
+        wait_for_state="up",
+        timeout=60,
+    )
+
+    # Update the vlan id
+    await instance.update(
+        [
+            inmanta_lsm.model.PatchCallEdit(
+                edit_id=str(uuid.uuid4()),
+                operation=inmanta_lsm.model.EditOperation.replace,
+                target="vlan_id",
+                value=vlan_id_update,
+            ),
+        ],
+        wait_for_state="up",
+        timeout=60,
+    )
+
+    # Delete the instance
+    await instance.delete(wait_for_state="terminated", timeout=60)
+
+
+def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    # get connection to remote_orchestrator
+    client = remote_orchestrator.client
+
+    # setup project
+    project.compile("import quickstart")
+
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
+
+    # verify the service is in the catalog
+    result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
+    assert result.code == 200
+
+    # Create a first service that should be deployed
+    first_service = service_full_cycle(
+        remote_orchestrator=remote_orchestrator,
+        router_ip="10.1.9.17",
+        interface_name="eth1",
+        address="10.0.0.254/24",
+        vlan_id=14,
+        vlan_id_update=42,
+    )
+
+    # Create another valid service
+    another_service = service_full_cycle(
+        remote_orchestrator=remote_orchestrator,
+        router_ip="10.1.9.18",
+        interface_name="eth2",
+        address="10.0.0.253/24",
+        vlan_id=15,
+        vlan_id_update=52,
+    )
+
+    # Run all the services
+    util.sync_execute_scenarios(first_service, another_service, timeout=60)
+```
+> source: [test_quickstart.py::test_full_cycle](./examples/quickstart/tests/test_quickstart.py)
+
 
 ### Second case: mocking the lsm api
 
@@ -74,32 +171,83 @@ This toolbox comes with one more fixture: `lsm_project`.  This fixture allows to
 
 A simple usage would be as follow:
 ```python
-def test_model(lsm_project: lsm_project.LsmProject) -> None:
-    # Create a service object, you can modify it as you wish, depending on what you are trying to test
-    service = inmanta_lsm.model.ServiceInstance(
-        id=uuid.uuid4(),
-        environment=lsm_project.environment,
-        service_entity="vlan-assignment",
-        version=1,
-        config={},
-        state="start",
-        candidate_attributes={"router_ip": "10.1.9.17", "interface_name": "eth1", "address": "10.0.0.254/24", "vlan_id": 14},
-        active_attributes=None,
-        rollback_attributes=None,
-        created_at=datetime.datetime.now(),
-        last_updated=datetime.datetime.now(),
-        callback=[],
-        deleted=False,
-        deployment_progress=None,
-        service_identity_attribute_value=None,
+def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+    # Export the service entities
+    lsm_project.export_service_entities("import quickstart")
+
+    # Create a service.  This will add it to our inventory, in its initial state
+    # (as defined in the lifecycle), and fill in any default attributes we didn't
+    # provide.
+    service = lsm_project.create_service(
+        service_entity_name="vlan-assignment",
+        attributes={
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
+        # With auto_transfer=True, we follow the first auto transfers of the service's
+        # lifecycle, triggering a compile (validating compile when appropriate) for
+        # each state we meets.
+        auto_transfer=True,
     )
 
-    # Add the service to the mocked server.  From now on it will be taken into account
-    # for EACH compile
-    lsm_project.add_service(service)
+    # Assert that the service has been created and is now in creating state
+    assert service.state == "creating"
 
-    # Run a compile, with central focus the service we just created
-    lsm_project.compile("import quickstart", service_id=service.id)
+    # Assert that the default value has been added to our attributes
+    assert "value_with_default" in service.active_attributes
+
+    # Do a second compile, in the non-validating creating state
+    lsm_project.compile(service_id=service.id)
+
+    # Move to the up state
+    service.state = "up"
+    lsm_project.compile(service_id=service.id)
+
+    # Trigger an update on our service from the up state.  Change the vlan id
+    new_attributes = copy.deepcopy(service.active_attributes)
+    new_attributes["vlan_id"] = 15
+    lsm_project.update_service(
+        service_id=service.id,
+        attributes=new_attributes,
+        auto_transfer=True,
+    )
+
+    # Assert that the service has been updated and is now in update_inprogress state
+    assert service.state == "update_inprogress"
+
+```
+
+### Third case: development on an active environment.
+
+In some cases, (i.e. PoC) you might want to update the code of your module that is currently deployed in an environment.
+You can either start a new test case with pytest-inmanta-lsm's `remote_orchestrator` fixture, which will clear up everything
+and allow you to start from scratch.  Or you can use the similar `remote_orchestrator_access` fixture, which gives you the
+same handy `RemoteOrchestrator` object, but doesn't clear the environment of any existing services, or resources.  This allows
+you for example to re-export the service catalog, or re-synchronize your module's source code and keep all the existing services.
+
+To do so, simply create a test case using the `remote_orchestrator_access` fixture, and the same cli/env var options as used for
+normal pytest-inmanta-lsm test cases.
+```python
+def test_update_existing_environment(
+    project: plugin.Project,
+    remote_orchestrator_access: remote_orchestrator.RemoteOrchestrator,
+) -> None:
+    """
+    Make sure that it is possible to simply run a compile and export service entities,
+    without initially cleaning up the environment.
+    """
+
+    # Setup the compiler config
+    remote_orchestrator_access.setup_config()
+
+    # Do a local compile of our model
+    project.compile("import quickstart")
+
+    # Export service entities (and update the project)
+    remote_orchestrator_access.export_service_entities()
+
 ```
 
 ## Options and environment variables
@@ -162,15 +310,28 @@ pytest-inmanta-lsm:
                         The environment to use on the remote server (is created
                         if it doesn't exist) (overrides INMANTA_LSM_ENVIRONMENT,
                         defaults to 719c7ad5-6657-444b-b536-a27174cb7498)
-  --lsm-host=LSM_HOST   Remote orchestrator to use for the remote_inmanta
-                        fixture (overrides INMANTA_LSM_HOST, defaults to
-                        127.0.0.1)
+  --lsm-host=LSM_HOST   IP address or domain name of the remote orchestrator api we
+                        wish to use in our test. It will be picked up and used by the
+                        remote_orchestrator fixture.  This is also the default remote
+                        hostname, if it is not specified in the --lsm-rh option.
+                        (overrides INMANTA_LSM_HOST, defaults to 127.0.0.1)
   --lsm-no-clean        Don't cleanup the orchestrator after tests (for
                         debugging purposes) (overrides INMANTA_LSM_NO_CLEAN,
                         defaults to False)
   --lsm-srv-port
                         Port the orchestrator api is listening to (overrides
                         INMANTA_LSM_SRV_PORT, defaults to 8888)
+  --lsm-rsh=LSM_RSH     A command which allows us to start a shell on the remote
+                        orchestrator or send file to it.  When sending files, this value
+                        will be passed to the `-e` argument of rsync.  When running a
+                        command, we will append the host name and `sh` to this value,
+                        and pass the command to execute as input to the open remote
+                        shell. (overrides INMANTA_LSM_REMOTE_SHELL)
+  --lsm-rh=LSM_RH       The name of the host that we should try to open the remote
+                        shell on, as recognized by the remote shell command.  This
+                        doesn't have to strictly be a hostname, as long as it is a
+                        valid host identifier to the chosen rsh protocol. (overrides
+                        INMANTA_LSM_REMOTE_HOST)
   --lsm-ssh-port
                         Port to use to ssh to the remote orchestrator (overrides
                         INMANTA_LSM_SSH_PORT, defaults to 22)
