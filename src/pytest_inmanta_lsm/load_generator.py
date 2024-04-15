@@ -66,6 +66,52 @@ class LoadTask:
     urls: list[str]
 
 
+def create_list_of_tasks(environment: str, service_type: str) -> list[LoadTask]:
+    """
+    Create and return a list of pre-defined tasks
+
+    :param environment: The environment to use
+    :param service_type: The type of Service that will exist on the environment
+    """
+    current_datetime = datetime.datetime.utcnow()
+    current_formatted_datetime = current_datetime.isoformat()[:-3] + "Z"
+    to_formatted_datetime = (current_datetime + datetime.timedelta(days=7)).isoformat()[:-3] + "Z"
+
+    tasks = [
+        LoadTask(
+            description="Background load calls",
+            urls=[
+                "/api/v2/notification?limit=100&filter.cleared=false",
+                f"/api/v2/environment/{environment}?details=false",
+            ],
+        ),
+        LoadTask(
+            description="Metrics page call",
+            urls=[
+                "/api/v2/metrics?metrics=lsm.service_count&metrics=lsm.service_instance_count&metrics=orchestrator."
+                "compile_time&metrics=orchestrator.compile_waiting_time&metrics=orchestrator.compile_rate&"
+                "metrics=resource.agent_count&metrics=resource.resource_count&start_interval="
+                f"{current_formatted_datetime}&end_interval={to_formatted_datetime}&nb_datapoints=15&"
+                "round_timestamps=true"
+            ],
+        ),
+        LoadTask(description="Service catalog overview call", urls=["/lsm/v1/service_catalog?instance_summary=True"]),
+        LoadTask(
+            description="Catalog for a specific service type calls",
+            urls=[
+                f"/lsm/v1/service_catalog/{service_type}?instance_summary=True",
+                f"/lsm/v1/service_inventory/{service_type}?include_deployment_progress=True&limit=20&&sort=created_at.desc",
+            ],
+        ),
+        LoadTask(description="Compile reports call", urls=["/api/v2/compilereport?limit=20&sort=requested.desc"]),
+        LoadTask(
+            description="Resources view call",
+            urls=["/api/v2/resource?deploy_summary=True&limit=20&filter.status=%21orphaned&sort=resource_type.asc"],
+        ),
+    ]
+    return tasks
+
+
 class LoadGenerator:
     def __init__(
         self,
@@ -77,7 +123,7 @@ class LoadGenerator:
         self.base_url = base_url
         self.sleep_time = sleep_time
 
-        self.tasks = self.create_list_of_tasks(environment, service_type)
+        self.tasks = create_list_of_tasks(environment, service_type)
         self.logger = handler_logger.LoggerWrapper(LOGGER)
         self._session = self.init_session(environment)
         self._lock = threading.Lock()
@@ -89,7 +135,7 @@ class LoadGenerator:
         self._thread.start()
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        self.stop_load()
+        self.change_status()
         self.logger.debug("Stopping Thread %(thread)s", thread=self._thread.name)
         self._thread.join(30)
         self.logger.debug("Thread %(thread)s has been stopped, closing session", thread=self._thread.name)
@@ -127,10 +173,18 @@ class LoadGenerator:
         return session
 
     def fetch_thread_status(self) -> bool:
+        """
+        Retrieve the status of whether the thread should keep running or not
+        """
         with self._lock:
             return self.SHOULD_THREAD_RUN
 
     def log_response(self, response: requests.Response):
+        """
+        Log the received response. If we are not able to dump the response, we will only log the method and the URL
+
+        :param response: The response that we need to log
+        """
         try:
             response.raise_for_status()
             self.logger.debug(
@@ -158,46 +212,12 @@ class LoadGenerator:
                 url=response.url,
             )
 
-    def create_list_of_tasks(self, environment: str, service_type: str) -> list[LoadTask]:
-        current_datetime = datetime.datetime.utcnow()
-        current_formatted_datetime = current_datetime.isoformat()[:-3] + "Z"
-        to_formatted_datetime = (current_datetime + datetime.timedelta(days=7)).isoformat()[:-3] + "Z"
-
-        tasks = [
-            LoadTask(
-                description="Background load calls",
-                urls=[
-                    "/api/v2/notification?limit=100&filter.cleared=false",
-                    f"/api/v2/environment/{environment}?details=false",
-                ],
-            ),
-            LoadTask(
-                description="Metrics page call",
-                urls=[
-                    "/api/v2/metrics?metrics=lsm.service_count&metrics=lsm.service_instance_count&metrics=orchestrator."
-                    "compile_time&metrics=orchestrator.compile_waiting_time&metrics=orchestrator.compile_rate&"
-                    "metrics=resource.agent_count&metrics=resource.resource_count&start_interval="
-                    f"{current_formatted_datetime}&end_interval={to_formatted_datetime}&nb_datapoints=15&"
-                    "round_timestamps=true"
-                ],
-            ),
-            LoadTask(description="Service catalog overview call", urls=["/lsm/v1/service_catalog?instance_summary=True"]),
-            LoadTask(
-                description="Catalog for a specific service type calls",
-                urls=[
-                    f"/lsm/v1/service_catalog/{service_type}?instance_summary=True",
-                    f"/lsm/v1/service_inventory/{service_type}?include_deployment_progress=True&limit=20&&sort=created_at.desc",
-                ],
-            ),
-            LoadTask(description="Compile reports call", urls=["/api/v2/compilereport?limit=20&sort=requested.desc"]),
-            LoadTask(
-                description="Resources view call",
-                urls=["/api/v2/resource?deploy_summary=True&limit=20&filter.status=%21orphaned&sort=resource_type.asc"],
-            ),
-        ]
-        return tasks
-
     def run_task(self, task: LoadTask) -> None:
+        """
+        Run the given task
+
+        :param task: The task that needs to be executed. A task can be composed of multiple URLs
+        """
         self.logger.debug(task.description)
 
         for url in task.urls:
@@ -207,6 +227,9 @@ class LoadGenerator:
         time.sleep(self.sleep_time)
 
     def create_load(self):
+        """
+        Loop to run provided tasks. This loop will only stop when `SHOULD_THREAD_RUN` is set to False
+        """
         while True:
             for task in self.tasks:
                 self.run_task(task)
@@ -215,7 +238,10 @@ class LoadGenerator:
                 if not should_run:
                     return
 
-    def stop_load(self):
+    def change_status(self):
+        """
+        Change the `SHOULD_THREAD_RUN` status
+        """
         with self._lock:
             self.SHOULD_THREAD_RUN = False
-        self.logger.debug("Signaling Thread %(thread)s to stop", thread=self._thread.name)
+        self.logger.debug("Thread %(thread)s should stop", thread=self._thread.name)
