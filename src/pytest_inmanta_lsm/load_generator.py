@@ -69,14 +69,14 @@ class LoadGenerator:
         """
         return self.running
 
-    def stop(self):
+    def stop(self) -> None:
         """
-        Change the `SHOULD_THREAD_RUN` status
+        Set the `running` flag to False
         """
         self.running = False
         self.logger.debug("%s should stop", self.thread.name)
 
-    def between_callback(self):
+    def between_callback(self) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -87,7 +87,7 @@ class LoadGenerator:
             self.exception = e
         loop.close()
 
-    async def remote_call(self, call: typing.Callable[[], typing.Awaitable[model.BaseModel]]):
+    async def remote_call(self, call: typing.Callable[[], typing.Awaitable[model.BaseModel]]) -> None:
         try:
             await call()
         except Exception as e:
@@ -98,9 +98,9 @@ class LoadGenerator:
 
             time.sleep(self.sleep_time)
 
-    async def create_load(self):
+    async def create_load(self) -> None:
         """
-        Loop to run provided tasks. This loop will only stop when `SHOULD_THREAD_RUN` is set to False
+        Create load until `running` flag is set to False
         """
         start_datetime = datetime.datetime.utcnow()
         nb_datapoints = 15
