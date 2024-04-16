@@ -8,51 +8,21 @@
 
 import asyncio
 import datetime
+import functools
 import logging
 import threading
 import time
+import typing
+
+from inmanta.data import model
 
 from pytest_inmanta_lsm import remote_orchestrator
 
 LOGGER = logging.getLogger(__name__)
 
 
-# Custom Thread Class
-class LoadThread(threading.Thread):
-    def run(self):
-        """Method representing the thread's activity.
-
-        The standard run() method invokes the callable object passed to the object's
-        constructor as the target argument, if any, with sequential and keyword arguments
-        taken from the args and kwargs arguments, respectively.
-
-        We override it to save any exception in the `exc` field
-        """
-        self.exc = None
-        try:
-            if self._target is not None:
-                self._target(*self._args, **self._kwargs)
-        except BaseException as e:
-            self.exc = e
-        finally:
-            # Avoid a refcycle if the thread is running a function with
-            # an argument that has a member that points to the thread.
-            del self._target, self._args, self._kwargs
-
-    def join(self, timeout=None):
-        """Wait until the thread terminates.
-
-        This blocks the calling thread until the thread whose join() method is
-        called terminates -- either normally or through an unhandled exception
-        or until the optional timeout occurs.
-
-        We override it to raise any exception that the Thread could have faced
-        """
-        super().join(timeout)
-        # we re-raise the caught exception
-        # if any was caught
-        if self.exc:
-            raise self.exc
+class LoadException(Exception):  # noqa: N818
+    pass
 
 
 class LoadGenerator:
@@ -67,41 +37,66 @@ class LoadGenerator:
         self.service_type = service_type
         self.sleep_time = sleep_time
         self.logger = logger
-        self._lock = threading.Lock()
-        self.SHOULD_THREAD_RUN = True
-        self._thread = LoadThread(target=self.between_callback, daemon=True, name="Thread-LG")
+        self.running = True
+        self._thread: typing.Optional[threading.Thread] = None
+        self.exception: typing.Optional[Exception] = None
 
     def __enter__(self) -> None:
-        self.logger.debug("Starting Thread %s", self._thread.name)
+        self.logger.debug("Creating new Thread")
+        self._thread = threading.Thread(target=self.between_callback, daemon=True, name="Thread-LG")
+        self.logger.debug("Starting %s", self._thread.name)
         self._thread.start()
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        self.change_status()
-        self.logger.debug("Stopping Thread %s", self._thread.name)
-        self._thread.join(30)
-        self.logger.debug("Thread %s has been stopped, closing session", self._thread.name)
+        self.stop()
+        self.logger.debug("Stopping %s", self._thread.name)
+        self._thread.join(self.remote_orchestrator.client.timeout)
+        self.logger.debug("%s has been stopped", self._thread.name)
 
-    def fetch_thread_status(self) -> bool:
+        if self.exception is not None:
+            raise self.exception
+
+    @property
+    def thread(self) -> threading.Thread:
+        if self._thread is None:
+            raise RuntimeError("The thread is not initialized, this instance should be used in a context!")
+
+        return self._thread
+
+    def is_running(self) -> bool:
         """
         Retrieve the status of whether the thread should keep running or not
         """
-        with self._lock:
-            return self.SHOULD_THREAD_RUN
+        return self.running
 
-    def change_status(self):
+    def stop(self):
         """
         Change the `SHOULD_THREAD_RUN` status
         """
-        with self._lock:
-            self.SHOULD_THREAD_RUN = False
-        self.logger.debug("Thread %s should stop", self._thread.name)
+        self.running = False
+        self.logger.debug("%s should stop", self.thread.name)
 
     def between_callback(self):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
-        loop.run_until_complete(self.create_load())
+        try:
+            loop.run_until_complete(self.create_load())
+        except LoadException:
+            self.logger.warning("%s - Load has been stopeed!", self.thread.name)
+        except Exception as e:
+            self.exception = e
         loop.close()
+
+    async def remote_call(self, call: typing.Callable[[], typing.Awaitable[model.BaseModel]]):
+        try:
+            await call()
+        except Exception as e:
+            self.logger.warning("%s - encountered the following error:%s!", self.thread.name, str(e))
+        finally:
+            if not self.is_running():
+                raise LoadException()
+
+            time.sleep(self.sleep_time)
 
     async def create_load(self):
         """
@@ -116,22 +111,28 @@ class LoadGenerator:
         end_datetime = start_datetime + datetime.timedelta(hours=nb_datapoints + 1)
 
         while True:
-            self.logger.debug("Thread %s - Background load calls", self._thread.name)
-            await self.remote_orchestrator.request(
-                "list_notifications",
+            self.logger.debug("%s - Background load calls", self.thread.name)
+            list_notification = functools.partial(
+                self.remote_orchestrator.request,
+                method="list_notifications",
                 tid=self.remote_orchestrator.environment,
                 limit=100,
                 filter={"cleared": False},
             )
-            await self.remote_orchestrator.request(
-                "environment_get",
+            await self.remote_call(list_notification)
+
+            environment_get = functools.partial(
+                self.remote_orchestrator.request,
+                method="environment_get",
                 id=self.remote_orchestrator.environment,
                 details=False,
             )
+            await self.remote_call(environment_get)
 
-            self.logger.debug("Thread %s - Metrics page call", self._thread.name)
-            await self.remote_orchestrator.request(
-                "get_environment_metrics",
+            self.logger.debug("%s - Metrics page call", self.thread.name)
+            get_environment_metrics = functools.partial(
+                self.remote_orchestrator.request,
+                method="get_environment_metrics",
                 tid=self.remote_orchestrator.environment,
                 metrics=[
                     "lsm.service_count",
@@ -147,53 +148,56 @@ class LoadGenerator:
                 nb_datapoints=nb_datapoints,
                 round_timestamps=True,
             )
+            await self.remote_call(get_environment_metrics)
 
-            self.logger.debug("Thread %s - Service catalog overview call", self._thread.name)
-            await self.remote_orchestrator.request(
-                "lsm_service_catalog_list",
+            self.logger.debug("%s - Service catalog overview call", self.thread.name)
+            lsm_service_catalog_list = functools.partial(
+                self.remote_orchestrator.request,
+                method="lsm_service_catalog_list",
                 tid=self.remote_orchestrator.environment,
                 instance_summary=True,
             )
+            await self.remote_call(lsm_service_catalog_list)
 
-            self.logger.debug("Thread %s - Catalog for a specific service type calls", self._thread.name)
-            try:
-                await self.remote_orchestrator.request(
-                    "lsm_service_catalog_get_entity",
-                    tid=self.remote_orchestrator.environment,
-                    service_entity=self.service_type,
-                    instance_summary=True,
-                )
-                await self.remote_orchestrator.request(
-                    "lsm_services_list",
-                    tid=self.remote_orchestrator.environment,
-                    service_entity=self.service_type,
-                    include_deployment_progress=True,
-                    limit=20,
-                    sort="created_at.desc",
-                )
-            except AssertionError:
-                self.logger.warning("Thread %s - Service entity `%s` not found!", self._thread.name, self.service_type)
+            self.logger.debug("%s - Catalog for a specific service type calls", self.thread.name)
+            lsm_service_catalog_get_entity = functools.partial(
+                self.remote_orchestrator.request,
+                method="lsm_service_catalog_get_entity",
+                tid=self.remote_orchestrator.environment,
+                service_entity=self.service_type,
+                instance_summary=True,
+            )
+            await self.remote_call(lsm_service_catalog_get_entity)
 
-            self.logger.debug("Thread %s - Compile reports call", self._thread.name)
-            await self.remote_orchestrator.request(
-                "get_compile_reports",
+            lsm_services_list = functools.partial(
+                self.remote_orchestrator.request,
+                method="lsm_services_list",
+                tid=self.remote_orchestrator.environment,
+                service_entity=self.service_type,
+                include_deployment_progress=True,
+                limit=20,
+                sort="created_at.desc",
+            )
+            await self.remote_call(lsm_services_list)
+
+            self.logger.debug("%s - Compile reports call", self.thread.name)
+            get_compile_reports = functools.partial(
+                self.remote_orchestrator.request,
+                method="get_compile_reports",
                 tid=self.remote_orchestrator.environment,
                 limit=20,
                 sort="requested.desc",
             )
+            await self.remote_call(get_compile_reports)
 
-            self.logger.debug("Thread %s - Resources view call", self._thread.name)
-            await self.remote_orchestrator.request(
-                "resource_list",
+            self.logger.debug("%s - Resources view call", self.thread.name)
+            resource_list = functools.partial(
+                self.remote_orchestrator.request,
+                method="resource_list",
                 tid=self.remote_orchestrator.environment,
                 deploy_summary=True,
                 limit=20,
                 filter={"status": "orphaned"},
                 sort="resource_type.asc",
             )
-
-            should_run = self.fetch_thread_status()
-            if not should_run:
-                break
-
-            time.sleep(self.sleep_time)
+            await self.remote_call(resource_list)
