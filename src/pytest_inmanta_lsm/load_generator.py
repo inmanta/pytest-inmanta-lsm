@@ -82,7 +82,7 @@ class LoadGenerator:
         try:
             loop.run_until_complete(self.create_load())
         except LoadException:
-            self.logger.warning("%s - Load has been stopeed!", self.thread.name)
+            self.logger.warning("%s - Load has been stopped!", self.thread.name)
         except Exception as e:
             self.exception = e
         loop.close()
