@@ -862,7 +862,7 @@ class LsmProject:
     def compile(
         self,
         model: typing.Optional[str] = None,
-        service_id: typing.Optional[uuid.UUID | str | list[uuid.UUID | str]] = None,
+        service_id: typing.Optional[typing.Union[uuid.UUID, str, typing.Sequence[typing.Union[uuid.UUID, str]] = None,
         validation: bool = True,
     ) -> None:
         """
