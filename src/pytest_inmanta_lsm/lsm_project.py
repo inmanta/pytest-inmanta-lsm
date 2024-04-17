@@ -634,7 +634,7 @@ class LsmProject:
                 False,
             )
 
-    def get_service(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
+    def get_service(self, service_id: uuid.UUID | str) -> inmanta_lsm.model.ServiceInstance:
         """
         Get the service with the given id from our inventory.  If no such service exists,
         raise a LookupError.
@@ -899,9 +899,9 @@ class LsmProject:
 
         # Sort out the type variance of service_id
         match service_id:
-            case [*v]:
-                service_ids = " ".join(str(i) for i in v)
-                if validation and len(v)!=1:
+            case [*content]:
+                service_ids = " ".join(str(i) for i in content)
+                if validation and len(content)!=1:
                     raise Exception(f"when performing a validation compile, only one service id can be passed, got {service_ids}")
             case uuid.UUID():
                 service_ids = str(service_id)
