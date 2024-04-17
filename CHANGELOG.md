@@ -1,4 +1,7 @@
-# v 3.3.0 (?)
+# v 3.4.0 (?)
+Changes in this release:
+
+# v 3.3.0 (2024-04-15)
 Changes in this release:
 - Better logs when `docker-compose` in not installed
 - Add async `RemoteServiceInstance` class, for async service testing.
@@ -12,6 +15,7 @@ Changes in this release:
     - Follow the first "auto" state transfers, running the corresponding compiles, and applying the corresponding attribute operations.
 - Extend `LsmProject` mocking capability to allow partial compile selection testing.
 - Add `--lsm-rsh` and `--lsm-rh` to support remote access to a local container without ssh.
+- Add `remote_orchestrator_access` fixture, which sets up a remote orchestrator object allowing us to interact with the remote environment, but doesn't do any cleanup on its own.
 
 # v 3.2.0 (2024-02-20)
 Changes in this release:
