@@ -862,7 +862,7 @@ class LsmProject:
     def compile(
         self,
         model: typing.Optional[str] = None,
-        service_id: typing.Optional[typing.Union[uuid.UUID, str, typing.Sequence[typing.Union[uuid.UUID, str]] = None,
+        service_id: typing.Optional[typing.Union[uuid.UUID, str, typing.Sequence[typing.Union[uuid.UUID, str]]]] = None,
         validation: bool = True,
     ) -> None:
         """
@@ -898,18 +898,12 @@ class LsmProject:
             return
 
         # Sort out the type variance of service_id
-        match service_id:
-            case [*content]:
-                # If list, convert to space separated string
-                service_ids = " ".join(str(i) for i in content)
-                if validation and len(content)!=1:
-                    raise Exception(f"when performing a validation compile, only one service id can be passed, got {service_ids}")
-            case uuid.UUID():
-                service_ids = str(service_id)
-            case str():
-                service_ids = service_id
-            case _:
-                raise TypeError(f"Excpected str, uuid or list of those, got {service_id}, {type(service_id)}")
+        if isinstance(service_id, list):
+            service_ids = " ".join(str(i) for i in service_id)
+            if validation and len(service_id) != 1:
+                raise Exception(f"when performing a validation compile, only one service id can be passed, got {service_ids}")
+        else:
+            service_ids = str(service_id)
 
         # Get the service targeted by the compile
         env: dict[str, str] = {}
@@ -917,7 +911,7 @@ class LsmProject:
 
         if validation:
             # We only validate for
-            service = self.get_service(str(service_id))
+            service = self.get_service(service_ids)
             env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
 
         try:
@@ -934,7 +928,7 @@ class LsmProject:
 
         LOGGER.debug(
             "Triggering compile for service %s with the following environment variables: %s",
-            service_id,
+            service_ids,
             env,
         )
         with self.monkeypatch.context() as m:
