@@ -1,5 +1,6 @@
 # v 3.4.0 (?)
 Changes in this release:
+- Add support to LsmProject.compile to have multiple instances selected
 
 # v 3.3.0 (2024-04-15)
 Changes in this release:

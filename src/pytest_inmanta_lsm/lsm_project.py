@@ -862,7 +862,7 @@ class LsmProject:
     def compile(
         self,
         model: typing.Optional[str] = None,
-        service_id: typing.Optional[uuid.UUID] = None,
+        service_id: typing.Optional[uuid.UUID | str | list[uuid.UUID | str]] = None,
         validation: bool = True,
     ) -> None:
         """
@@ -876,6 +876,7 @@ class LsmProject:
         :param service_id: The id of the service that should be compiled, the service must have
             been added to the set of services prior to the compile.  If no service_id is provided,
             do a normal, full-compile.
+            For validation only one ID can be provided. For other compiles, multiple can be provided
         :param validation: Whether this is a validation compile or not.
         """
         # Make sure we have a model to compile
@@ -896,12 +897,27 @@ class LsmProject:
             self.project.compile(model, no_dedent=False)
             return
 
-        # Get the service targeted by the compile
-        service = self.get_service(service_id)
+        # Sort out the type variance of service_id
+        match service_id:
+            case [*v]:
+                service_ids = " ".join(str(i) for i in v)
+                if validation and len(v)!=1:
+                    raise Exception(f"when performing a validation compile, only one service id can be passed, got {service_ids}")
+            case uuid.UUID():
+                service_ids = str(service_id)
+            case str():
+                service_ids = service_id
+            case _:
+                raise TypeError(f"Excpected str, uuid or list of those, got {service_id}, {type(service_id)}")
 
+        # Get the service targeted by the compile
         env: dict[str, str] = {}
-        env[inmanta_lsm.const.ENV_INSTANCE_ID] = str(service_id)
-        env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
+        env[inmanta_lsm.const.ENV_INSTANCE_ID] = service_ids
+
+        if validation:
+            # We only validate for
+            service = self.get_service(str(service_id))
+            env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
 
         try:
             env[inmanta_lsm.const.ENV_PARTIAL_COMPILE] = str(self.partial_compile)
@@ -916,9 +932,8 @@ class LsmProject:
             env[inmanta_lsm.const.ENV_MODEL_STATE] = inmanta_lsm.model.ModelState.candidate
 
         LOGGER.debug(
-            "Triggering compile for service %s (%s) with the following environment variables: %s",
-            service.id,
-            service.service_entity,
+            "Triggering compile for service %s with the following environment variables: %s",
+            service_id,
             env,
         )
         with self.monkeypatch.context() as m:
