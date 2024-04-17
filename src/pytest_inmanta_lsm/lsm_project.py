@@ -900,6 +900,7 @@ class LsmProject:
         # Sort out the type variance of service_id
         match service_id:
             case [*content]:
+                # If list, convert to space separated string
                 service_ids = " ".join(str(i) for i in content)
                 if validation and len(content)!=1:
                     raise Exception(f"when performing a validation compile, only one service id can be passed, got {service_ids}")
