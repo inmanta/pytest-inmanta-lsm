@@ -898,18 +898,17 @@ class LsmProject:
             return
 
         # Sort out the type variance of service_id
-        if isinstance(service_id, str):
+        if isinstance(service_id, (str, uuid.UUID)):
             # strings are also sequences
-            service_ids = service_id
+            service_ids = str(service_id)
         elif isinstance(service_id, typing.Sequence):
             service_ids = " ".join(str(i) for i in service_id)
-
         else:
-            service_ids = str(service_id)
+            raise TypeError(f"Unexpected argument type for service_id, got {service_id} ({type(service_id)})")
 
         # Make sure all instances exist in the inventory
         for service_id in service_ids.split(" "):
-            service = self.get_service(service_ids)
+            service = self.get_service(service_id)
 
         env: dict[str, str] = {}
         env[inmanta_lsm.const.ENV_INSTANCE_ID] = service_ids
