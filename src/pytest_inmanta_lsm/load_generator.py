@@ -11,7 +11,6 @@ import datetime
 import functools
 import logging
 import threading
-import time
 import typing
 
 from inmanta.data import model
@@ -31,7 +30,7 @@ class LoadGenerator:
         remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
         service_type: str,
         logger: logging.Logger = LOGGER,
-        sleep_time: float = 1.0,
+        sleep_time: float = 0.5,
     ):
         self.remote_orchestrator = remote_orchestrator
         self.service_type = service_type
@@ -63,12 +62,6 @@ class LoadGenerator:
 
         return self._thread
 
-    def is_running(self) -> bool:
-        """
-        Retrieve the status of whether the thread should keep running or not
-        """
-        return self.running
-
     def stop(self) -> None:
         """
         Set the `running` flag to False
@@ -85,18 +78,19 @@ class LoadGenerator:
             self.logger.warning("%s - Load has been stopped!", self.thread.name)
         except Exception as e:
             self.exception = e
-        loop.close()
+        finally:
+            loop.close()
 
     async def remote_call(self, call: typing.Callable[[], typing.Awaitable[model.BaseModel]]) -> None:
+        if not self.running:
+            raise LoadException()
+
         try:
             await call()
         except Exception as e:
             self.logger.warning("%s - encountered the following error:%s!", self.thread.name, str(e))
         finally:
-            if not self.is_running():
-                raise LoadException()
-
-            time.sleep(self.sleep_time)
+            await asyncio.sleep(self.sleep_time)
 
     async def create_load(self) -> None:
         """
@@ -107,7 +101,7 @@ class LoadGenerator:
         # start_interval and end_interval should be at least <nb_datapoints> minutes separated from each other
         # But we need also to respect the following constraint:
         # When round_timestamps is set to True, the number of hours between start_interval and end_interval should be
-        # at least the amount of hours equal to nb_datapoints
+        # at least the amount of hours equals to nb_datapoints
         end_datetime = start_datetime + datetime.timedelta(hours=nb_datapoints + 1)
 
         while True:
