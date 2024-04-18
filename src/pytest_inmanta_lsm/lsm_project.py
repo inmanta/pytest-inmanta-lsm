@@ -634,7 +634,7 @@ class LsmProject:
                 False,
             )
 
-    def get_service(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
+    def get_service(self, service_id: typing.Union[uuid.UUID, str]) -> inmanta_lsm.model.ServiceInstance:
         """
         Get the service with the given id from our inventory.  If no such service exists,
         raise a LookupError.
@@ -862,7 +862,7 @@ class LsmProject:
     def compile(
         self,
         model: typing.Optional[str] = None,
-        service_id: typing.Optional[uuid.UUID] = None,
+        service_id: typing.Optional[typing.Union[uuid.UUID, str, typing.Sequence[typing.Union[uuid.UUID, str]]]] = None,
         validation: bool = True,
     ) -> None:
         """
@@ -876,6 +876,7 @@ class LsmProject:
         :param service_id: The id of the service that should be compiled, the service must have
             been added to the set of services prior to the compile.  If no service_id is provided,
             do a normal, full-compile.
+            For validation only one ID can be provided. For other compiles, multiple can be provided
         :param validation: Whether this is a validation compile or not.
         """
         # Make sure we have a model to compile
@@ -896,12 +897,29 @@ class LsmProject:
             self.project.compile(model, no_dedent=False)
             return
 
-        # Get the service targeted by the compile
-        service = self.get_service(service_id)
+        # Sort out the type variance of service_id
+        if isinstance(service_id, (str, uuid.UUID)):
+            # strings are also sequences
+            service_ids = str(service_id)
+        elif isinstance(service_id, typing.Sequence):
+            service_ids = " ".join(str(i) for i in service_id)
+        else:
+            raise TypeError(f"Unexpected argument type for service_id, got {service_id} ({type(service_id)})")
+
+        # Make sure all instances exist in the inventory
+        for service_id in service_ids.split(" "):
+            service = self.get_service(service_id)
 
         env: dict[str, str] = {}
-        env[inmanta_lsm.const.ENV_INSTANCE_ID] = str(service_id)
-        env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
+        env[inmanta_lsm.const.ENV_INSTANCE_ID] = service_ids
+
+        if validation:
+            if len(service_ids.split(" ")) != 1:
+                raise Exception(
+                    f"when performing a validation compile, only one service id can be passed, got {repr(service_ids)}"
+                )
+            service = self.get_service(service_ids)
+            env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
 
         try:
             env[inmanta_lsm.const.ENV_PARTIAL_COMPILE] = str(self.partial_compile)
@@ -916,9 +934,8 @@ class LsmProject:
             env[inmanta_lsm.const.ENV_MODEL_STATE] = inmanta_lsm.model.ModelState.candidate
 
         LOGGER.debug(
-            "Triggering compile for service %s (%s) with the following environment variables: %s",
-            service.id,
-            service.service_entity,
+            "Triggering compile for service %s with the following environment variables: %s",
+            service_ids,
             env,
         )
         with self.monkeypatch.context() as m:

@@ -114,7 +114,6 @@ class StateTimeoutError(RemoteServiceInstanceError[T], TimeoutError):
 
 
 class RemoteServiceInstance:
-
     DEFAULT_TIMEOUT = 600.0
     RETRY_INTERVAL = 5.0
     CREATE_FLOW_BAD_STATES: list[str] = ["rejected", "failed"]
