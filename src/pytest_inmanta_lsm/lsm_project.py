@@ -634,7 +634,7 @@ class LsmProject:
                 False,
             )
 
-    def get_service(self, service_id: uuid.UUID | str) -> inmanta_lsm.model.ServiceInstance:
+    def get_service(self, service_id: typing.Union[uuid.UUID, str]) -> inmanta_lsm.model.ServiceInstance:
         """
         Get the service with the given id from our inventory.  If no such service exists,
         raise a LookupError.
