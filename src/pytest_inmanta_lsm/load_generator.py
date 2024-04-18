@@ -63,7 +63,8 @@ class LoadGenerator:
         exc: typing.Optional[BaseException],
         traceback: typing.Optional[types.TracebackType],
     ) -> None:
-        self.stop()
+        self.running = False
+        self.logger.debug("%s should stop", self.thread.name)
         self.logger.debug("Stopping %s", self.thread.name)
         self.thread.join(self.remote_orchestrator.client.timeout)
         self.logger.debug("%s has been stopped", self.thread.name)
@@ -77,13 +78,6 @@ class LoadGenerator:
             raise RuntimeError("The thread is not initialized, this instance should be used in a context!")
 
         return self._thread
-
-    def stop(self) -> None:
-        """
-        Set the `running` flag to False
-        """
-        self.running = False
-        self.logger.debug("%s should stop", self.thread.name)
 
     def between_callback(self) -> None:
         """
