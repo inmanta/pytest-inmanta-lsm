@@ -915,7 +915,9 @@ class LsmProject:
 
         if validation:
             if len(service_ids.split(" ")) != 1:
-                raise Exception(f"when performing a validation compile, only one service id can be passed, got {repr(service_ids)}")
+                raise Exception(
+                    f"when performing a validation compile, only one service id can be passed, got {repr(service_ids)}"
+                )
             service = self.get_service(service_ids)
             env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
 
