@@ -178,7 +178,7 @@ def test_full_cycle_with_load_generator(
 ) -> None:
     service_type = "vlan-assignment"
 
-    with load_generator.LoadGenerator(remote_orchestrator=remote_orchestrator, service_type=service_type):
+    with load_generator.LoadGenerator(remote_orchestrator=remote_orchestrator, service_entity_name=service_type):
         start_time = time.time()
         test_full_cycle(project=project, remote_orchestrator=remote_orchestrator)
     end_time = time.time()

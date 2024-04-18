@@ -11,6 +11,7 @@ import datetime
 import functools
 import logging
 import threading
+import types
 import typing
 
 from inmanta.data import model
@@ -21,19 +22,31 @@ LOGGER = logging.getLogger(__name__)
 
 
 class LoadException(Exception):  # noqa: N818
+    """A specific exception for the LoadGenerator: this means that the LoadGenerator thread has to stop running."""
+
     pass
 
 
 class LoadGenerator:
+    """
+    This class helps to generate additional load on a real remote orchestrator by simulating the load produced by the dashboard.
+    """
+
     def __init__(
         self,
         remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
-        service_type: str,
+        service_entity_name: str,
         logger: logging.Logger = LOGGER,
         sleep_time: float = 0.5,
     ):
+        """
+        :param remote_orchestrator: The orchestrator, to which requests must be made
+        :param service_entity_name: The name of the service entity
+        :param logger: The logger to use
+        :param sleep_time: The time to wait between the different requests
+        """
         self.remote_orchestrator = remote_orchestrator
-        self.service_type = service_type
+        self.service_entity_name = service_entity_name
         self.sleep_time = sleep_time
         self.logger = logger
         self.running = True
@@ -46,7 +59,12 @@ class LoadGenerator:
         self.logger.debug("Starting %s", self._thread.name)
         self._thread.start()
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
+    def __exit__(
+        self,
+        exc_type: typing.Optional[typing.Type[BaseException]],
+        exc: typing.Optional[BaseException],
+        traceback: typing.Optional[types.TracebackType],
+    ) -> None:
         self.stop()
         self.logger.debug("Stopping %s", self._thread.name)
         self._thread.join(self.remote_orchestrator.client.timeout)
@@ -70,11 +88,16 @@ class LoadGenerator:
         self.logger.debug("%s should stop", self.thread.name)
 
     def between_callback(self) -> None:
+        """
+        Will create the load in an async manner. This method will also save any exception that could have occurred in the
+        thread. This mechanism allows to raise an exception once the thread has joined, see the `__exit__` method.
+        """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(self.create_load())
         except LoadException:
+            # We need to stop creating the load
             self.logger.warning("%s - Load has been stopped!", self.thread.name)
         except Exception as e:
             self.exception = e
@@ -82,6 +105,12 @@ class LoadGenerator:
             loop.close()
 
     async def remote_call(self, call: typing.Callable[[], typing.Awaitable[model.BaseModel]]) -> None:
+        """
+        First, it ensures that the Thread should still be running, otherwise it stops. Then, it interacts with the remote
+        orchestrator with the given callable function.
+
+        :param call: An asynchronous function that represents a specific request for the Remote Orchestrator
+        """
         if not self.running:
             raise LoadException()
 
@@ -158,7 +187,7 @@ class LoadGenerator:
                 self.remote_orchestrator.request,
                 method="lsm_service_catalog_get_entity",
                 tid=self.remote_orchestrator.environment,
-                service_entity=self.service_type,
+                service_entity=self.service_entity_name,
                 instance_summary=True,
             )
             await self.remote_call(lsm_service_catalog_get_entity)
@@ -167,7 +196,7 @@ class LoadGenerator:
                 self.remote_orchestrator.request,
                 method="lsm_services_list",
                 tid=self.remote_orchestrator.environment,
-                service_entity=self.service_type,
+                service_entity=self.service_entity_name,
                 include_deployment_progress=True,
                 limit=20,
                 sort="created_at.desc",
