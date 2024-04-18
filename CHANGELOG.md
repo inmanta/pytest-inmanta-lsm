@@ -1,6 +1,7 @@
 # v 3.4.0 (?)
 Changes in this release:
 - Add support to `LsmProject.compile` to have multiple instances selected
+- Add `LoadGenerator` helper to generate some load on the remote orchestrator
 
 # v 3.3.0 (2024-04-15)
 Changes in this release:
