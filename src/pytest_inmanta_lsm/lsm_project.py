@@ -898,19 +898,25 @@ class LsmProject:
             return
 
         # Sort out the type variance of service_id
-        if isinstance(service_id, list):
+        if isinstance(service_id, str):
+            # strings are also sequences
+            service_ids = service_id
+        elif isinstance(service_id, typing.Sequence):
             service_ids = " ".join(str(i) for i in service_id)
-            if validation and len(service_id) != 1:
-                raise Exception(f"when performing a validation compile, only one service id can be passed, got {service_ids}")
+
         else:
             service_ids = str(service_id)
 
-        # Get the service targeted by the compile
+        # Make sure all instances exist in the inventory
+        for service_id in service_ids.split(" "):
+            service = self.get_service(service_ids)
+
         env: dict[str, str] = {}
         env[inmanta_lsm.const.ENV_INSTANCE_ID] = service_ids
 
         if validation:
-            # We only validate for
+            if len(service_ids.split(" ")) != 1:
+                raise Exception(f"when performing a validation compile, only one service id can be passed, got {service_ids}")
             service = self.get_service(service_ids)
             env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
 
