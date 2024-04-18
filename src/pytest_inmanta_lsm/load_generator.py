@@ -14,8 +14,6 @@ import threading
 import types
 import typing
 
-from inmanta.data import model
-
 from pytest_inmanta_lsm import remote_orchestrator
 
 LOGGER = logging.getLogger(__name__)
@@ -66,9 +64,9 @@ class LoadGenerator:
         traceback: typing.Optional[types.TracebackType],
     ) -> None:
         self.stop()
-        self.logger.debug("Stopping %s", self._thread.name)
-        self._thread.join(self.remote_orchestrator.client.timeout)
-        self.logger.debug("%s has been stopped", self._thread.name)
+        self.logger.debug("Stopping %s", self.thread.name)
+        self.thread.join(self.remote_orchestrator.client.timeout)
+        self.logger.debug("%s has been stopped", self.thread.name)
 
         if self.exception is not None:
             raise self.exception
@@ -104,7 +102,7 @@ class LoadGenerator:
         finally:
             loop.close()
 
-    async def remote_call(self, call: typing.Callable[[], typing.Awaitable[model.BaseModel]]) -> None:
+    async def remote_call(self, call: functools.partial[typing.Coroutine[typing.Any, typing.Any, None]]) -> None:
         """
         First, it ensures that the Thread should still be running, otherwise it stops. Then, it interacts with the remote
         orchestrator with the given callable function.
