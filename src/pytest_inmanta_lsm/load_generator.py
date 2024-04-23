@@ -83,6 +83,8 @@ class LoadGenerator:
         """
         Will create the load in an async manner. This method will also save any exception that could have occurred in the
         thread. This mechanism allows to raise an exception once the thread has joined, see the `__exit__` method.
+
+        It will rely on Asyncio as all the requests made by the remote orchestrator instance will be async calls
         """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -119,10 +121,11 @@ class LoadGenerator:
         """
         start_datetime = datetime.datetime.utcnow()
         nb_datapoints = 15
-        # start_interval and end_interval should be at least <nb_datapoints> minutes separated from each other
-        # But we need also to respect the following constraint:
-        # When round_timestamps is set to True, the number of hours between start_interval and end_interval should be
-        # at least the amount of hours equals to nb_datapoints
+        # These variables will be used as input for different methods. There are some constraints that those variables need to
+        # fit it:
+        # - start_interval and end_interval should be at least <nb_datapoints> minutes separated from each other
+        # - when round_timestamps is set to True, the number of hours between start_interval and end_interval should be
+        #   at least the amount of hours equals to nb_datapoints
         end_datetime = start_datetime + datetime.timedelta(hours=nb_datapoints + 1)
 
         while True:
