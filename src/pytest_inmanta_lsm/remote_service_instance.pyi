@@ -29,6 +29,7 @@ class RemoteServiceInstance:
         :param service_id: manually choose the id of the service instance
         :param lookback_depth: the amount of states to search for failures if we detect a bad state
         """
+
     @property
     def instance_id(self) -> uuid.UUID: ...
     @property
@@ -38,12 +39,14 @@ class RemoteServiceInstance:
         Get the current managed service instance in its current state, and return it as a
         ServiceInstance object.
         """
+
     def history(self, *, since_version: int = 0) -> list[model.ServiceInstanceLog]:
         """
         Get the service instance history, since the specified version (included).
 
         :param since_version: The version (included) starting from which we should gather the logs.
         """
+
     def diagnose(self, *, version: int) -> FullDiagnosis:
         """
         Get a diagnosis of the service recent errors/failures, if any.
@@ -51,6 +54,7 @@ class RemoteServiceInstance:
         :param version: The version of the service at which we are looking for
             failures or errors.
         """
+
     def wait_for_state(
         self,
         target_state: str,
@@ -78,6 +82,7 @@ class RemoteServiceInstance:
         :raises StateTimeoutError: If the timeout is reached while waiting for the desired state
         :raises VersionExceededError: If version is provided and the current state goes past it
         """
+
     def create(
         self,
         attributes: dict[str, object],
@@ -102,6 +107,7 @@ class RemoteServiceInstance:
         :raises TimeoutError: If the timeout is reached while waiting for the desired state
         :raises VersionExceededError: If version is provided and the current state goes past it
         """
+
     def update(
         self,
         edit: list[model.PatchCallEdit],
@@ -128,6 +134,7 @@ class RemoteServiceInstance:
         :raises TimeoutError: If the timeout is reached while waiting for the desired state
         :raises VersionExceededError: If version is provided and the current state goes past it
         """
+
     def delete(
         self,
         *,
@@ -152,6 +159,7 @@ class RemoteServiceInstance:
         :raises TimeoutError: If the timeout is reached while waiting for the desired state
         :raises VersionExceededError: If version is provided and the current state goes past it
         """
+
     def set_state(
         self,
         state: str,

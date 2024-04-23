@@ -8,6 +8,7 @@
 
 import asyncio
 import copy
+import time
 import uuid
 
 import inmanta_lsm.model
@@ -16,6 +17,7 @@ from pytest_inmanta import plugin
 
 import pytest_inmanta_lsm.lsm_project
 from pytest_inmanta_lsm import (
+    load_generator,
     remote_orchestrator,
     remote_service_instance,
     remote_service_instance_async,
@@ -169,6 +171,41 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
 
     # Run all the services
     util.sync_execute_scenarios(first_service, duplicated_service, another_service, timeout=60)
+
+
+def test_full_cycle_with_load_generator(
+    caplog: pytest.LogCaptureFixture, project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator
+) -> None:
+    service_type = "vlan-assignment"
+
+    with load_generator.LoadGenerator(remote_orchestrator=remote_orchestrator, service_entity_name=service_type):
+        start_time = time.time()
+        test_full_cycle(project=project, remote_orchestrator=remote_orchestrator)
+    end_time = time.time()
+    assert (
+        end_time - start_time
+    ) < remote_orchestrator.client.timeout, "Thread should join before timeout of the remote orchestrator client"
+
+    load_lines = [
+        "/api/v2/notification?limit=100&filter.cleared=False",
+        f"/api/v2/environment/{remote_orchestrator.environment}?details=False",
+        "/api/v2/metrics?metrics=lsm.service_count&metrics=lsm.service_instance_count&metrics=orchestrator."
+        "compile_time&metrics=orchestrator.compile_waiting_time&metrics=orchestrator.compile_rate&"
+        "metrics=resource.agent_count&metrics=resource.resource_count&start_interval=",
+        f"/lsm/v1/service_catalog/{service_type}?instance_summary=True",
+        f"/lsm/v1/service_inventory/{service_type}?include_deployment_progress=True&limit=20&sort=created_at.desc",
+        "/lsm/v1/service_catalog?instance_summary=True",
+        "/api/v2/compilereport?limit=20&sort=requested.desc",
+        "/api/v2/resource?deploy_summary=True&limit=20&sort=resource_type.asc&filter.status=orphaned",
+    ]
+    relevant_log_lines = [
+        log.message
+        for log in caplog.records
+        if any([load_line in log.message for load_line in load_lines]) and log.threadName == "Thread-LG"
+    ]
+
+    assert len(set(relevant_log_lines)) == 8, "8 different requests should be made by the LoadExecutor!"
+    assert len(relevant_log_lines) >= 8, "At least 8 requests should be made by the LoadExecutor!"
 
 
 def test_transient_state(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:

@@ -8,7 +8,10 @@
 
 import lsm
 import lsm::fsm
-import net
+typedef vlan_id as int matching std::validate_type("pydantic.conint", self, {"ge": 0, "lt": 4096})
+"""
+    A constrained integer that represents a vlan identifier
+"""
 
 entity VlanAssignment extends lsm::ServiceEntity:
     std::ipv_any_address router_ip
@@ -21,7 +24,7 @@ entity VlanAssignment extends lsm::ServiceEntity:
     string address__description="The IP-address/netmask to assign to the given VLAN interface."
     lsm::attribute_modifier address__modifier="rw+"
 
-    net::vlan_id vlan_id
+    vlan_id vlan_id
     string vlan_id__description="The VLAN ID to assign to the given interface."
     lsm::attribute_modifier vlan_id__modifier="rw+"
 
