@@ -240,3 +240,16 @@ inm_lsm_ctr_env = PathTestParameter(
     exists=True,
     is_file=True,
 )
+
+inm_lsm_dump = BooleanTestParameter(
+    argument="--lsm-dump-on-failure",
+    environment_variable="INMANTA_LSM_DUMP_ON_FAILURE",
+    usage=(
+        "Whether to create and save a support archive when a test fails.  The support "
+        "archive will be saved in the /tmp directory of the host running the test and will not be cleaned up.  "
+        "The value of this option can be overwritten for each test case individually by overwriting the "
+        "value of the remote_orchestrator_dump_on_failure fixture."
+    ),
+    default=False,
+    group=param_group,
+)
