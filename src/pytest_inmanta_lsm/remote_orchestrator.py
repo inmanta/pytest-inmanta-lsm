@@ -7,11 +7,13 @@
 """
 
 import dataclasses
+import functools
 import logging
 import pathlib
 import shlex
 import subprocess
 import typing
+import urllib.parse
 import uuid
 from pprint import pformat
 from uuid import UUID
@@ -20,6 +22,7 @@ import inmanta.data.model
 import inmanta.module
 import inmanta.protocol.endpoints
 import pydantic
+import requests
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from packaging.version import Version
@@ -240,6 +243,10 @@ class RemoteOrchestrator:
         # Cached value of the name of the user we have on the remote orchestrator
         self._whoami: typing.Optional[str] = None
 
+        # requests.Session object allowing to interact with the orchestrator api.  This is
+        # useful for the api endpoints that can not be reached using the "native" inmanta client.
+        self._session: typing.Optional[requests.Session] = None
+
         # Allow to change the remote host, as the access to the remote shell or to the
         # remote api might be different (i.e. podman exec -i <container-name> vs curl <container-ip>)
         self.remote_host = remote_host if remote_host is not None else host
@@ -294,6 +301,66 @@ class RemoteOrchestrator:
                     inmanta_config.Config.set(section, "ssl_ca_cert_file", self.ca_cert)
             if self.token:
                 inmanta_config.Config.set(section, "token", self.token)
+
+    @property
+    def session(self) -> requests.Session:
+        """
+        Get a requests.Session object pre-configured to communicate with the remote
+        orchestrator.  The session already handles authentication and ssl for the user.
+        It also sets up a default base_url, matching the protocol, host and port of the
+        remote orchestrator (as specified in the inmanta config).  To use the client,
+        you can then simply do:
+
+            .. code-block:: python
+
+                with remote_orchestrator.session.get("/api/v2/support", stream=True) as r:
+                    r.raise_for_status()
+                    with open("support_archive.zip", "wb") as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+
+        """
+        if self._session is not None:
+            # Return the existing session object
+            return self._session
+
+        # Create a new session towards the orchestrator
+        self._session = requests.Session()
+
+        # Read the config to know where the orchestrator is, and how we should
+        # communicate with it
+        token: typing.Optional[str] = inmanta_config.Config.get("client_rest_transport", "token", None)
+        ca_certs: typing.Optional[str] = inmanta_config.Config.get("client_rest_transport", "ssl_ca_cert_file", None)
+        port: int = int(inmanta_config.Config.get("client_rest_transport", "port") or 8888)
+        host: str = inmanta_config.Config.get("client_rest_transport", "host") or "localhost"
+        ssl: bool = inmanta_config.Config.getboolean("client_rest_transport", "ssl", False)
+        protocol = "https" if ssl else "http"
+
+        # Setup authentication (if required)
+        if token is not None:
+            self._session.headers["Authorization"] = f"Bearer {token}"
+
+        # Setup ca_certs (if required)
+        if ca_certs is not None:
+            self._session.cert = ca_certs
+
+        # Setup base url for all requests made
+        def request_with_base_url(
+            request: typing.Callable, base_url: str, url: str, *args: object, **kwargs: object
+        ) -> requests.Response:
+            return request(
+                urllib.parse.urljoin(base_url, url),
+                *args,
+                **kwargs,
+            )
+
+        self._session.request = functools.partial(  # type: ignore[method-assign]
+            request_with_base_url,
+            self._session.request,
+            f"{protocol}://{host}:{port}",
+        )
+
+        return self._session
 
     @typing.overload
     async def request(self, method: str, returned_type: None = None, **kwargs: object) -> None:
