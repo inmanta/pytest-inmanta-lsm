@@ -31,19 +31,10 @@ def test_full_cycle(project, remote_orchestrator, fail: bool):
 
     service_instance = remote_orchestrator.get_managed_instance(SERVICE_NAME)
 
-    def create() -> None:
-        """
-        create an instance and wait for it to be up
-        """
-
-        service_instance.create(
-            attributes={"service_id": "id", "fail": fail},
-            wait_for_state="up",
-            bad_states=["rejected", "failed", "deleting", "create_failed"],
-        )
-
-    if fail:
-        with pytest.raises(RuntimeError):
-            create()
-    else:
-        create()
+    # Create an instance and wait for it to be up, if fail==True, let the
+    # test fail, to test pytest-inmanta-lsm in a context where the test didn't pass.
+    service_instance.create(
+        attributes={"service_id": "id", "fail": fail},
+        wait_for_state="up",
+        bad_states=["rejected", "failed", "deleting", "create_failed"],
+    )

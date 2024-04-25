@@ -94,7 +94,8 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
 
     # store test results for each phase of a call, which can
     # be "setup", "call", "teardown"
-    item.stash.setdefault(phase_report_key, {})[rep.when] = rep
+    default: dict = {}
+    item.stash.setdefault(phase_report_key, default)[rep.when] = rep
 
 
 @pytest.fixture(name="lsm_project")
