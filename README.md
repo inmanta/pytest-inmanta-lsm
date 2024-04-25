@@ -345,6 +345,13 @@ pytest-inmanta-lsm:
                         The token used to authenticate to the remote
                         orchestrator when authentication is enabled. (overrides
                         INMANTA_LSM_TOKEN)
+  --lsm-dump-on-failure
+                        Whether to create and save a support archive when a test fails.
+                        The support archive will be saved in the /tmp directory of the
+                        host running the test and will not be cleaned up. The value of
+                        this option can be overwritten for each test case individually
+                        by overwriting the value of the remote_orchestrator_dump_on_failure
+                        fixture. (overrides INMANTA_LSM_DUMP_ON_FAILURE, defaults to False)
 
 ```
 
