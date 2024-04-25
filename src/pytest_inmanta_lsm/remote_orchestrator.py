@@ -346,9 +346,10 @@ class RemoteOrchestrator:
 
         # Setup base url for all requests made
         def request_with_base_url(
-            request: typing.Callable, base_url: str, url: str, *args: object, **kwargs: object
+            request: typing.Callable, method: str, base_url: str, url: str, *args: object, **kwargs: object
         ) -> requests.Response:
             return request(
+                method,
                 urllib.parse.urljoin(base_url, url),
                 *args,
                 **kwargs,
