@@ -10,6 +10,7 @@ import logging
 import os
 import shlex
 import shutil
+import tempfile
 import textwrap
 import time
 import uuid
@@ -46,6 +47,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_ctr_image,
     inm_lsm_ctr_license,
     inm_lsm_ctr_pub_key,
+    inm_lsm_dump,
     inm_lsm_env,
     inm_lsm_env_name,
     inm_lsm_host,
@@ -77,6 +79,9 @@ except ImportError:
 
 
 LOGGER = logging.getLogger(__name__)
+
+# https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+phase_report_key = pytest.StashKey[dict[str, pytest.CollectReport]]()
 
 
 @pytest.fixture(name="lsm_project")
@@ -410,12 +415,22 @@ def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, 
 
 
 @pytest.fixture
+def remote_orchestrator_dump_on_failure(request: pytest.FixtureRequest) -> bool:
+    """
+    Whether we should produce a support archive in the case where the test fail.
+    """
+    return inm_lsm_dump.resolve(request.config)
+
+
+@pytest.fixture
 def remote_orchestrator(
     remote_orchestrator_shared: RemoteOrchestrator,
     remote_orchestrator_project: Project,
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
     remote_orchestrator_partial: bool,
-) -> RemoteOrchestrator:
+    remote_orchestrator_dump_on_failure: bool,
+    request: pytest.FixtureRequest,
+) -> Iterator[RemoteOrchestrator]:
     # Clean environment, but keep project files
     remote_orchestrator_shared.clear_environment(soft=True)
 
@@ -443,7 +458,42 @@ def remote_orchestrator(
     result = remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
     assert result.code in range(200, 300), str(result.result)
 
-    return remote_orchestrator_shared
+    yield remote_orchestrator_shared
+
+    # Check that status of the test that just ran
+    # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+    report = request.node.stash[phase_report_key]
+    if "call" not in report or not report["call"].failed:
+        # The test didn't fail, we don't need to create a support archive
+        return
+
+    if not remote_orchestrator_dump_on_failure:
+        # We don't want to create a support archive on failure
+        return
+
+    # Check that the version of the remote orchestrator is recent enough to
+    # support the archive dump endpoint
+    if remote_orchestrator_shared.server_version < version.Version("6.4.0.dev"):
+        # This version is too old, we can't create the dump, log a warning and
+        # exit here
+        LOGGER.warning(
+            "Orchestrator version (%s) doesn't have the api call we need to dump " "the support archive: /api/v2/support",
+            remote_orchestrator_shared.server_version,
+        )
+        return
+
+    # Get the support archive from the orchestrator and save it to a temp file
+    # This archive is intentionally "leaked" so that anyone investigating the test
+    # failure can gather more information about the failure
+    # Download the file and stream the output to a file
+    _, tmp_file = tempfile.mkstemp(suffix="_support_archive.zip", prefix=f"{request.node.name}_")
+    with remote_orchestrator_shared.session.get("/api/v2/support", stream=True) as r:
+        r.raise_for_status()
+        with open(tmp_file, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+    LOGGER.info("Support archive of orchestrator has been saved at %s", tmp_file)
 
 
 @pytest.fixture
