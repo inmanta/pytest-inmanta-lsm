@@ -478,7 +478,7 @@ def remote_orchestrator(
         # This version is too old, we can't create the dump, log a warning and
         # exit here
         LOGGER.warning(
-            "Orchestrator version (%s) doesn't have the api call we need to dump " "the support archive: /api/v2/support",
+            "Orchestrator version (%s) doesn't have the api call we need to dump the support archive: /api/v2/support",
             remote_orchestrator_shared.server_version,
         )
         return
