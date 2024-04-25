@@ -14,7 +14,7 @@ import tempfile
 import textwrap
 import time
 import uuid
-from typing import Dict, Generator, Iterator, Optional, Tuple, Union
+from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
 
 import pkg_resources
@@ -81,6 +81,20 @@ LOGGER = logging.getLogger(__name__)
 
 # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
 phase_report_key = pytest.StashKey[dict[str, pytest.CollectReport]]()
+
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) -> Generator[None, Any, None]:
+    # execute all other hooks to obtain the report object
+    # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+    # https://github.com/pytest-dev/pytest/issues/6780#issue-568447972
+    outcome = yield
+
+    rep: pytest.TestReport = outcome.get_result()
+
+    # store test results for each phase of a call, which can
+    # be "setup", "call", "teardown"
+    item.stash.setdefault(phase_report_key, {})[rep.when] = rep
 
 
 @pytest.fixture(name="lsm_project")
