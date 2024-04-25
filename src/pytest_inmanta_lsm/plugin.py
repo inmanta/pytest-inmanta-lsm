@@ -336,15 +336,14 @@ def remote_orchestrator_access(
     # Make sure the remote orchestrator is running
     for _ in range(0, 10):
         try:
-            response = remote_orchestrator.session.get("/api/v1/serverstatus", timeout=2)
-            response.raise_for_status()
-        except Exception as exc:
+            # Try to get the version of the server, if we can't get it, the server
+            # is not reachable (yet)
+            remote_orchestrator.server_version
+            return remote_orchestrator
+        except AssertionError as exc:
             LOGGER.warning(str(exc))
             time.sleep(1)
             continue
-
-        if response.status_code == 200:
-            return remote_orchestrator
 
     raise RuntimeError(f"Couldn't reach the orchestrator at {host}:{port}")
 

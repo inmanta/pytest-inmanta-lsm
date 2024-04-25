@@ -19,6 +19,7 @@ from pprint import pformat
 from uuid import UUID
 
 import inmanta.data.model
+import inmanta.model
 import inmanta.module
 import inmanta.protocol.endpoints
 import pydantic
@@ -319,6 +320,10 @@ class RemoteOrchestrator:
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
 
+        For most api calls, it will be easier to use the self.request and self.sync_request
+        methods.  The requests.Session object gives you however more flexibility that the
+        for-mentioned methods, allowing to also interact with some api endpoints not supported
+        by the native inmanta client helper.
         """
         if self._session is not None:
             # Return the existing session object
@@ -397,30 +402,51 @@ class RemoteOrchestrator:
         else:
             return None
 
+    @typing.overload
+    def sync_request(self, method: str, returned_type: None = None, **kwargs: object) -> None:
+        pass
+
+    @typing.overload
+    def sync_request(self, method: str, returned_type: type[T], **kwargs: object) -> T:
+        pass
+
+    def sync_request(
+        self,
+        method: str,
+        returned_type: typing.Optional[type[T]] = None,
+        **kwargs: object,
+    ) -> typing.Optional[T]:
+        """
+        Helper method to send a request to the orchestrator, which we expect to succeed with 20X code and
+        return an object of a given type.
+
+        :param method: The name of the method to execute
+        :param returned_type: The type of the object that the api should return
+        :param **kwargs: Parameters to pass to the method we are calling
+        """
+        response: Result = getattr(self.client, method)(**kwargs)
+        assert response.code in range(200, 300), str(response.result)
+        if returned_type is not None:
+            assert response.result is not None, str(response)
+            try:
+                return pydantic.TypeAdapter(returned_type).validate_python(response.result["data"])
+            except AttributeError:
+                # Handle pydantic v1
+                return pydantic.parse_obj_as(returned_type, response.result["data"])
+        else:
+            return None
+
     @property
     def server_version(self) -> Version:
         """
         Get the version of the remote orchestrator.  The version is not expected to change
         for the duration of the test case, so that value is cached after the first call.
         """
-        if self._server_version is not None:
-            return self._server_version
-
-        self._server_version = self._get_server_version()
+        if self._server_version is None:
+            status = self.sync_request("get_server_status", inmanta.data.model.StatusResponse)
+            self._server_version = Version(status.version)
+            LOGGER.debug("Remote orchestrator has version %s", self._server_version)
         return self._server_version
-
-    def _get_server_version(self) -> Version:
-        """
-        Get the version of the remote orchestrator
-        """
-        server_status: Result = self.client.get_server_status()
-        if server_status.code != 200:
-            raise Exception(f"Failed to get server status for {self.host}")
-        try:
-            assert server_status.result is not None
-            return Version(server_status.result["data"]["version"])
-        except (KeyError, TypeError):
-            raise Exception(f"Unexpected response for server status API call: {server_status.result}")
 
     @property
     def remote_user(self) -> str:
