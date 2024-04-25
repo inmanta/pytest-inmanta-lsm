@@ -258,8 +258,8 @@ class RemoteOrchestrator:
         # Setting up the client when the config is loaded
         self.setup_config()
 
-        self.orchestrator_environment.configure_environment(self.client)
-        self.server_version = self._get_server_version()
+        # Save the version of the remote orchestrator server
+        self._server_version: typing.Optional[Version] = None
 
         # The path on the remote orchestrator where the project will be synced
         self.remote_project_path = pathlib.Path(
@@ -395,6 +395,18 @@ class RemoteOrchestrator:
                 return pydantic.parse_obj_as(returned_type, response.result["data"])
         else:
             return None
+
+    @property
+    def server_version(self) -> Version:
+        """
+        Get the version of the remote orchestrator.  The version is not expected to change
+        for the duration of the test case, so that value is cached after the first call.
+        """
+        if self._server_version is not None:
+            return self._server_version
+
+        self._server_version = self._get_server_version()
+        return self._server_version
 
     def _get_server_version(self) -> Version:
         """

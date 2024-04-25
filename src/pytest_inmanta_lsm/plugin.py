@@ -20,7 +20,6 @@ from uuid import UUID
 import pkg_resources
 import pytest
 import pytest_inmanta.plugin
-import requests
 from inmanta import module
 from packaging import version
 from pytest_inmanta.plugin import Project
@@ -171,11 +170,9 @@ def remote_orchestrator_host(
 ) -> Tuple[str, int]:
     """
     Resolve the host and port options or take the values from the deployed docker orchestrator.
-    Tries to reach the orchestrator 10 times, if it fails, raises a RuntimeError.
-
     Returns a tuple containing the host and port at which the orchestrator has been reached.
     """
-    host, port = (
+    return (
         (
             inm_lsm_host.resolve(request.config),
             inm_lsm_srv_port.resolve(request.config),
@@ -183,21 +180,6 @@ def remote_orchestrator_host(
         if remote_orchestrator_container is None
         else (str(remote_orchestrator_container.orchestrator_ips[0]), remote_orchestrator_container.orchestrator_port)
     )
-
-    for _ in range(0, 10):
-        try:
-            http = "https" if inm_lsm_ssl.resolve(request.config) else "http"
-            response = requests.get(f"{http}://{host}:{port}/api/v1/serverstatus", timeout=2, verify=False)
-            response.raise_for_status()
-        except Exception as exc:
-            LOGGER.warning(str(exc))
-            time.sleep(1)
-            continue
-
-        if response.status_code == 200:
-            return host, port
-
-    raise RuntimeError(f"Couldn't reach the orchestrator at {host}:{port}")
 
 
 @pytest.fixture
@@ -276,6 +258,7 @@ def remote_orchestrator_access(
     This fixture allows to get the remote orchestrator object, without any of the initial cleanup.
     This allows to easily build helper tests that simply sync a remote environment with our local
     project, without clearing its service inventory.
+    Tries to reach the orchestrator 10 times, if it fails, raises a RuntimeError.
     """
     LOGGER.info("Setting up remote orchestrator")
 
@@ -318,7 +301,7 @@ def remote_orchestrator_access(
     environment_name = get_optional_option(inm_lsm_env_name)
     project_name = get_optional_option(inm_lsm_project_name)
 
-    return RemoteOrchestrator(
+    remote_orchestrator = RemoteOrchestrator(
         OrchestratorEnvironment(
             id=UUID(remote_orchestrator_environment),
             name=environment_name,
@@ -335,6 +318,21 @@ def remote_orchestrator_access(
         remote_shell=shlex.split(remote_shell) if remote_shell is not None else None,
         remote_host=remote_host,
     )
+
+    # Make sure the remote orchestrator is running
+    for _ in range(0, 10):
+        try:
+            response = remote_orchestrator.session.get("/api/v1/serverstatus", timeout=2)
+            response.raise_for_status()
+        except Exception as exc:
+            LOGGER.warning(str(exc))
+            time.sleep(1)
+            continue
+
+        if response.status_code == 200:
+            return remote_orchestrator
+
+    raise RuntimeError(f"Couldn't reach the orchestrator at {host}:{port}")
 
 
 @pytest.fixture(scope="session")
@@ -356,6 +354,9 @@ def remote_orchestrator_shared(
         verify_v2_editable_install()
 
     remote_orchestrator = remote_orchestrator_access
+
+    # Configure the environment on the remote orchestrator
+    remote_orchestrator.orchestrator_environment.configure_environment(remote_orchestrator.client)
 
     # Make sure we start our test suite with a clean environment
     remote_orchestrator.clear_environment()
