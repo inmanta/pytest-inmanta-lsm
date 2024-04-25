@@ -337,16 +337,20 @@ def remote_orchestrator_access(
     # Make sure the remote orchestrator is running
     for _ in range(0, 10):
         try:
-            # Try to get the version of the server, if we can't get it, the server
-            # is not reachable (yet)
-            remote_orchestrator.server_version
-            return remote_orchestrator
-        except AssertionError as exc:
+            # Try to get the status of the server, use the session object to set
+            # a custom timeout
+            remote_orchestrator.session.get("/api/v1/serverstatus", timeout=2).raise_for_status()
+            break
+        except Exception as exc:
             LOGGER.warning(str(exc))
             time.sleep(1)
-            continue
+    else:
+        raise RuntimeError(f"Couldn't reach the orchestrator at {host}:{port}")
 
-    raise RuntimeError(f"Couldn't reach the orchestrator at {host}:{port}")
+    # Configure the environment on the remote orchestrator
+    remote_orchestrator.orchestrator_environment.configure_environment(remote_orchestrator.client)
+
+    return remote_orchestrator
 
 
 @pytest.fixture(scope="session")
@@ -368,9 +372,6 @@ def remote_orchestrator_shared(
         verify_v2_editable_install()
 
     remote_orchestrator = remote_orchestrator_access
-
-    # Configure the environment on the remote orchestrator
-    remote_orchestrator.orchestrator_environment.configure_environment(remote_orchestrator.client)
 
     # Make sure we start our test suite with a clean environment
     remote_orchestrator.clear_environment()
