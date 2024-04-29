@@ -159,7 +159,7 @@ def remote_orchestrator_container(
             )
             compose_file = legacy_compose_file
         elif iso_major_version_match.group("tag") == "dev":
-            # Latest dev, use the the latest compose file
+            # Latest dev, use the the latest compose file, this is always safe because we don't distribute this externally
             compose_file = latest_compose_file
         elif version.Version(iso_major_version_match.group("version")) >= version.Version("7.1"):
             # The server has the --db-wait-time option
