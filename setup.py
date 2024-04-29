@@ -34,6 +34,7 @@ setup(
     packages=["pytest_inmanta_lsm"],
     package_data={
         "pytest_inmanta_lsm": [
+            "resources/docker-compose-legacy.yml",
             "resources/docker-compose.yml",
             "resources/my-env-file",
             "resources/my-server-conf.cfg",

@@ -169,7 +169,6 @@ inm_lsm_ctr_compose = PathTestParameter(
     argument="--lsm-ctr-compose-file",
     environment_variable="INMANTA_LSM_CONTAINER_COMPOSE_FILE",
     usage="The path to a docker-compose file, that should be used to setup an orchestrator",
-    default=Path(__file__).parent / "resources/docker-compose.yml",
     group=param_group,
     exists=True,
     is_file=True,
