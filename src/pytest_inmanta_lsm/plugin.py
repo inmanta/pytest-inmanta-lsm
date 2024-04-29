@@ -8,6 +8,8 @@
 
 import logging
 import os
+import pathlib
+import re
 import shlex
 import shutil
 import tempfile
@@ -20,6 +22,7 @@ from uuid import UUID
 import pkg_resources
 import pytest
 import pytest_inmanta.plugin
+import pytest_inmanta.test_parameter
 from inmanta import module
 from packaging import version
 from pytest_inmanta.plugin import Project
@@ -132,10 +135,40 @@ def remote_orchestrator_container(
         yield None
         return
 
+    orchestrator_image = inm_lsm_ctr_image.resolve(request.config)
+    latest_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose.yml"
+    legacy_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose-iso6.yml"
+    try:
+        compose_file = inm_lsm_ctr_compose.resolve(request.config)
+    except pytest_inmanta.test_parameter.ParameterNotSetException:
+        # The compose file is not set, we can then either use the default one, or
+        # the default legacy one (for <iso7.1).  To decide which one is the most
+        # appropriate, we parse the container image tag and extract the iso version
+        iso_major_version_match = re.fullmatch(
+            r"(?:.*)\/service-orchestrator:((\d+(?:\.\d+)*)(?:\-dev)?|dev)",
+            orchestrator_image,
+        )
+        if not iso_major_version_match:
+            LOGGER.warning(
+                "Can not parse orchestrator image tag: %s.  Using legacy docker-compose file",
+                orchestrator_image,
+            )
+            compose_file = legacy_compose_file
+        elif iso_major_version_match.group(1) == "dev":
+            # Latest dev, use the the latest compose file
+            compose_file = latest_compose_file
+        elif version.Version(iso_major_version_match.group(2)) >= version.Version("7.1"):
+            # The server has the --db-wait-time option
+            # https://github.com/inmanta/inmanta-core/pull/7217
+            compose_file = latest_compose_file
+        else:
+            # The image is not recent enough, we have to use the legacy docker-compose file
+            compose_file = legacy_compose_file
+
     LOGGER.debug("Deploying an orchestrator using docker")
     with OrchestratorContainer(
-        compose_file=inm_lsm_ctr_compose.resolve(request.config),
-        orchestrator_image=inm_lsm_ctr_image.resolve(request.config),
+        compose_file=compose_file,
+        orchestrator_image=orchestrator_image,
         postgres_version=inm_lsm_ctr_db_version.resolve(request.config),
         public_key_file=inm_lsm_ctr_pub_key.resolve(request.config),
         license_file=inm_lsm_ctr_license.resolve(request.config),

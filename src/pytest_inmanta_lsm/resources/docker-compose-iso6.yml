@@ -1,0 +1,18 @@
+version: '3'
+services:
+  postgres:
+    container_name: ${INMANTA_LSM_CONTAINER_DB_HOSTNAME}
+    image: postgres:${INMANTA_LSM_CONTAINER_DB_VERSION}
+    environment:
+      POSTGRES_USER: inmanta
+      POSTGRES_PASSWORD: inmanta
+
+  inmanta-server:
+    image: ${INMANTA_LSM_CONTAINER_ORCHESTRATOR_IMAGE}
+    volumes:
+      - ${INMANTA_LSM_CONTAINER_PUBLIC_KEY_FILE}:/var/lib/inmanta/.ssh/authorized_keys
+      - ${INMANTA_LSM_CONTAINER_LICENSE_FILE}:/etc/inmanta/license/com.inmanta.license
+      - ${INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE}:/etc/inmanta/license/com.inmanta.jwe
+      - ./my-server-conf.cfg:/etc/inmanta/inmanta.cfg
+      - ./my-env-file:/etc/inmanta/env
+    command: "server-with-ssh --wait-for-host ${INMANTA_LSM_CONTAINER_DB_HOSTNAME} --wait-for-port 5432"
