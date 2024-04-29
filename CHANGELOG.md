@@ -4,6 +4,7 @@ Changes in this release:
 - Add `LoadGenerator` helper to generate some load on the remote orchestrator
 - Add `--lsm-dump-on-failure` option, allowing to generate a support archive of the orchestrator when a test fails, and save it in the host /tmp directory. (#409)
 - Make sure that the orchestrators started by pytest-inmanta-lsm log their output to `/var/log/inmanta/server.log` instead of stdout.
+- Fix race condition in `RemoteServiceInstance.wait_for_state` that would make it return a `ServiceInstance` for the latest version rather than the one we asked the method to wait for.
 
 # v 3.3.0 (2024-04-15)
 Changes in this release:
