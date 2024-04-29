@@ -247,7 +247,8 @@ class RemoteServiceInstance:
         start_version: int,
     ) -> model.ServiceInstance:
         """
-        Wait for this service instance to reach the desired target state.
+        Wait for this service instance to reach the desired target state.  Returns a ServiceInstance
+        object that is in the state that was waited for.
 
         :param target_state: The state we want to wait our service instance to reach.
         :param target_version: The version the service is expected to be in once we reached the target
@@ -258,8 +259,8 @@ class RemoteServiceInstance:
         :param timeout: The time, in seconds, after which we should stop waiting and
             raise a StateTimeoutError.  If set to None, uses the DEFAULT_TIMEOUT attribute of the
             object.
-        :param start_version: The initial version we know the service has been in, we only
-            look for versions after this one.
+        :param start_version: A service version from which we should search for the target state.
+            This version and all of the prior versions will not be checked for a match as the target state.
         :raises BadStateError: If the instance went into a bad state
         :raises StateTimeoutError: If the timeout is reached while waiting for the desired state
         :raises VersionExceededError: If version is provided and the current state goes past it
