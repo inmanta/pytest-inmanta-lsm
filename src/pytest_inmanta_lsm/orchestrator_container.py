@@ -147,7 +147,7 @@ class OrchestratorContainer:
         shutil.copy(str(self.env_file), str(self._cwd / "my-env-file"))
 
         # Generate a unique name for the db host (we use the same strategy as docker-compose)
-        db_hostname = f"{self._cwd.name}_postgres_1"
+        db_hostname = f"{self._cwd.name}-postgres-1"
 
         env_file = f"""
             INMANTA_LSM_CONTAINER_DB_HOSTNAME={db_hostname}
@@ -223,20 +223,20 @@ class OrchestratorContainer:
 
     def _up(self) -> None:
         # Pull container images
-        cmd = ["docker-compose", "--verbose", "pull"]
+        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "pull"]
         run_cmd(cmd=cmd, cwd=self.cwd)
         # Starting the lab
-        cmd = ["docker-compose", "--verbose", "up", "-d"]
+        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "up", "-d"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
         # Getting the containers ids
-        cmd = ["docker-compose", "--verbose", "ps", "-q"]
+        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "ps", "-q"]
         stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
         self._containers = stdout.strip("\n").split("\n")
 
     def _down(self) -> None:
         # Stopping the lab
-        cmd = ["docker-compose", "--verbose", "down", "-v"]
+        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "down", "-v"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
     def __enter__(self) -> "OrchestratorContainer":
