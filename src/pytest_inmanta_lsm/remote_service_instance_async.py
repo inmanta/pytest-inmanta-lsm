@@ -24,6 +24,31 @@ LOGGER = logging.getLogger(__name__)
 T = typing.TypeVar("T")
 
 
+def get_log_as_service_instance(log: model.ServiceInstanceLog, current: model.ServiceInstance) -> model.ServiceInstance:
+    """
+    This helper method allow to convert of a ServiceInstanceLog into the corresponding ServiceInstance.
+    It takes a ServiceInstance object as input to use it as a basis for the crafted instance.  Any field
+    which are shared with the ServiceInstanceLog object will be overwritten with the value from
+    ServiceInstanceLog object.
+
+    :param log: The ServiceInstanceLog to convert to a ServiceInstance object.
+    :param current: The ServiceInstance to use as a basis for the crafted instance.
+    """
+    try:
+        # Dump the log as a dict, to make it easier to get its attributes values
+        # programmatically
+        raw_log = log.model_dump()
+        return model.ServiceInstance(
+            **{attr: raw_log[attr] if attr in raw_log else value for attr, value in current.model_dump().items()}
+        )
+    except AttributeError:
+        # Stay compatible with pydantic v1
+        raw_log = log.dict()
+        return model.ServiceInstance(
+            **{attr: raw_log[attr] if attr in raw_log else value for attr, value in current.dict().items()}
+        )
+
+
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
     """
     Base exception for error raised by a managed service instance.
@@ -288,7 +313,7 @@ class RemoteServiceInstance:
                     # Always skip the last version, as it is either our start version, or a
                     # version we checked on the previous iteration.
                     if log.version > last_version and is_done(log):
-                        return await self.get()
+                        return get_log_as_service_instance(log, await self.get())
                 except BadStateError:
                     # We encountered a bad state, print the diagnosis then quit
                     diagnosis = await self.diagnose(version=log.version)
