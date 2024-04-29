@@ -27,6 +27,7 @@ T = typing.TypeVar("T")
 def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.ServiceInstance:
     """
     This helper method allow to convert of a ServiceInstanceLog into the corresponding ServiceInstance.
+    Might be replaced by https://github.com/inmanta/inmanta-lsm/issues/1711
 
     :param log: The ServiceInstanceLog to convert to a ServiceInstance object.
     """
