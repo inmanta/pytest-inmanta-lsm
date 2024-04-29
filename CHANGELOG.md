@@ -3,6 +3,7 @@ Changes in this release:
 - Add support to `LsmProject.compile` to have multiple instances selected
 - Add `LoadGenerator` helper to generate some load on the remote orchestrator
 - Add `--lsm-dump-on-failure` option, allowing to generate a support archive of the orchestrator when a test fails, and save it in the host /tmp directory. (#409)
+- Make sure that the orchestrators started by pytest-inmanta-lsm log their output to `/var/log/inmanta/server.log` instead of stdout.
 
 # v 3.3.0 (2024-04-15)
 Changes in this release:
