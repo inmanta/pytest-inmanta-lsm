@@ -137,7 +137,7 @@ def remote_orchestrator_container(
 
     orchestrator_image = inm_lsm_ctr_image.resolve(request.config)
     latest_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose.yml"
-    legacy_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose-iso6.yml"
+    legacy_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose-legacy.yml"
     try:
         compose_file = inm_lsm_ctr_compose.resolve(request.config)
     except pytest_inmanta.test_parameter.ParameterNotSetException:
@@ -145,24 +145,29 @@ def remote_orchestrator_container(
         # the default legacy one (for <iso7.1).  To decide which one is the most
         # appropriate, we parse the container image tag and extract the iso version
         iso_major_version_match = re.fullmatch(
-            r"(?:.*)\/service-orchestrator:((\d+(?:\.\d+)*)(?:\-dev)?|dev)",
+            r".*\/service-orchestrator:(?P<tag>(?P<version>\d+(\.\d+)*)(\-dev)?|dev)",
             orchestrator_image,
         )
         if not iso_major_version_match:
-            LOGGER.warning(
-                "Can not parse orchestrator image tag: %s.  Using legacy docker-compose file",
+            # The tag is not something we know, probably a custom container image, we then
+            # use the previous docker-compose file, as the custom container image probably
+            # expects it to stay like this.
+            LOGGER.info(
+                "Can not parse orchestrator image tag: %s.  Using legacy docker-compose file %s",
                 orchestrator_image,
+                str(legacy_compose_file),
             )
             compose_file = legacy_compose_file
-        elif iso_major_version_match.group(1) == "dev":
+        elif iso_major_version_match.group("tag") == "dev":
             # Latest dev, use the the latest compose file
             compose_file = latest_compose_file
-        elif version.Version(iso_major_version_match.group(2)) >= version.Version("7.1"):
+        elif version.Version(iso_major_version_match.group("version")) >= version.Version("7.1"):
             # The server has the --db-wait-time option
             # https://github.com/inmanta/inmanta-core/pull/7217
             compose_file = latest_compose_file
         else:
-            # The image is not recent enough, we have to use the legacy docker-compose file
+            # The image is not recent enough for the --db-wait-time option, we have to use the
+            # legacy docker-compose file which relies on the entrypoint to wait for the db
             compose_file = legacy_compose_file
 
     LOGGER.debug("Deploying an orchestrator using docker")

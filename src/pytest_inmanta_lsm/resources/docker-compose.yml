@@ -21,6 +21,4 @@ services:
     volumes:
       - ${INMANTA_LSM_CONTAINER_LICENSE_FILE}:/etc/inmanta/license/com.inmanta.license
       - ${INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE}:/etc/inmanta/license/com.inmanta.jwe
-      # The last mount is not required, but it is kept for backward compatibility
-      - ./my-env-file:/etc/inmanta/env
     command: "--log-file /var/log/inmanta/server.log --log-file-level DEBUG --timed-logs server --db-wait-time 10"
