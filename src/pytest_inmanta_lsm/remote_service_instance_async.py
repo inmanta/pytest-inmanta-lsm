@@ -24,6 +24,33 @@ LOGGER = logging.getLogger(__name__)
 T = typing.TypeVar("T")
 
 
+def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.ServiceInstance:
+    """
+    This helper method allow to convert of a ServiceInstanceLog into the corresponding ServiceInstance.
+    Might be replaced by https://github.com/inmanta/inmanta-lsm/issues/1711
+
+    :param log: The ServiceInstanceLog to convert to a ServiceInstance object.
+    """
+    return model.ServiceInstance(
+        id=log.service_instance_id,
+        environment=log.environment,
+        service_entity=log.service_entity,
+        version=log.version,
+        config=log.config,
+        state=log.state,
+        candidate_attributes=log.candidate_attributes,
+        active_attributes=log.active_attributes,
+        rollback_attributes=log.rollback_attributes,
+        created_at=log.created_at,
+        last_updated=log.last_updated,
+        callback=log.callback,
+        deleted=log.deleted,
+        deployment_progress=None,
+        service_identity_attribute_value=log.service_identity_attribute_value,
+        referenced_by=None,
+    )
+
+
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
     """
     Base exception for error raised by a managed service instance.
@@ -222,7 +249,8 @@ class RemoteServiceInstance:
         start_version: int,
     ) -> model.ServiceInstance:
         """
-        Wait for this service instance to reach the desired target state.
+        Wait for this service instance to reach the desired target state.  Returns a ServiceInstance
+        object that is in the state that was waited for.
 
         :param target_state: The state we want to wait our service instance to reach.
         :param target_version: The version the service is expected to be in once we reached the target
@@ -233,8 +261,8 @@ class RemoteServiceInstance:
         :param timeout: The time, in seconds, after which we should stop waiting and
             raise a StateTimeoutError.  If set to None, uses the DEFAULT_TIMEOUT attribute of the
             object.
-        :param start_version: The initial version we know the service has been in, we only
-            look for versions after this one.
+        :param start_version: A service version from which we should search for the target state.
+            This version and all of the prior versions will not be checked for a match as the target state.
         :raises BadStateError: If the instance went into a bad state
         :raises StateTimeoutError: If the timeout is reached while waiting for the desired state
         :raises VersionExceededError: If version is provided and the current state goes past it
@@ -288,7 +316,7 @@ class RemoteServiceInstance:
                     # Always skip the last version, as it is either our start version, or a
                     # version we checked on the previous iteration.
                     if log.version > last_version and is_done(log):
-                        return await self.get()
+                        return get_service_instance_from_log(log)
                 except BadStateError:
                     # We encountered a bad state, print the diagnosis then quit
                     diagnosis = await self.diagnose(version=log.version)

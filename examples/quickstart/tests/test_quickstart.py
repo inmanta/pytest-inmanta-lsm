@@ -240,6 +240,9 @@ def test_transient_state(project: plugin.Project, remote_orchestrator: remote_or
         timeout=60,
     )
 
+    # Assert that the state our instance is in after we stop waiting for it is "creating"
+    assert created.state == "creating"
+
     # Wait for up state
     instance.wait_for_state(
         target_state="up",
