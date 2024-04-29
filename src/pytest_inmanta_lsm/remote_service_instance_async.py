@@ -24,29 +24,30 @@ LOGGER = logging.getLogger(__name__)
 T = typing.TypeVar("T")
 
 
-def get_log_as_service_instance(log: model.ServiceInstanceLog, current: model.ServiceInstance) -> model.ServiceInstance:
+def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.ServiceInstance:
     """
     This helper method allow to convert of a ServiceInstanceLog into the corresponding ServiceInstance.
-    It takes a ServiceInstance object as input to use it as a basis for the crafted instance.  Any field
-    which are shared with the ServiceInstanceLog object will be overwritten with the value from
-    ServiceInstanceLog object.
 
     :param log: The ServiceInstanceLog to convert to a ServiceInstance object.
-    :param current: The ServiceInstance to use as a basis for the crafted instance.
     """
-    try:
-        # Dump the log as a dict, to make it easier to get its attributes values
-        # programmatically
-        raw_log = log.model_dump()
-        return model.ServiceInstance(
-            **{attr: raw_log[attr] if attr in raw_log else value for attr, value in current.model_dump().items()}
-        )
-    except AttributeError:
-        # Stay compatible with pydantic v1
-        raw_log = log.dict()
-        return model.ServiceInstance(
-            **{attr: raw_log[attr] if attr in raw_log else value for attr, value in current.dict().items()}
-        )
+    return model.ServiceInstance(
+        id=log.service_instance_id,
+        environment=log.environment,
+        service_entity=log.service_entity,
+        version=log.version,
+        config=log.config,
+        state=log.state,
+        candidate_attributes=log.candidate_attributes,
+        active_attributes=log.active_attributes,
+        rollback_attributes=log.rollback_attributes,
+        created_at=log.created_at,
+        last_updated=log.last_updated,
+        callback=log.callback,
+        deleted=log.deleted,
+        deployment_progress=None,
+        service_identity_attribute_value=log.service_identity_attribute_value,
+        referenced_by=None,
+    )
 
 
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
@@ -314,7 +315,7 @@ class RemoteServiceInstance:
                     # Always skip the last version, as it is either our start version, or a
                     # version we checked on the previous iteration.
                     if log.version > last_version and is_done(log):
-                        return get_log_as_service_instance(log, await self.get())
+                        return get_service_instance_from_log(log)
                 except BadStateError:
                     # We encountered a bad state, print the diagnosis then quit
                     diagnosis = await self.diagnose(version=log.version)
