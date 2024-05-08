@@ -24,33 +24,6 @@ LOGGER = logging.getLogger(__name__)
 T = typing.TypeVar("T")
 
 
-def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.ServiceInstance:
-    """
-    This helper method allow to convert of a ServiceInstanceLog into the corresponding ServiceInstance.
-    Might be replaced by https://github.com/inmanta/inmanta-lsm/issues/1711
-
-    :param log: The ServiceInstanceLog to convert to a ServiceInstance object.
-    """
-    return model.ServiceInstance(
-        id=log.service_instance_id,
-        environment=log.environment,
-        service_entity=log.service_entity,
-        version=log.version,
-        config=log.config,
-        state=log.state,
-        candidate_attributes=log.candidate_attributes,
-        active_attributes=log.active_attributes,
-        rollback_attributes=log.rollback_attributes,
-        created_at=log.created_at,
-        last_updated=log.last_updated,
-        callback=log.callback,
-        deleted=log.deleted,
-        deployment_progress=None,
-        service_identity_attribute_value=log.service_identity_attribute_value,
-        referenced_by=None,
-    )
-
-
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
     """
     Base exception for error raised by a managed service instance.
@@ -316,7 +289,7 @@ class RemoteServiceInstance:
                     # Always skip the last version, as it is either our start version, or a
                     # version we checked on the previous iteration.
                     if log.version > last_version and is_done(log):
-                        return get_service_instance_from_log(log)
+                        return log.to_service_instance()
                 except BadStateError:
                     # We encountered a bad state, print the diagnosis then quit
                     diagnosis = await self.diagnose(version=log.version)
