@@ -21,7 +21,7 @@ def read(fname):
 
 setup(
     name="pytest-inmanta-lsm",
-    version="3.3.0",
+    version="3.4.0",
     python_requires=">=3.6",  # also update classifiers
     author="Inmanta",
     author_email="code@inmanta.com",
@@ -34,6 +34,7 @@ setup(
     packages=["pytest_inmanta_lsm"],
     package_data={
         "pytest_inmanta_lsm": [
+            "resources/docker-compose-legacy.yml",
             "resources/docker-compose.yml",
             "resources/my-env-file",
             "resources/my-server-conf.cfg",

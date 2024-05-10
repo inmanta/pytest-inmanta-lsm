@@ -9,16 +9,10 @@ services:
 
   inmanta-server:
     image: ${INMANTA_LSM_CONTAINER_ORCHESTRATOR_IMAGE}
-    entrypoint: ["/usr/bin/inmanta"]
-    env_file: ["./my-env-file"]
-    user: inmanta:inmanta
-    environment:
-      INMANTA_DATABASE_HOST: ${INMANTA_LSM_CONTAINER_DB_HOSTNAME}
-      INMANTA_DATABASE_USERNAME: inmanta
-      INMANTA_DATABASE_PASSWORD: inmanta
-      INMANTA_SERVER_BIND_ADDRESS: "0.0.0.0"
-      INMANTA_SERVER_BIND_PORT: 8888
     volumes:
+      - ${INMANTA_LSM_CONTAINER_PUBLIC_KEY_FILE}:/var/lib/inmanta/.ssh/authorized_keys
       - ${INMANTA_LSM_CONTAINER_LICENSE_FILE}:/etc/inmanta/license/com.inmanta.license
       - ${INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE}:/etc/inmanta/license/com.inmanta.jwe
-    command: "--log-file /var/log/inmanta/server.log --log-file-level DEBUG --timed-logs server --db-wait-time 10"
+      - ./my-server-conf.cfg:/etc/inmanta/inmanta.cfg
+      - ./my-env-file:/etc/inmanta/env
+    command: "server-with-ssh --wait-for-host ${INMANTA_LSM_CONTAINER_DB_HOSTNAME} --wait-for-port 5432"

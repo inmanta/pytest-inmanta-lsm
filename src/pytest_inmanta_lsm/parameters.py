@@ -169,7 +169,6 @@ inm_lsm_ctr_compose = PathTestParameter(
     argument="--lsm-ctr-compose-file",
     environment_variable="INMANTA_LSM_CONTAINER_COMPOSE_FILE",
     usage="The path to a docker-compose file, that should be used to setup an orchestrator",
-    default=Path(__file__).parent / "resources/docker-compose.yml",
     group=param_group,
     exists=True,
     is_file=True,
@@ -239,4 +238,17 @@ inm_lsm_ctr_env = PathTestParameter(
     group=param_group,
     exists=True,
     is_file=True,
+)
+
+inm_lsm_dump = BooleanTestParameter(
+    argument="--lsm-dump-on-failure",
+    environment_variable="INMANTA_LSM_DUMP_ON_FAILURE",
+    usage=(
+        "Whether to create and save a support archive when a test fails.  The support "
+        "archive will be saved in the /tmp directory of the host running the test and will not be cleaned up.  "
+        "The value of this option can be overwritten for each test case individually by overwriting the "
+        "value of the remote_orchestrator_dump_on_failure fixture."
+    ),
+    default=False,
+    group=param_group,
 )

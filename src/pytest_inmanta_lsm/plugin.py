@@ -8,18 +8,21 @@
 
 import logging
 import os
+import pathlib
+import re
 import shlex
 import shutil
+import tempfile
 import textwrap
 import time
 import uuid
-from typing import Dict, Generator, Iterator, Optional, Tuple, Union
+from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
 
 import pkg_resources
 import pytest
 import pytest_inmanta.plugin
-import requests
+import pytest_inmanta.test_parameter
 from inmanta import module
 from packaging import version
 from pytest_inmanta.plugin import Project
@@ -46,6 +49,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_ctr_image,
     inm_lsm_ctr_license,
     inm_lsm_ctr_pub_key,
+    inm_lsm_dump,
     inm_lsm_env,
     inm_lsm_env_name,
     inm_lsm_host,
@@ -77,6 +81,24 @@ except ImportError:
 
 
 LOGGER = logging.getLogger(__name__)
+
+# https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+phase_report_key = pytest.StashKey[dict[str, pytest.CollectReport]]()
+
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) -> Generator[None, Any, None]:
+    # execute all other hooks to obtain the report object
+    # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+    # https://github.com/pytest-dev/pytest/issues/6780#issue-568447972
+    outcome = yield
+
+    rep: pytest.TestReport = outcome.get_result()
+
+    # store test results for each phase of a call, which can
+    # be "setup", "call", "teardown"
+    default: dict = {}
+    item.stash.setdefault(phase_report_key, default)[rep.when] = rep
 
 
 @pytest.fixture(name="lsm_project")
@@ -113,10 +135,45 @@ def remote_orchestrator_container(
         yield None
         return
 
+    orchestrator_image = inm_lsm_ctr_image.resolve(request.config)
+    latest_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose.yml"
+    legacy_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose-legacy.yml"
+    try:
+        compose_file = inm_lsm_ctr_compose.resolve(request.config)
+    except pytest_inmanta.test_parameter.ParameterNotSetException:
+        # The compose file is not set, we can then either use the default one, or
+        # the default legacy one (for <iso7.1).  To decide which one is the most
+        # appropriate, we parse the container image tag and extract the iso version
+        iso_major_version_match = re.fullmatch(
+            r".*\/service-orchestrator:(?P<tag>(?P<version>\d+(\.\d+)*)(\-dev)?|dev)",
+            orchestrator_image,
+        )
+        if not iso_major_version_match:
+            # The tag is not something we know, probably a custom container image, we then
+            # use the previous docker-compose file, as the custom container image probably
+            # expects it to stay like this.
+            LOGGER.info(
+                "Can not parse orchestrator image tag: %s.  Using legacy docker-compose file %s",
+                orchestrator_image,
+                str(legacy_compose_file),
+            )
+            compose_file = legacy_compose_file
+        elif iso_major_version_match.group("tag") == "dev":
+            # Latest dev, use the the latest compose file, this is always safe because we don't distribute this externally
+            compose_file = latest_compose_file
+        elif version.Version(iso_major_version_match.group("version")) >= version.Version("7.1"):
+            # The server has the --db-wait-time option
+            # https://github.com/inmanta/inmanta-core/pull/7217
+            compose_file = latest_compose_file
+        else:
+            # The image is not recent enough for the --db-wait-time option, we have to use the
+            # legacy docker-compose file which relies on the entrypoint to wait for the db
+            compose_file = legacy_compose_file
+
     LOGGER.debug("Deploying an orchestrator using docker")
     with OrchestratorContainer(
-        compose_file=inm_lsm_ctr_compose.resolve(request.config),
-        orchestrator_image=inm_lsm_ctr_image.resolve(request.config),
+        compose_file=compose_file,
+        orchestrator_image=orchestrator_image,
         postgres_version=inm_lsm_ctr_db_version.resolve(request.config),
         public_key_file=inm_lsm_ctr_pub_key.resolve(request.config),
         license_file=inm_lsm_ctr_license.resolve(request.config),
@@ -166,11 +223,9 @@ def remote_orchestrator_host(
 ) -> Tuple[str, int]:
     """
     Resolve the host and port options or take the values from the deployed docker orchestrator.
-    Tries to reach the orchestrator 10 times, if it fails, raises a RuntimeError.
-
     Returns a tuple containing the host and port at which the orchestrator has been reached.
     """
-    host, port = (
+    return (
         (
             inm_lsm_host.resolve(request.config),
             inm_lsm_srv_port.resolve(request.config),
@@ -178,21 +233,6 @@ def remote_orchestrator_host(
         if remote_orchestrator_container is None
         else (str(remote_orchestrator_container.orchestrator_ips[0]), remote_orchestrator_container.orchestrator_port)
     )
-
-    for _ in range(0, 10):
-        try:
-            http = "https" if inm_lsm_ssl.resolve(request.config) else "http"
-            response = requests.get(f"{http}://{host}:{port}/api/v1/serverstatus", timeout=2, verify=False)
-            response.raise_for_status()
-        except Exception as exc:
-            LOGGER.warning(str(exc))
-            time.sleep(1)
-            continue
-
-        if response.status_code == 200:
-            return host, port
-
-    raise RuntimeError(f"Couldn't reach the orchestrator at {host}:{port}")
 
 
 @pytest.fixture
@@ -271,6 +311,7 @@ def remote_orchestrator_access(
     This fixture allows to get the remote orchestrator object, without any of the initial cleanup.
     This allows to easily build helper tests that simply sync a remote environment with our local
     project, without clearing its service inventory.
+    Tries to reach the orchestrator 10 times, if it fails, raises a RuntimeError.
     """
     LOGGER.info("Setting up remote orchestrator")
 
@@ -313,7 +354,7 @@ def remote_orchestrator_access(
     environment_name = get_optional_option(inm_lsm_env_name)
     project_name = get_optional_option(inm_lsm_project_name)
 
-    return RemoteOrchestrator(
+    remote_orchestrator = RemoteOrchestrator(
         OrchestratorEnvironment(
             id=UUID(remote_orchestrator_environment),
             name=environment_name,
@@ -330,6 +371,24 @@ def remote_orchestrator_access(
         remote_shell=shlex.split(remote_shell) if remote_shell is not None else None,
         remote_host=remote_host,
     )
+
+    # Make sure the remote orchestrator is running
+    for _ in range(0, 10):
+        try:
+            # Try to get the status of the server, use the session object to set
+            # a custom timeout
+            remote_orchestrator.session.get("/api/v1/serverstatus", timeout=2).raise_for_status()
+            break
+        except Exception as exc:
+            LOGGER.warning(str(exc))
+            time.sleep(1)
+    else:
+        raise RuntimeError(f"Couldn't reach the orchestrator at {host}:{port}")
+
+    # Configure the environment on the remote orchestrator
+    remote_orchestrator.orchestrator_environment.configure_environment(remote_orchestrator.client)
+
+    return remote_orchestrator
 
 
 @pytest.fixture(scope="session")
@@ -410,12 +469,22 @@ def remote_orchestrator_project(remote_orchestrator_shared: RemoteOrchestrator, 
 
 
 @pytest.fixture
+def remote_orchestrator_dump_on_failure(request: pytest.FixtureRequest) -> bool:
+    """
+    Whether we should produce a support archive in the case where the test fail.
+    """
+    return inm_lsm_dump.resolve(request.config)
+
+
+@pytest.fixture
 def remote_orchestrator(
     remote_orchestrator_shared: RemoteOrchestrator,
     remote_orchestrator_project: Project,
     remote_orchestrator_settings: Dict[str, Union[str, int, bool]],
     remote_orchestrator_partial: bool,
-) -> RemoteOrchestrator:
+    remote_orchestrator_dump_on_failure: bool,
+    request: pytest.FixtureRequest,
+) -> Iterator[RemoteOrchestrator]:
     # Clean environment, but keep project files
     remote_orchestrator_shared.clear_environment(soft=True)
 
@@ -443,7 +512,42 @@ def remote_orchestrator(
     result = remote_orchestrator_shared.client.resume_environment(remote_orchestrator_shared.environment)
     assert result.code in range(200, 300), str(result.result)
 
-    return remote_orchestrator_shared
+    yield remote_orchestrator_shared
+
+    # Check that status of the test that just ran
+    # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
+    report = request.node.stash[phase_report_key]
+    if "call" not in report or not report["call"].failed:
+        # The test didn't fail, we don't need to create a support archive
+        return
+
+    if not remote_orchestrator_dump_on_failure:
+        # We don't want to create a support archive on failure
+        return
+
+    # Check that the version of the remote orchestrator is recent enough to
+    # support the archive dump endpoint
+    if remote_orchestrator_shared.server_version < version.Version("6.4.0.dev"):
+        # This version is too old, we can't create the dump, log a warning and
+        # exit here
+        LOGGER.warning(
+            "Orchestrator version (%s) doesn't have the api call we need to dump the support archive: /api/v2/support",
+            remote_orchestrator_shared.server_version,
+        )
+        return
+
+    # Get the support archive from the orchestrator and save it to a temp file
+    # This archive is intentionally "leaked" so that anyone investigating the test
+    # failure can gather more information about the failure
+    # Download the file and stream the output to a file
+    _, tmp_file = tempfile.mkstemp(suffix="_support_archive.zip", prefix=f"{request.node.name}_")
+    with remote_orchestrator_shared.session.get("/api/v2/support", stream=True) as r:
+        r.raise_for_status()
+        with open(tmp_file, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+    LOGGER.info("Support archive of orchestrator has been saved at %s", tmp_file)
 
 
 @pytest.fixture

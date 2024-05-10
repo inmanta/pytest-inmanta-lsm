@@ -43,7 +43,8 @@ def test_deploy_service(project: plugin.Project, remote_orchestrator: remote_orc
         service_entity_name=SERVICE_NAME,
     )
 
-    # Create the service instance and stop waiting in a transient state
+    # Create the service instance and stop waiting in a transient state, and get the service instance
+    # as it is in the target state.
     created = instance.create(
         {
             "router_ip": "10.1.9.17",
@@ -55,12 +56,18 @@ def test_deploy_service(project: plugin.Project, remote_orchestrator: remote_orc
         timeout=60,
     )
 
-    # Wait for up state, we provide here the version from which we should follow the
-    # service, which is the version in which we last stopped following the service.  This
-    # guarantees that we don't "miss" the target state, in case it is a transient one, and
-    # don't confuse the start state for the target one in case it is the same one.
-    # The start version should always be the last version in which we know our service has
-    # been, BEFORE the target state we expect our service to go into.
+    # Wait for up state.  The method will check each version that the service goes through,
+    # starting AFTER the start_version if it is provided, or the current version of the service
+    # if start_version is not provided.  As soon as a version is a match, the helper will return the
+    # service instance at this given state.
+    # It is important to provide the correct start_version to avoid falling in any of these situations:
+    # 1. We could miss the target state, if at the moment we start waiting for the target state, it is
+    #    already reached and no start_version is provided (as we would start looking AFTER the current
+    #    version).
+    # 2. We could select the wrong target state if we start looking at too old versions (in the case of
+    #    an update for example, we might mistake the source up state for the target one).
+    # In this example, we start after the version of the creating state, as we know it is before our up
+    # state.
     instance.wait_for_state(
         target_state="up",
         start_version=created.version,
@@ -345,6 +352,13 @@ pytest-inmanta-lsm:
                         The token used to authenticate to the remote
                         orchestrator when authentication is enabled. (overrides
                         INMANTA_LSM_TOKEN)
+  --lsm-dump-on-failure
+                        Whether to create and save a support archive when a test fails.
+                        The support archive will be saved in the /tmp directory of the
+                        host running the test and will not be cleaned up. The value of
+                        this option can be overwritten for each test case individually
+                        by overwriting the value of the remote_orchestrator_dump_on_failure
+                        fixture. (overrides INMANTA_LSM_DUMP_ON_FAILURE, defaults to False)
 
 ```
 
