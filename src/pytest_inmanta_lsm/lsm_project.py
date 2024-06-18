@@ -752,25 +752,34 @@ class LsmProject:
         service_entity = self.get_service_entity(service_entity_name)
 
         # Create the service instance object
-        service = inmanta_lsm.model.ServiceInstance(
-            id=uuid.uuid4(),
-            environment=uuid.UUID(self.environment),
-            service_entity=service_entity_name,
-            version=1,
-            desired_state_version=1,
-            config={},
-            state=service_entity.lifecycle.initial_state,
-            candidate_attributes=service_entity.add_defaults(attributes),  # type: ignore
-            active_attributes=None,
-            rollback_attributes=None,
-            created_at=datetime.datetime.now(),
-            last_updated=datetime.datetime.now(),
-            callback=[],
-            deleted=False,
-            deployment_progress=None,
-            service_identity_attribute_value=None,
-            transfer_context=inmanta_lsm.model.TransferContext.auto,
-        )
+        service_instance_attributes = {
+            "id": uuid.uuid4(),
+            "environment": uuid.UUID(self.environment),
+            "service_entity": service_entity_name,
+            "version": 1,
+            "desired_state_version": 1,
+            "config": {},
+            "state": service_entity.lifecycle.initial_state,
+            "candidate_attributes": service_entity.add_defaults(attributes),  # type: ignore
+            "active_attributes": None,
+            "rollback_attributes": None,
+            "created_at": datetime.datetime.now(),
+            "last_updated": datetime.datetime.now(),
+            "callback": [],
+            "deleted": False,
+            "deployment_progress": None,
+            "service_identity_attribute_value": None,
+            "transfer_context": inmanta_lsm.model.TransferContext.auto,
+        }
+
+        # The method `desired_state_version` and `transfer_context` fields were only recently added to inmanta_lsm, this offers
+        # compatibility with older versions of the orchestrator.
+        try:
+            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)
+        except AttributeError:
+            service_instance_attributes.pop("desired_state_version", None)
+            service_instance_attributes.pop("transfer_context", None)
+            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)
 
         # Add the service to our inventory
         self.add_service(service)
