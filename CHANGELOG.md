@@ -2,10 +2,8 @@
 Changes in this release:
 - Make sure that the orchestrators started by pytest-inmanta-lsm log their output to `/var/log/inmanta/server.log` instead of stdout for rc containers.
 - Fix compatibility with updated ServiceInstance model -> new fields:
-  - `desired_state_version`
-  - `transfer_context`
-
-  Refer to inmanta-lsm for more details.
+  - `desired_state_version` : The version of the desired state of a service instance. This version is incremented every time the desired state of the service is changing, i.e. the exported model.
+  - `transfer_context`: Flag to know if an instance needs to perform / recover additional transfers.
 
 # v 3.4.0 (2024-05-10)
 Changes in this release:
