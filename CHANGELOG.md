@@ -1,6 +1,11 @@
 # v 3.5.0 (?)
 Changes in this release:
 - Make sure that the orchestrators started by pytest-inmanta-lsm log their output to `/var/log/inmanta/server.log` instead of stdout for rc containers.
+- Fix compatibility with updated ServiceInstance model -> new fields:
+  - `desired_state_version`
+  - `transfer_context`
+
+  Refer to inmanta-lsm for more details.
 
 # v 3.4.0 (2024-05-10)
 Changes in this release:

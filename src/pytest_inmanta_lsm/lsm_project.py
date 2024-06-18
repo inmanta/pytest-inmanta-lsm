@@ -757,6 +757,7 @@ class LsmProject:
             environment=uuid.UUID(self.environment),
             service_entity=service_entity_name,
             version=1,
+            desired_state_version=1,
             config={},
             state=service_entity.lifecycle.initial_state,
             candidate_attributes=service_entity.add_defaults(attributes),  # type: ignore
@@ -768,6 +769,7 @@ class LsmProject:
             deleted=False,
             deployment_progress=None,
             service_identity_attribute_value=None,
+            transfer_context=inmanta_lsm.model.TransferContext.auto,
         )
 
         # Add the service to our inventory

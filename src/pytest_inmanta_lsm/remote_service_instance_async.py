@@ -40,6 +40,7 @@ def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.Servic
             environment=log.environment,
             service_entity=log.service_entity,
             version=log.version,
+            desired_state_version=log.desired_state_version,
             config=log.config,
             state=log.state,
             candidate_attributes=log.candidate_attributes,
@@ -52,6 +53,7 @@ def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.Servic
             deployment_progress=None,
             service_identity_attribute_value=log.service_identity_attribute_value,
             referenced_by=None,
+            transfer_context=log.transfer_context,
         )
 
 
