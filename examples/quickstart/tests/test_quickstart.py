@@ -334,7 +334,9 @@ def test_partial_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject)
         # lifecycle, triggering a compile (validating compile when appropriate) for
         # each state we meets.
         auto_transfer=True,
+        service_id=uuid.UUID(int=42),
     )
+    assert service.id == uuid.UUID(int=42)
     lsm_project.compile(service_id=service.id)
     lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
 
