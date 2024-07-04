@@ -147,6 +147,7 @@ def test_full_cycle(
     # Create a second service that should be rejected
     duplicated_service = service_duplicate_rejection(
         remote_orchestrator=remote_orchestrator,
+        remote_orchestrator_dump_on_failure=remote_orchestrator_dump_on_failure,
     )
 
     # Create another valid service
@@ -181,7 +182,7 @@ def test_full_cycle_with_load_generator(
 
     with load_generator.LoadGenerator(remote_orchestrator=remote_orchestrator, service_entity_name=service_type):
         start_time = time.time()
-        test_full_cycle(project=project, remote_orchestrator=remote_orchestrator)
+        test_full_cycle(project=project, remote_orchestrator=remote_orchestrator, remote_orchestrator_dump_on_failure=False)
     end_time = time.time()
     assert (
         end_time - start_time
