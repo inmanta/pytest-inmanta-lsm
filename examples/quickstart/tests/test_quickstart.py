@@ -55,6 +55,9 @@ async def service_full_cycle(
         bad_states=["rejected", "up"] if create_fail else ["rejected", "failed"],
     )
 
+    if create_fail:
+        return
+
     # Update the vlan id
     await instance.update(
         [
