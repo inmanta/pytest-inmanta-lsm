@@ -43,23 +43,17 @@ async def service_full_cycle(
     )
 
     # Create the service instance on the remote orchestrator
-    creation = instance.create(
+    await instance.create(
         {
             "router_ip": router_ip,
             "interface_name": interface_name,
             "address": address,
             "vlan_id": vlan_id,
         },
-        wait_for_state="up",
+        wait_for_state="failed" if create_fail else "up",
         timeout=60,
-        bad_states=["rejected", "failed"],
+        bad_states=["rejected", "up"] if create_fail else ["rejected", "failed"],
     )
-    if create_fail:
-        with pytest.raises(remote_service_instance_async.BadStateError):
-            await creation
-        return
-    else:
-        await creation
 
     # Update the vlan id
     await instance.update(
