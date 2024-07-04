@@ -171,7 +171,7 @@ def test_full_cycle(
     )
 
     # Run all the services
-    util.sync_execute_scenarios(first_service, duplicated_service, another_service, timeout=60)
+    util.sync_execute_scenarios(first_service, duplicated_service, another_service)
 
 
 def test_full_cycle_with_load_generator(
