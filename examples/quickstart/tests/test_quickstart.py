@@ -80,8 +80,10 @@ async def service_full_cycle(
     await instance.delete(wait_for_state="terminated", timeout=60)
 
 
+@pytest.mark.parametrize(("remote_orchestrator_dump_on_failure",), [True])
 async def service_duplicate_rejection(
     remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    remote_orchestrator_dump_on_failure: bool,
 ) -> None:
     # Create an async service instance object
     instance = remote_service_instance_async.RemoteServiceInstance(
@@ -119,7 +121,12 @@ async def service_duplicate_rejection(
     await instance.delete(wait_for_state="terminated", timeout=60)
 
 
-def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+@pytest.mark.parametrize(("remote_orchestrator_dump_on_failure",), [True])
+def test_full_cycle(
+    project: plugin.Project,
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    remote_orchestrator_dump_on_failure: bool,
+) -> None:
     # get connection to remote_orchestrator
     client = remote_orchestrator.client
 
