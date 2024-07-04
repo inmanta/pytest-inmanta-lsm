@@ -43,23 +43,20 @@ async def service_full_cycle(
     )
 
     # Create the service instance on the remote orchestrator
-    creation = instance.create(
+    await instance.create(
         {
             "router_ip": router_ip,
             "interface_name": interface_name,
             "address": address,
             "vlan_id": vlan_id,
         },
-        wait_for_state="up",
+        wait_for_state="failed" if create_fail else "up",
         timeout=60,
-        bad_states=["rejected", "failed"],
+        bad_states=["rejected", "up"] if create_fail else ["rejected", "failed"],
     )
+
     if create_fail:
-        with pytest.raises(remote_service_instance_async.BadStateError):
-            await creation
         return
-    else:
-        await creation
 
     # Update the vlan id
     await instance.update(
@@ -80,8 +77,10 @@ async def service_full_cycle(
     await instance.delete(wait_for_state="terminated", timeout=60)
 
 
+@pytest.mark.parametrize(("remote_orchestrator_dump_on_failure",), [(True,)])
 async def service_duplicate_rejection(
     remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    remote_orchestrator_dump_on_failure: bool,
 ) -> None:
     # Create an async service instance object
     instance = remote_service_instance_async.RemoteServiceInstance(
@@ -119,7 +118,12 @@ async def service_duplicate_rejection(
     await instance.delete(wait_for_state="terminated", timeout=60)
 
 
-def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+@pytest.mark.parametrize(("remote_orchestrator_dump_on_failure",), [(True,)])
+def test_full_cycle(
+    project: plugin.Project,
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    remote_orchestrator_dump_on_failure: bool,
+) -> None:
     # get connection to remote_orchestrator
     client = remote_orchestrator.client
 
@@ -146,6 +150,7 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
     # Create a second service that should be rejected
     duplicated_service = service_duplicate_rejection(
         remote_orchestrator=remote_orchestrator,
+        remote_orchestrator_dump_on_failure=remote_orchestrator_dump_on_failure,
     )
 
     # Create another valid service
@@ -170,7 +175,7 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
     )
 
     # Run all the services
-    util.sync_execute_scenarios(first_service, duplicated_service, another_service, timeout=60)
+    util.sync_execute_scenarios(first_service, duplicated_service, another_service)
 
 
 def test_full_cycle_with_load_generator(
@@ -180,7 +185,7 @@ def test_full_cycle_with_load_generator(
 
     with load_generator.LoadGenerator(remote_orchestrator=remote_orchestrator, service_entity_name=service_type):
         start_time = time.time()
-        test_full_cycle(project=project, remote_orchestrator=remote_orchestrator)
+        test_full_cycle(project=project, remote_orchestrator=remote_orchestrator, remote_orchestrator_dump_on_failure=False)
     end_time = time.time()
     assert (
         end_time - start_time
