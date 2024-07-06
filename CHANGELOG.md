@@ -1,3 +1,8 @@
+# v 3.5.0 (2024-07-06)
+Changes in this release:
+- Make sure that the orchestrators started by pytest-inmanta-lsm log their output to `/var/log/inmanta/server.log` instead of stdout for rc containers.
+- Allow to pick a service id when using `LsmProject.create_service` instead of getting a random one.
+
 # v 3.4.0 (2024-05-10)
 Changes in this release:
 - Add support to `LsmProject.compile` to have multiple instances selected
