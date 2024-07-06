@@ -1,3 +1,6 @@
+# v 3.6.0 (?)
+Changes in this release:
+
 # v 3.5.0 (2024-07-06)
 Changes in this release:
 - Make sure that the orchestrators started by pytest-inmanta-lsm log their output to `/var/log/inmanta/server.log` instead of stdout for rc containers.
