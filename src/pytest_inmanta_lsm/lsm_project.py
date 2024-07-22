@@ -733,6 +733,7 @@ class LsmProject:
         attributes: dict,
         *,
         auto_transfer: bool = True,
+        service_id: typing.Optional[uuid.UUID] = None,
     ) -> inmanta_lsm.model.ServiceInstance:
         """
         Helper method to create an instance of the given service entity and set the
@@ -747,13 +748,15 @@ class LsmProject:
             automatically added to it.
         :param auto_transfer: Whether to automatically go through the first auto transfers, triggering
             one compile for each state we pass by.
+        :param service_id: The id to give to the newly created service, if None is provided, a random
+            id is assigned.
         """
         # Resolve the initial state for our service and resolve attributes defaults
         service_entity = self.get_service_entity(service_entity_name)
 
         # Create the service instance object
         service = inmanta_lsm.model.ServiceInstance(
-            id=uuid.uuid4(),
+            id=service_id or uuid.uuid4(),
             environment=uuid.UUID(self.environment),
             service_entity=service_entity_name,
             version=1,
