@@ -1,5 +1,6 @@
 # v 3.6.0 (?)
 Changes in this release:
+- Add support for `lsm::VersionedServiceEntityBinding`
 
 # v 3.5.0 (2024-07-06)
 Changes in this release:
