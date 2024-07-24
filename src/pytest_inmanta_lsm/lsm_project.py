@@ -615,6 +615,7 @@ class LsmProject:
         types = {
             binding: self.project.get_instances(binding)
             for binding in ["lsm::ServiceEntityBinding", "lsm::ServiceEntityBindingV2", "lsm::VersionedServiceEntityBinding"]
+            if binding in self.project.types
         }
 
         # Save the model used in the export, and reset the service entity catalog
