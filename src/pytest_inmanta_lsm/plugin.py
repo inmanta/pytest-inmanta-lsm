@@ -145,7 +145,7 @@ def remote_orchestrator_container(
         # the default legacy one (for <iso7.1).  To decide which one is the most
         # appropriate, we parse the container image tag and extract the iso version
         iso_major_version_match = re.fullmatch(
-            r".*\/service-orchestrator:(?P<tag>(?P<version>\d+(\.\d+)*)(\-dev|\-rc|\-dev-ng)?|dev|dev\-ng)",
+            r".*\/service-orchestrator:(?P<tag>(?P<version>\d+(\.\d+)*)(-dev|-rc|-dev-ng)?|dev|dev-ng)",
             orchestrator_image,
         )
         if not iso_major_version_match:
