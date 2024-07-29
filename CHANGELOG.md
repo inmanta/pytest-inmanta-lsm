@@ -1,5 +1,6 @@
 # v 3.7.0 (?)
 Changes in this release:
+- Add support for ng containers.
 
 # v 3.6.0 (2024-07-24)
 Changes in this release:
