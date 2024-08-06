@@ -775,14 +775,12 @@ class LsmProject:
             "service_identity_attribute_value": None,
         }
 
-        # The method `desired_state_version` and `transfer_context` fields were only recently added to inmanta_lsm, this offers
-        # compatibility with older versions of the orchestrator.
+        # The `desired_state_version` field has only recently been added to inmanta_lsm.
+        # This ensures compatibility with older versions of the orchestrator.
         try:
-            service_instance_attributes["transfer_context"] = inmanta_lsm.model.TransferContext.auto
             service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)
         except AttributeError:
             service_instance_attributes.pop("desired_state_version", None)
-            service_instance_attributes.pop("transfer_context", None)
             service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)
 
         # Add the service to our inventory
