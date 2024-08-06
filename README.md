@@ -164,7 +164,7 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
     )
 
     # Run all the services
-    util.sync_execute_scenarios(first_service, another_service, timeout=60)
+    util.sync_execute_scenarios(first_service, another_service)
 ```
 > source: [test_quickstart.py::test_full_cycle](./examples/quickstart/tests/test_quickstart.py)
 

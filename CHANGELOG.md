@@ -1,9 +1,18 @@
-# v 3.5.0 (?)
+# v 3.7.0 (?)
 Changes in this release:
-- Make sure that the orchestrators started by pytest-inmanta-lsm log their output to `/var/log/inmanta/server.log` instead of stdout for rc containers.
+- Add support for ng containers.
 - Fix compatibility with updated ServiceInstance model -> new fields:
   - `desired_state_version` : The version of the desired state of a service instance. This version is incremented every time the desired state of the service is changing, i.e. the exported model.
   - `transfer_context`: Flag to know if an instance needs to perform / recover additional transfers.
+
+# v 3.6.0 (2024-07-24)
+Changes in this release:
+- Add support for `lsm::VersionedServiceEntityBinding`
+
+# v 3.5.0 (2024-07-06)
+Changes in this release:
+- Make sure that the orchestrators started by pytest-inmanta-lsm log their output to `/var/log/inmanta/server.log` instead of stdout for rc containers.
+- Allow to pick a service id when using `LsmProject.create_service` instead of getting a random one.
 
 # v 3.4.0 (2024-05-10)
 Changes in this release:
