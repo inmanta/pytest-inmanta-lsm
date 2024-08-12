@@ -145,7 +145,7 @@ def remote_orchestrator_container(
         # the default legacy one (for <iso7.1).  To decide which one is the most
         # appropriate, we parse the container image tag and extract the iso version
         iso_major_version_match = re.fullmatch(
-            r".*\/service-orchestrator:(?P<tag>(?P<version>\d+(\.\d+)*)(\-dev|\-rc)?|dev)",
+            r".*\/service-orchestrator:(?P<tag>(?P<version>\d+(\.\d+)*)(-dev|-rc|-dev-ng)?|dev|dev-ng)",
             orchestrator_image,
         )
         if not iso_major_version_match:
@@ -158,7 +158,7 @@ def remote_orchestrator_container(
                 str(legacy_compose_file),
             )
             compose_file = legacy_compose_file
-        elif iso_major_version_match.group("tag") == "dev":
+        elif iso_major_version_match.group("tag") in ["dev", "dev-ng"]:
             # Latest dev, use the the latest compose file, this is always safe because we don't distribute this externally
             compose_file = latest_compose_file
         elif version.Version(iso_major_version_match.group("version")) >= version.Version("7.1"):
