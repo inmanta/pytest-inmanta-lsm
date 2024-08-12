@@ -1,6 +1,7 @@
 # v 3.7.0 (?)
 Changes in this release:
 - Add support for ng containers.
+- Renamed `lsm::VersionedServiceEntityBinding` to `lsm::ServiceBinding`
 
 # v 3.6.0 (2024-07-24)
 Changes in this release:
