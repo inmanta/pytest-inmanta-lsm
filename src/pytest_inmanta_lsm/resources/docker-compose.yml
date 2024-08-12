@@ -18,6 +18,8 @@ services:
       INMANTA_DATABASE_PASSWORD: inmanta
       INMANTA_SERVER_BIND_ADDRESS: "0.0.0.0"
       INMANTA_SERVER_BIND_PORT: 8888
+      INMANTA_LICENSE_ENTITLEMENT_FILE: /etc/inmanta/license/com.inmanta.jwe
+      INMANTA_LICENSE_LICENSE_KEY: /etc/inmanta/license/com.inmanta.license
     volumes:
       - ${INMANTA_LSM_CONTAINER_LICENSE_FILE}:/etc/inmanta/license/com.inmanta.license
       - ${INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE}:/etc/inmanta/license/com.inmanta.jwe
