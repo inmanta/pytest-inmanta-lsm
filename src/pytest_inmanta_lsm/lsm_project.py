@@ -16,7 +16,6 @@ import re
 import typing
 import uuid
 import warnings
-from contextlib import suppress
 
 import inmanta.config
 import inmanta.protocol.common
@@ -672,53 +671,6 @@ class LsmProject:
 
         return self.service_entities[service_entity_name]
 
-    def transfer_to_next_state(
-        self,
-        service: inmanta_lsm.model.ServiceInstance,
-        transfer: inmanta_lsm.model.LifecycleTransfer,
-        is_error_transition: bool = False,
-    ) -> None:
-        """
-        Apply this state to our service, if it is different from the current
-        state, also increment the version and the desired state version (if the exported model is changing)
-
-        :param service: The current service
-        :param transfer: The current transfer
-        :param is_error_transition: Is it an error transition?
-        """
-        if is_error_transition:
-            if transfer is None:
-                raise RuntimeError(f"Error transition is not defined for {str(transfer)}!")
-
-            next_state = transfer.error
-        else:
-            next_state = transfer.target
-
-        if service.state == next_state:
-            return
-
-        # In case of an `AttributeError`, we don't need to do anything: we are dealing with an old orchestrator
-        is_preserving_same_desired_state = False
-        with suppress(AttributeError):
-            if is_error_transition:
-                is_preserving_same_desired_state = transfer.error_same_desired_state
-            else:
-                is_preserving_same_desired_state = transfer.target_same_desired_state
-
-            if not is_preserving_same_desired_state:
-                service.desired_state_version += 1
-
-        service.version += 1
-        service.last_updated = datetime.datetime.now()
-        service.state = next_state
-
-        # Trigger a compile for the transition
-        if not is_preserving_same_desired_state:
-            self.compile(
-                service_id=service.id,
-                validation=transfer.validate_,
-            )
-
     def auto_transfer(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
         """
         Mock the logic of an auto transfer.  This can be used to automatically perform validation
@@ -739,7 +691,35 @@ class LsmProject:
             transfer_type=inmanta_lsm.const.TransferTrigger.AUTO,
         )
 
+        def next_state(state: str, is_error_transition: bool = False) -> None:
+            """
+            Apply this state to our service, if it is different from the current
+            state, also increment the version
+
+            :param state: The new state to apply
+            :param is_error_transition: Is it an error transition?
+            """
+            if service.state == state:
+                return
+
+            try:
+                if is_error_transition:
+                    is_preserving_same_desired_state = transfer.error_same_desired_state
+                else:
+                    is_preserving_same_desired_state = transfer.target_same_desired_state
+
+                if not is_preserving_same_desired_state:
+                    service.desired_state_version += 1
+            except AttributeError:
+                # We don't need to do anything: we are dealing with an old orchestrator
+                pass
+
+            service.last_updated = datetime.datetime.now()
+            service.version += 1
+            service.state = state
+
         try:
+            # Trigger a compile for the transition
             LOGGER.info(
                 "Triggering compile on state %s before auto transfer (%s) for service %s (%s)",
                 service.state,
@@ -747,12 +727,16 @@ class LsmProject:
                 service.id,
                 service.service_entity,
             )
+            self.compile(
+                service_id=service.id,
+                validation=transfer.validate_,
+            )
             perform_attribute_operation(service, transfer.target_operation)
-            self.transfer_to_next_state(service=service, transfer=transfer, is_error_transition=False)
+            next_state(state=transfer.target)
         except Exception:
             perform_attribute_operation(service, transfer.error_operation)
             if transfer.error is not None:
-                self.transfer_to_next_state(service=service, transfer=transfer, is_error_transition=True)
+                next_state(state=transfer.error, is_error_transition=True)
             raise
 
         return service
@@ -854,11 +838,10 @@ class LsmProject:
 
         # Go into the update state
         try:
-            transfer = service_entity.lifecycle.get_transfer(
+            service.state = service_entity.lifecycle.get_transfer(
                 from_state=service.state,
                 transfer_type=inmanta_lsm.const.TransferTrigger.ON_UPDATE,
-            )
-            self.transfer_to_next_state(service=service, transfer=transfer, is_error_transition=False)
+            ).target
         except KeyError:
             raise RuntimeError(f"Service {service.id} can not be updated from state {service.state}")
 
