@@ -614,7 +614,7 @@ class LsmProject:
         # Find all instances of all entity bindings
         types = {
             binding: self.project.get_instances(binding)
-            for binding in ["lsm::ServiceEntityBinding", "lsm::ServiceEntityBindingV2", "lsm::VersionedServiceEntityBinding"]
+            for binding in ["lsm::ServiceEntityBinding", "lsm::ServiceEntityBindingV2", "lsm::ServiceBinding"]
             if binding in self.project.types
         }
 

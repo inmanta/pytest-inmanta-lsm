@@ -1,7 +1,11 @@
-# v 3.7.0 (?)
+# v 3.8.0 (?)
+Changes in this release:
+- Extends the mocking mechanism to support the LSM Transfer Optimization feature
+
+# v 3.7.0 (2024-08-12)
 Changes in this release:
 - Add support for ng containers.
-- Extends the mocking mechanism to support the LSM Transfer Optimization feature
+- Renamed `lsm::VersionedServiceEntityBinding` to `lsm::ServiceBinding`
 
 # v 3.6.0 (2024-07-24)
 Changes in this release:
