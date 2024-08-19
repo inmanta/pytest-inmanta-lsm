@@ -687,12 +687,12 @@ class LsmProject:
         :param is_error_transition: Is it an error transition?
         """
         if is_error_transition:
-            if transfer is None:
+            if transfer.error is None:
                 raise RuntimeError(f"Error transition is not defined for {str(transfer)}!")
 
             next_state = transfer.error
         else:
-            next_state = transfer.target
+            next_state = transfers.target
 
         if service.state == next_state:
             return
@@ -719,7 +719,7 @@ class LsmProject:
                 validation=transfer.validate_,
             )
 
-    def auto_transfer(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
+    def auto_transfer(self, service_id: uuid.UUID, has_error_occured: bool) -> inmanta_lsm.model.ServiceInstance:
         """
         Mock the logic of an auto transfer.  This can be used to automatically perform validation
         compiles in a given state and do the promote/rollback operations resulting from it, as well
@@ -739,7 +739,12 @@ class LsmProject:
             transfer_type=inmanta_lsm.const.TransferTrigger.AUTO,
         )
 
-        try:
+        if has_error_occured:
+            perform_attribute_operation(service, transfer.error_operation)
+            if transfer.error is not None:
+                self.transfer_to_next_state(service=service, transfer=transfer, is_error_transition=True)
+            raise
+        else:
             LOGGER.info(
                 "Triggering compile on state %s before auto transfer (%s) for service %s (%s)",
                 service.state,
@@ -749,11 +754,6 @@ class LsmProject:
             )
             perform_attribute_operation(service, transfer.target_operation)
             self.transfer_to_next_state(service=service, transfer=transfer, is_error_transition=False)
-        except Exception:
-            perform_attribute_operation(service, transfer.error_operation)
-            if transfer.error is not None:
-                self.transfer_to_next_state(service=service, transfer=transfer, is_error_transition=True)
-            raise
 
         return service
 
@@ -858,13 +858,16 @@ class LsmProject:
                 from_state=service.state,
                 transfer_type=inmanta_lsm.const.TransferTrigger.ON_UPDATE,
             )
-            self.transfer_to_next_state(service=service, transfer=transfer, is_error_transition=False)
         except KeyError:
             raise RuntimeError(f"Service {service.id} can not be updated from state {service.state}")
 
         # Update the candidate attributes and apply all the defaults to them
         service.candidate_attributes = service_entity.add_defaults(attributes)  # type: ignore
-        service.last_updated = datetime.datetime.now()
+        has_error_occurred = False
+        try:
+            self.transfer_to_next_state(service=service, transfer=transfer, is_error_transition=False)
+        except Exception:
+            has_error_occurred = True
 
         if not auto_transfer:
             # Nothing more to do
@@ -874,7 +877,7 @@ class LsmProject:
         # it is required
         while True:
             try:
-                self.auto_transfer(service.id)
+                self.auto_transfer(service.id, has_error_occurred=has_error_occurred)
             except KeyError:
                 # No more auto transfer to follow
                 return service
