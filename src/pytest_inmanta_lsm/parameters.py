@@ -200,7 +200,7 @@ inm_lsm_ctr_pub_key = PathTestParameter(
     is_file=True,
 )
 
-inm_lsm_ctr_license = PathTestParameter(
+inm_lsm_ctr_license = StringTestParameter(
     argument="--lsm-ctr-license-file",
     environment_variable="INMANTA_LSM_CONTAINER_LICENSE_FILE",
     usage="A path to a license file, required by the orchestrator",
@@ -210,7 +210,7 @@ inm_lsm_ctr_license = PathTestParameter(
     is_file=True,
 )
 
-inm_lsm_ctr_entitlement = PathTestParameter(
+inm_lsm_ctr_entitlement = StringTestParameter(
     argument="--lsm-ctr-jwe-file",
     environment_variable="INMANTA_LSM_CONTAINER_JWE_FILE",
     usage="A path to an entitlement file, required by the orchestrator",
