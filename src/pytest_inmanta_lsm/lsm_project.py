@@ -5,6 +5,7 @@
 """
 
 import collections
+import contextlib
 import copy
 import datetime
 import functools
@@ -16,7 +17,6 @@ import re
 import typing
 import uuid
 import warnings
-from contextlib import suppress
 
 import inmanta.config
 import inmanta.protocol.common
@@ -692,14 +692,14 @@ class LsmProject:
 
             next_state = transfer.error
         else:
-            next_state = transfers.target
+            next_state = transfer.target
 
         if service.state == next_state:
             return
 
         # In case of an `AttributeError`, we don't need to do anything: we are dealing with an old orchestrator
         is_preserving_same_desired_state = False
-        with suppress(AttributeError):
+        with contextlib.suppress(AttributeError):
             if is_error_transition:
                 is_preserving_same_desired_state = transfer.error_same_desired_state
             else:
@@ -719,7 +719,7 @@ class LsmProject:
                 validation=transfer.validate_,
             )
 
-    def auto_transfer(self, service_id: uuid.UUID, has_error_occured: bool) -> inmanta_lsm.model.ServiceInstance:
+    def auto_transfer(self, service_id: uuid.UUID, has_error_occurred: bool) -> inmanta_lsm.model.ServiceInstance:
         """
         Mock the logic of an auto transfer.  This can be used to automatically perform validation
         compiles in a given state and do the promote/rollback operations resulting from it, as well
@@ -727,6 +727,7 @@ class LsmProject:
         raise a KeyError.
 
         :param service_id: The id of the service for which we should follow the next auto transfer.
+        :param has_error_occurred: Has an error occurred during the compilation of the current state.
         """
         # Get the service and its service entity definition
         service = self.get_service(service_id)
@@ -739,7 +740,7 @@ class LsmProject:
             transfer_type=inmanta_lsm.const.TransferTrigger.AUTO,
         )
 
-        if has_error_occured:
+        if has_error_occurred:
             perform_attribute_operation(service, transfer.error_operation)
             if transfer.error is not None:
                 self.transfer_to_next_state(service=service, transfer=transfer, is_error_transition=True)
@@ -823,7 +824,7 @@ class LsmProject:
         # it is required
         while True:
             try:
-                self.auto_transfer(service.id)
+                self.auto_transfer(service.id, has_error_occured=False)
             except KeyError:
                 # No more auto transfer to follow
                 return service
