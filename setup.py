@@ -34,6 +34,7 @@ setup(
     packages=["pytest_inmanta_lsm"],
     package_data={
         "pytest_inmanta_lsm": [
+            "resources/docker-compose-http-license.yml",
             "resources/docker-compose-legacy.yml",
             "resources/docker-compose.yml",
             "resources/my-env-file",

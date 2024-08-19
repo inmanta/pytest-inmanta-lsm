@@ -200,24 +200,20 @@ inm_lsm_ctr_pub_key = PathTestParameter(
     is_file=True,
 )
 
-inm_lsm_ctr_license = PathTestParameter(
+inm_lsm_ctr_license = StringTestParameter(
     argument="--lsm-ctr-license-file",
     environment_variable="INMANTA_LSM_CONTAINER_LICENSE_FILE",
     usage="A path to a license file, required by the orchestrator",
-    default=Path("/etc/inmanta/license/com.inmanta.license"),
+    default="/etc/inmanta/license/com.inmanta.license",
     group=param_group,
-    exists=True,
-    is_file=True,
 )
 
-inm_lsm_ctr_entitlement = PathTestParameter(
+inm_lsm_ctr_entitlement = StringTestParameter(
     argument="--lsm-ctr-jwe-file",
     environment_variable="INMANTA_LSM_CONTAINER_JWE_FILE",
     usage="A path to an entitlement file, required by the orchestrator",
-    default=Path("/etc/inmanta/license/com.inmanta.jwe"),
+    default="/etc/inmanta/license/com.inmanta.jwe",
     group=param_group,
-    exists=True,
-    is_file=True,
 )
 
 inm_lsm_ctr_config = PathTestParameter(

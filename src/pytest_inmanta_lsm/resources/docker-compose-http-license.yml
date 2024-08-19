@@ -1,0 +1,23 @@
+version: '3'
+services:
+  postgres:
+    container_name: ${INMANTA_LSM_CONTAINER_DB_HOSTNAME}
+    image: postgres:${INMANTA_LSM_CONTAINER_DB_VERSION}
+    environment:
+      POSTGRES_USER: inmanta
+      POSTGRES_PASSWORD: inmanta
+
+  inmanta-server:
+    image: ${INMANTA_LSM_CONTAINER_ORCHESTRATOR_IMAGE}
+    entrypoint: ["/usr/bin/inmanta"]
+    env_file: ["./my-env-file"]
+    user: inmanta:inmanta
+    environment:
+      INMANTA_DATABASE_HOST: ${INMANTA_LSM_CONTAINER_DB_HOSTNAME}
+      INMANTA_DATABASE_USERNAME: inmanta
+      INMANTA_DATABASE_PASSWORD: inmanta
+      INMANTA_SERVER_BIND_ADDRESS: "0.0.0.0"
+      INMANTA_SERVER_BIND_PORT: 8888
+      INMANTA_LICENSE_ENTITLEMENT_FILE: ${INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE}
+      INMANTA_LICENSE_LICENSE_KEY: ${INMANTA_LSM_CONTAINER_LICENSE_FILE}
+    command: "--log-file /var/log/inmanta/server.log --log-file-level DEBUG --timed-logs server --db-wait-time 10"

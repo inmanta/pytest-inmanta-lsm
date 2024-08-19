@@ -99,8 +99,8 @@ class OrchestratorContainer:
         orchestrator_image: str,
         postgres_version: str,
         public_key_file: Path,
-        license_file: Path,
-        entitlement_file: Path,
+        license_file: str,
+        entitlement_file: str,
         config_file: Path,
         env_file: Path,
     ) -> None:
