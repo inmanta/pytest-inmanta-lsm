@@ -691,15 +691,28 @@ class LsmProject:
             transfer_type=inmanta_lsm.const.TransferTrigger.AUTO,
         )
 
-        def next_state(state: str) -> None:
+        def next_state(state: str, is_error_transition: bool = False) -> None:
             """
             Apply this state to our service, if it is different from the current
             state, also increment the version
 
             :param state: The new state to apply
+            :param is_error_transition: Is it an error transition?
             """
             if service.state == state:
                 return
+
+            try:
+                if is_error_transition:
+                    is_preserving_same_desired_state = transfer.error_same_desired_state
+                else:
+                    is_preserving_same_desired_state = transfer.target_same_desired_state
+
+                if not is_preserving_same_desired_state:
+                    service.desired_state_version += 1
+            except AttributeError:
+                # We don't need to do anything: we are dealing with an old orchestrator
+                pass
 
             service.last_updated = datetime.datetime.now()
             service.version += 1
@@ -719,11 +732,11 @@ class LsmProject:
                 validation=transfer.validate_,
             )
             perform_attribute_operation(service, transfer.target_operation)
-            next_state(transfer.target)
+            next_state(state=transfer.target)
         except Exception:
             perform_attribute_operation(service, transfer.error_operation)
             if transfer.error is not None:
-                next_state(transfer.error)
+                next_state(state=transfer.error, is_error_transition=True)
             raise
 
         return service
@@ -923,8 +936,7 @@ class LsmProject:
         for service_id in service_ids.split(" "):
             service = self.get_service(service_id)
 
-        env: dict[str, str] = {}
-        env[inmanta_lsm.const.ENV_INSTANCE_ID] = service_ids
+        env: dict[str, str] = {inmanta_lsm.const.ENV_INSTANCE_ID: service_ids}
 
         if validation:
             if len(service_ids.split(" ")) != 1:
