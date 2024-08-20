@@ -1,4 +1,4 @@
-# v 3.8.0 (?)
+# v 3.8.0 (2024-08-20)
 Changes in this release:
 - Add support for loading license/entitlement file from http url.
 
