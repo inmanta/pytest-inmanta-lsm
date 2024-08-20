@@ -137,6 +137,7 @@ def remote_orchestrator_container(
 
     orchestrator_image = inm_lsm_ctr_image.resolve(request.config)
     latest_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose.yml"
+    latest_compose_file_with_http_license = pathlib.Path(__file__).parent / "resources/docker-compose-http-license.yml"
     legacy_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose-legacy.yml"
     try:
         compose_file = inm_lsm_ctr_compose.resolve(request.config)
@@ -170,14 +171,24 @@ def remote_orchestrator_container(
             # legacy docker-compose file which relies on the entrypoint to wait for the db
             compose_file = legacy_compose_file
 
+    # Resolve the license file paths
+    license_file = inm_lsm_ctr_license.resolve(request.config)
+    entitlement_file = inm_lsm_ctr_entitlement.resolve(request.config)
+
+    if compose_file == latest_compose_file and license_file.startswith("http") and entitlement_file.startswith("http"):
+        # If we have the latest compose file and the path to the license files are http urls
+        # Then we should use the compose file which doesn't mount any license inside
+        # the server container
+        compose_file = latest_compose_file_with_http_license
+
     LOGGER.debug("Deploying an orchestrator using docker")
     with OrchestratorContainer(
         compose_file=compose_file,
         orchestrator_image=orchestrator_image,
         postgres_version=inm_lsm_ctr_db_version.resolve(request.config),
         public_key_file=inm_lsm_ctr_pub_key.resolve(request.config),
-        license_file=inm_lsm_ctr_license.resolve(request.config),
-        entitlement_file=inm_lsm_ctr_entitlement.resolve(request.config),
+        license_file=license_file,
+        entitlement_file=entitlement_file,
         config_file=inm_lsm_ctr_config.resolve(request.config),
         env_file=inm_lsm_ctr_env.resolve(request.config),
     ) as orchestrator:

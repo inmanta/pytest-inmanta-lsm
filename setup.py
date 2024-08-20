@@ -21,7 +21,7 @@ def read(fname):
 
 setup(
     name="pytest-inmanta-lsm",
-    version="3.7.0",
+    version="3.8.0",
     python_requires=">=3.6",  # also update classifiers
     author="Inmanta",
     author_email="code@inmanta.com",
@@ -34,6 +34,7 @@ setup(
     packages=["pytest_inmanta_lsm"],
     package_data={
         "pytest_inmanta_lsm": [
+            "resources/docker-compose-http-license.yml",
             "resources/docker-compose-legacy.yml",
             "resources/docker-compose.yml",
             "resources/my-env-file",
@@ -43,7 +44,7 @@ setup(
         ]
     },
     include_package_data=True,
-    install_requires=["pytest-inmanta~=2.5", "inmanta-lsm", "devtools"],
+    install_requires=["pytest-inmanta>=2.5,<4.0", "inmanta-lsm", "devtools"],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Framework :: Pytest",
