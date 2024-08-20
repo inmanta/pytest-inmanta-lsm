@@ -824,7 +824,7 @@ class LsmProject:
         # it is required
         while True:
             try:
-                self.auto_transfer(service.id, has_error_occured=False)
+                self.auto_transfer(service.id, has_error_occurred=False)
             except KeyError:
                 # No more auto transfer to follow
                 return service
