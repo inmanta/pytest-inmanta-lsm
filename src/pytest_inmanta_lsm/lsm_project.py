@@ -706,7 +706,9 @@ class LsmProject:
             service.version += 1
 
             try:
-                is_preserving_same_desired_state = transfer.error_same_desired_state if is_error_transition else transfer.target_same_desired_state
+                is_preserving_same_desired_state = (
+                    transfer.error_same_desired_state if is_error_transition else transfer.target_same_desired_state
+                )
                 if not is_preserving_same_desired_state:
                     service.desired_state_version += 1
             except AttributeError:
