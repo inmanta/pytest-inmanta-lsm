@@ -1,6 +1,7 @@
 # v 3.9.0 (?)
 Changes in this release:
 - Extends the mocking mechanism to support the LSM Transfer Optimization feature
+- Allow iso 7-dev containers to be deployed with latest docker-compose file.
 
 # v 3.8.0 (2024-08-20)
 Changes in this release:
