@@ -6,6 +6,12 @@ services:
     environment:
       POSTGRES_USER: inmanta
       POSTGRES_PASSWORD: inmanta
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inmanta"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
 
   inmanta-server:
     image: ${INMANTA_LSM_CONTAINER_ORCHESTRATOR_IMAGE}
@@ -20,7 +26,14 @@ services:
       INMANTA_SERVER_BIND_PORT: 8888
       INMANTA_LICENSE_ENTITLEMENT_FILE: /etc/inmanta/license/com.inmanta.jwe
       INMANTA_LICENSE_LICENSE_KEY: /etc/inmanta/license/com.inmanta.license
+    healthcheck:
+      test: ["CMD-SHELL", "curl http://127.0.0.1:8888/api/v1/serverstatus"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
     volumes:
       - ${INMANTA_LSM_CONTAINER_LICENSE_FILE}:/etc/inmanta/license/com.inmanta.license
       - ${INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE}:/etc/inmanta/license/com.inmanta.jwe
+    init: true
     command: "--log-file /var/log/inmanta/server.log --log-file-level DEBUG --timed-logs server --db-wait-time 10"
