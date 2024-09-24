@@ -1,5 +1,6 @@
 # v 3.9.0 (?)
 Changes in this release:
+- Allow to use relative path for container env file
 - Extends the mocking mechanism to support the LSM Transfer Optimization feature
 - Allow iso 7-dev containers to be deployed with latest docker-compose file.
 - Add init process and healthcheck to orchestrator containers started by pytest-inmanta-lsm
