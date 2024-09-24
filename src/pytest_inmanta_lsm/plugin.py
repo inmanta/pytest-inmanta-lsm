@@ -6,6 +6,7 @@
     :license: Inmanta EULA
 """
 
+import contextlib
 import logging
 import os
 import pathlib
@@ -84,6 +85,20 @@ LOGGER = logging.getLogger(__name__)
 
 # https://docs.pytest.org/en/latest/example/simple.html#making-test-result-information-available-in-fixtures
 phase_report_key = pytest.StashKey[dict[str, pytest.CollectReport]]()
+
+
+@contextlib.contextmanager
+def working_dir(path: str):
+    """
+    Helper to be able to temporarily change the working directory
+    """
+    # https://stackoverflow.com/questions/75048986/way-to-temporarily-change-the-directory-in-python-to-execute-code-without-affect
+    d = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(d)
 
 
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)
@@ -182,6 +197,12 @@ def remote_orchestrator_container(
         compose_file = latest_compose_file_with_http_license
 
     LOGGER.debug("Deploying an orchestrator using docker")
+    container_env_file = None
+
+    with working_dir(pytest_inmanta.plugin.CURDIR):
+        container_env_file = inm_lsm_ctr_env.resolve(request.config)
+        breakpoint()
+
     with OrchestratorContainer(
         compose_file=compose_file,
         orchestrator_image=orchestrator_image,
@@ -190,7 +211,7 @@ def remote_orchestrator_container(
         license_file=license_file,
         entitlement_file=entitlement_file,
         config_file=inm_lsm_ctr_config.resolve(request.config),
-        env_file=inm_lsm_ctr_env.resolve(request.config),
+        env_file=container_env_file,
     ) as orchestrator:
         LOGGER.debug(f"Deployed an orchestrator reachable at {orchestrator.orchestrator_ips} (cwd={orchestrator._cwd})")
         yield orchestrator
