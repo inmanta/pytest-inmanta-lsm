@@ -236,20 +236,20 @@ class OrchestratorContainer:
 
     def _up(self) -> None:
         # Pull container images
-        cmd = [*self.docker_compose(), f"--file={self.compose_file.name}", "--verbose", "pull"]
+        cmd = [*self.docker_compose, f"--file={self.compose_file.name}", "--verbose", "pull"]
         run_cmd(cmd=cmd, cwd=self.cwd)
         # Starting the lab
-        cmd = [*self.docker_compose(), f"--file={self.compose_file.name}", "--verbose", "up", "-d"]
+        cmd = [*self.docker_compose, f"--file={self.compose_file.name}", "--verbose", "up", "-d"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
         # Getting the containers ids
-        cmd = [*self.docker_compose(), f"--file={self.compose_file.name}", "--verbose", "ps", "-q"]
+        cmd = [*self.docker_compose, f"--file={self.compose_file.name}", "--verbose", "ps", "-q"]
         stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
         self._containers = stdout.strip("\n").split("\n")
 
     def _down(self) -> None:
         # Stopping the lab
-        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "down", "-v"]
+        cmd = [*self.docker_compose, f"--file={self.compose_file.name}", "--verbose", "down", "-v"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
     def __enter__(self) -> "OrchestratorContainer":
@@ -273,7 +273,7 @@ class OrchestratorContainer:
         if exc_type == DoNotCleanOrchestratorContainer:
             LOGGER.info(
                 "The orchestrator won't be cleaned up, do it manually once you are done with it.  "
-                f"`cd {self._cwd} && docker-compose down -v`"
+                f"`cd {self._cwd} && {' '.join(self.docker_compose)} down -v`"
             )
             return True
 
