@@ -384,7 +384,7 @@ def remote_orchestrator_access(
     )
 
     # Make sure the remote orchestrator is running
-    for _ in range(0, 10):
+    for _ in range(0, 20):
         try:
             # Try to get the status of the server, use the session object to set
             # a custom timeout

@@ -44,8 +44,6 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
             env=env_vars,
         )
     except FileNotFoundError as e:
-        if e.filename == "docker-compose":
-            raise FileNotFoundError("The `docker-compose` command is not found. You need it to have a local orchestrator.")
         raise e
 
     LOGGER.debug(f"Return code: {result.returncode}")
@@ -221,16 +219,31 @@ class OrchestratorContainer:
     def orchestrator_port(self) -> int:
         return int(self.config.get("server", "bind-port", vars={"fallback": "8888"}))
 
+    @property
+    def docker_compose(self) -> list[str]:
+        try:
+            run_cmd(cmd=["docker-compose", "--help"])
+            return ["docker-compose"]
+        except FileNotFoundError:
+            try:
+                run_cmd(cmd=["docker", "compose", "--help"])
+                return ["docker", "compose"]
+            except FileNotFoundError:
+                raise FileNotFoundError(
+                    "The `docker-compose` and `docker compose` commands were not found. "
+                    "You need one of them to have a local orchestrator."
+                )
+
     def _up(self) -> None:
         # Pull container images
-        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "pull"]
+        cmd = [*self.docker_compose(), f"--file={self.compose_file.name}", "--verbose", "pull"]
         run_cmd(cmd=cmd, cwd=self.cwd)
         # Starting the lab
-        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "up", "-d"]
+        cmd = [*self.docker_compose(), f"--file={self.compose_file.name}", "--verbose", "up", "-d"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
         # Getting the containers ids
-        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "ps", "-q"]
+        cmd = [*self.docker_compose(), f"--file={self.compose_file.name}", "--verbose", "ps", "-q"]
         stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
         self._containers = stdout.strip("\n").split("\n")
 
