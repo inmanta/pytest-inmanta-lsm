@@ -222,11 +222,11 @@ class OrchestratorContainer:
     @property
     def docker_compose(self) -> list[str]:
         try:
-            run_cmd(cmd=["docker-compose", "--help"], cwd=self.cwd)
+            subprocess.run(args=["docker-compose", "--help"])
             return ["docker-compose"]
         except FileNotFoundError:
             try:
-                run_cmd(cmd=["docker", "compose", "--help"], cwd=self.cwd)
+                subprocess.run(args=["docker-compose", "--help"])
                 return ["docker", "compose"]
             except FileNotFoundError:
                 raise FileNotFoundError(
