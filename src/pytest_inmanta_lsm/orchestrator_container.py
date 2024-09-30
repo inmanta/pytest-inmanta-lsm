@@ -23,6 +23,8 @@ from inmanta.config import LenientConfigParser
 
 LOGGER = logging.getLogger(__name__)
 
+DOCKER_COMPOSE_COMMAND = None
+
 
 def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     """
@@ -32,19 +34,16 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     LOGGER.info(f"Running command: {cmd}")
     env_vars = dict(os.environ)
     env_vars.pop("PYTHONPATH", None)
-    try:
-        result = subprocess.run(
-            args=cmd,
-            cwd=str(cwd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            encoding="utf-8",
-            text=True,
-            universal_newlines=True,
-            env=env_vars,
-        )
-    except FileNotFoundError as e:
-        raise e
+    result = subprocess.run(
+        args=cmd,
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        text=True,
+        universal_newlines=True,
+        env=env_vars,
+    )
 
     LOGGER.debug(f"Return code: {result.returncode}")
     LOGGER.debug("Stdout: %s", result.stdout)
@@ -221,18 +220,21 @@ class OrchestratorContainer:
 
     @property
     def docker_compose(self) -> list[str]:
-        try:
-            subprocess.run(args=["docker-compose", "--help"])
-            return ["docker-compose"]
-        except FileNotFoundError:
+        global DOCKER_COMPOSE_COMMAND
+        if DOCKER_COMPOSE_COMMAND is None:
             try:
-                subprocess.run(args=["docker", "compose", "--help"])
-                return ["docker", "compose"]
+                subprocess.run(args=["docker-compose", "version"])
+                DOCKER_COMPOSE_COMMAND = ["docker-compose"]
             except FileNotFoundError:
-                raise FileNotFoundError(
-                    "The `docker-compose` and `docker compose` commands were not found. "
-                    "You need one of them to have a local orchestrator."
-                )
+                try:
+                    subprocess.run(args=["docker", "compose", "version"])
+                    DOCKER_COMPOSE_COMMAND = ["docker", "compose"]
+                except FileNotFoundError:
+                    raise FileNotFoundError(
+                        "The `docker-compose` and `docker compose` commands were not found. "
+                        "You need one of them to have a local orchestrator."
+                    )
+        return DOCKER_COMPOSE_COMMAND
 
     def _up(self) -> None:
         # Pull container images
