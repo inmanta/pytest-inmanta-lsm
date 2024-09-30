@@ -226,7 +226,7 @@ class OrchestratorContainer:
             return ["docker-compose"]
         except FileNotFoundError:
             try:
-                subprocess.run(args=["docker-compose", "--help"])
+                subprocess.run(args=["docker", "compose", "--help"])
                 return ["docker", "compose"]
             except FileNotFoundError:
                 raise FileNotFoundError(
