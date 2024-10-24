@@ -262,11 +262,18 @@ class RemoteOrchestrator:
         # Save the version of the remote orchestrator server
         self._server_version: typing.Optional[Version] = None
 
+        cmd = "if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
+
+        use_new_disk_layout: bool = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip() == "True"
+
         # The path on the remote orchestrator where the project will be synced
-        self.remote_project_path = pathlib.Path(
-            "/var/lib/inmanta/server/environments/",
-            str(self.environment),
-        )
+        if use_new_disk_layout:
+            self.remote_project_path = pathlib.Path("/var/lib/inmanta/server/", str(self.environment), "/compiler")
+        else:
+            self.remote_project_path = pathlib.Path(
+                "/var/lib/inmanta/server/environments/",
+                str(self.environment),
+            )
         self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
 
     @property
