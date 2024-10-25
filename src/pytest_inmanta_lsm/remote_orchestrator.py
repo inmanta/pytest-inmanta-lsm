@@ -268,7 +268,7 @@ class RemoteOrchestrator:
 
         ls_cmd = "ls -la /var/lib/inmanta"
         ls_result = self.run_command([ls_cmd], shell=True, user=None, stderr=subprocess.PIPE).strip()
-        LOGGER.debug(ls_result)
+        LOGGER.info("LS /var/lib/inmanta: %s", ls_result)
         # The path on the remote orchestrator where the project will be synced
         if use_new_disk_layout:
             self.remote_project_path = pathlib.Path("/var/lib/inmanta/server/", str(self.environment), "/compiler")
