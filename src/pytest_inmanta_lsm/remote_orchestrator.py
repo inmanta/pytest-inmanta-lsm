@@ -263,36 +263,11 @@ class RemoteOrchestrator:
         # Save the version of the remote orchestrator server
         self._server_version: typing.Optional[Version] = None
 
-        cmd = "if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
+        # The path to the remote project is set once
+        # the orchestrator is up and running by calling sync_remote_project_path()
+        self.remote_project_path: typing.Optional[str] = None
+        self.remote_project_cache_path: typing.Optional[str] = None
 
-        use_new_disk_layout: bool = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip() == "True"
-
-        ls_cmd = "ls -la /var/lib/inmanta"
-        whoami_cmd =  "whoami"
-        pwd_cmd =  "pwd"
-        test_file_exists_cmd="if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
-
-        # cmds = [
-        #     ls_cmd,
-        #     whoami_cmd,
-        #     pwd_cmd,
-        #     test_file_exists_cmd,
-        # ]
-        # for cmd in cmds:
-        #     rst = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip()
-        #     LOGGER.info("Running cmd %s: %s", cmd, rst)
-
-        # The path on the remote orchestrator where the project will be synced
-        if use_new_disk_layout:
-            self.remote_project_path = pathlib.Path("/var/lib/inmanta/server/", str(self.environment), "/compiler")
-            LOGGER.info("Orchestrator is using new disk layout. Expecting project at %s.", self.remote_project_path)
-        else:
-            self.remote_project_path = pathlib.Path(
-                "/var/lib/inmanta/server/environments/",
-                str(self.environment),
-            )
-            LOGGER.info("Orchestrator is using old disk layout. Expecting project at %s.", self.remote_project_path)
-        self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
 
     @property
     def local_project(self) -> inmanta.module.Project:
@@ -309,21 +284,25 @@ class RemoteOrchestrator:
 
         return project
 
-    def call_cmds_once_configured(self):
-        ls_cmd = "ls -la /var/lib/inmanta"
-        whoami_cmd = "whoami"
-        pwd_cmd = "pwd"
-        test_file_exists_cmd = "if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
+    def sync_remote_project_path(self):
+        """
+        Determine where the local project should be synced in the remote orchestrator.
+        This path depends on the on-disk layout of the remote orchestrator.
+        """
+        cmd = "if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
+        use_new_disk_layout: bool = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip() == "True"
 
-        cmds = [
-            ls_cmd,
-            whoami_cmd,
-            pwd_cmd,
-            test_file_exists_cmd,
-        ]
-        for cmd in cmds:
-            rst = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip()
-            LOGGER.info("Running cmd %s: %s", cmd, rst)
+        # The path on the remote orchestrator where the project will be synced
+        if use_new_disk_layout:
+            self.remote_project_path = pathlib.Path("/var/lib/inmanta/server/", str(self.environment), "/compiler")
+            LOGGER.info("Orchestrator is using new disk layout. Expecting project at %s.", self.remote_project_path)
+        else:
+            self.remote_project_path = pathlib.Path(
+                "/var/lib/inmanta/server/environments/",
+                str(self.environment),
+            )
+            LOGGER.info("Orchestrator is using old disk layout. Expecting project at %s.", self.remote_project_path)
+        self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
 
     def setup_config(self) -> None:
         """
