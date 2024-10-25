@@ -398,7 +398,7 @@ def remote_orchestrator_access(
 
     # Configure the environment on the remote orchestrator
     remote_orchestrator.orchestrator_environment.configure_environment(remote_orchestrator.client)
-
+    remote_orchestrator.call_cmds_once_configured()
     return remote_orchestrator
 
 

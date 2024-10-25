@@ -74,6 +74,7 @@ class OrchestratorEnvironment:
         # The environment should now exist
         assert result.code in range(200, 300), str(result.result)
         assert result.result is not None
+        LOGGER.info('getting environment... %s', str(result.result["data"]))
         return inmanta.data.model.Environment(**result.result["data"])
 
     def get_project(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
@@ -269,15 +270,17 @@ class RemoteOrchestrator:
         ls_cmd = "ls -la /var/lib/inmanta"
         whoami_cmd =  "whoami"
         pwd_cmd =  "pwd"
+        test_file_exists_cmd="if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
 
-        cmds = [
-            ls_cmd,
-            whoami_cmd,
-            pwd_cmd,
-        ]
-        for cmd in cmds:
-            rst = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip()
-            LOGGER.info("Running cmd %s: %s", cmd, rst)
+        # cmds = [
+        #     ls_cmd,
+        #     whoami_cmd,
+        #     pwd_cmd,
+        #     test_file_exists_cmd,
+        # ]
+        # for cmd in cmds:
+        #     rst = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip()
+        #     LOGGER.info("Running cmd %s: %s", cmd, rst)
 
         # The path on the remote orchestrator where the project will be synced
         if use_new_disk_layout:
@@ -305,6 +308,22 @@ class RemoteOrchestrator:
             )
 
         return project
+
+    def call_cmds_once_configured(self):
+        ls_cmd = "ls -la /var/lib/inmanta"
+        whoami_cmd = "whoami"
+        pwd_cmd = "pwd"
+        test_file_exists_cmd = "if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
+
+        cmds = [
+            ls_cmd,
+            whoami_cmd,
+            pwd_cmd,
+            test_file_exists_cmd,
+        ]
+        for cmd in cmds:
+            rst = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip()
+            LOGGER.info("Running cmd %s: %s", cmd, rst)
 
     def setup_config(self) -> None:
         """
