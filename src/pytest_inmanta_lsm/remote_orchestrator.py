@@ -269,11 +269,13 @@ class RemoteOrchestrator:
         # The path on the remote orchestrator where the project will be synced
         if use_new_disk_layout:
             self.remote_project_path = pathlib.Path("/var/lib/inmanta/server/", str(self.environment), "/compiler")
+            LOGGER.info("Orchestrator is using new disk layout. Expecting project at %s.", self.remote_project_path)
         else:
             self.remote_project_path = pathlib.Path(
                 "/var/lib/inmanta/server/environments/",
                 str(self.environment),
             )
+            LOGGER.info("Orchestrator is using old disk layout. Expecting project at %s.", self.remote_project_path)
         self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
 
     @property
