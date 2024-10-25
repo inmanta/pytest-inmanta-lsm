@@ -74,7 +74,6 @@ class OrchestratorEnvironment:
         # The environment should now exist
         assert result.code in range(200, 300), str(result.result)
         assert result.result is not None
-        LOGGER.info('getting environment... %s', str(result.result["data"]))
         return inmanta.data.model.Environment(**result.result["data"])
 
     def get_project(self, client: inmanta.protocol.endpoints.SyncClient) -> inmanta.data.model.Project:
@@ -263,8 +262,9 @@ class RemoteOrchestrator:
         # Save the version of the remote orchestrator server
         self._server_version: typing.Optional[Version] = None
 
-        # The path to the remote project is set once
-        # the orchestrator is up and running by calling sync_remote_project_path()
+        # The path on the remote orchestrator where the project will be synced.
+        # This path is determined once the orchestrator
+        # is up and running by calling sync_remote_project_path()
         self.remote_project_path: typing.Optional[str] = None
         self.remote_project_cache_path: typing.Optional[str] = None
 
@@ -286,13 +286,12 @@ class RemoteOrchestrator:
 
     def sync_remote_project_path(self):
         """
-        Determine where the local project should be synced in the remote orchestrator.
+        Determine where the local project should be synced on the remote orchestrator.
         This path depends on the on-disk layout of the remote orchestrator.
         """
         cmd = "if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
         use_new_disk_layout: bool = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip() == "True"
 
-        # The path on the remote orchestrator where the project will be synced
         if use_new_disk_layout:
             self.remote_project_path = pathlib.Path("/var/lib/inmanta/server/", str(self.environment), "compiler")
             LOGGER.info("Orchestrator is using new disk layout. Expecting project at %s.", self.remote_project_path)
