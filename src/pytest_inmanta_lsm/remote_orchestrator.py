@@ -268,7 +268,6 @@ class RemoteOrchestrator:
         self.remote_project_path: typing.Optional[str] = None
         self.remote_project_cache_path: typing.Optional[str] = None
 
-
     @property
     def local_project(self) -> inmanta.module.Project:
         """
@@ -294,13 +293,11 @@ class RemoteOrchestrator:
 
         if use_new_disk_layout:
             self.remote_project_path = pathlib.Path("/var/lib/inmanta/server/", str(self.environment), "compiler")
-            LOGGER.info("Orchestrator is using new disk layout. Expecting project at %s.", self.remote_project_path)
         else:
             self.remote_project_path = pathlib.Path(
                 "/var/lib/inmanta/server/environments/",
                 str(self.environment),
             )
-            LOGGER.info("Orchestrator is using old disk layout. Expecting project at %s.", self.remote_project_path)
         self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
 
     def setup_config(self) -> None:
