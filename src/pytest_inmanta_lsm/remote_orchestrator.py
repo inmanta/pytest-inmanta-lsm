@@ -465,7 +465,6 @@ class RemoteOrchestrator:
         This path depends on the on-disk layout of the remote orchestrator.
         """
         if self._remote_project_path is None:
-
             cmd = "if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
             use_new_disk_layout: bool = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip() == "True"
 
