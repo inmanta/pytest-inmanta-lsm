@@ -395,7 +395,6 @@ def remote_orchestrator_access(
             time.sleep(1)
     else:
         raise RuntimeError(f"Couldn't reach the orchestrator at {host}:{port}")
-    remote_orchestrator.sync_remote_project_path()
 
     # Configure the environment on the remote orchestrator
     remote_orchestrator.orchestrator_environment.configure_environment(remote_orchestrator.client)
