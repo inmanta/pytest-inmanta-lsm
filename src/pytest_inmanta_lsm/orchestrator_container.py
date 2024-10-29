@@ -143,7 +143,7 @@ class OrchestratorContainer:
         # Make sure our compose topology is named docker-compose.yml, this makes the cleanup
         # a lot easier if anyone comes across the folder
         if self.compose_file.name != "docker-compose.yml":
-            self.compose_file = self.compose_file.replace(self.compose_file.with_name("docker-compose.yml"))
+            (self._cwd / self.compose_file.name).replace(self._cwd / "docker-compose.yml")
 
         shutil.copy(str(self.config_file), str(self._cwd / "my-server-conf.cfg"))
         shutil.copy(str(self.env_file), str(self._cwd / "my-env-file"))
