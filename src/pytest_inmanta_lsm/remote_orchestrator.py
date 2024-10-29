@@ -262,12 +262,10 @@ class RemoteOrchestrator:
         # Save the version of the remote orchestrator server
         self._server_version: typing.Optional[Version] = None
 
-        # The path on the remote orchestrator where the project will be synced
-        self.remote_project_path = pathlib.Path(
-            "/var/lib/inmanta/server/environments/",
-            str(self.environment),
-        )
-        self.remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
+        # Cached value of the path to the project on the remote orchestrator
+        self._remote_project_path: typing.Optional[pathlib.Path] = None
+        # Cached value of the path to the project's cache on the remote orchestrator
+        self._remote_project_cache_path: typing.Optional[pathlib.Path] = None
 
     @property
     def local_project(self) -> inmanta.module.Project:
@@ -459,6 +457,36 @@ class RemoteOrchestrator:
             self._whoami = self.run_command(["whoami"], user=None, stderr=subprocess.PIPE).strip()
             LOGGER.debug("Remote user at %s (accessed via %s) is %s", self.remote_host, self.remote_shell, repr(self._whoami))
         return self._whoami
+
+    @property
+    def remote_project_path(self) -> pathlib.Path:
+        """
+        Path on the remote orchestrator where the local project should be synced to.
+        This path depends on the on-disk layout of the remote orchestrator.
+        """
+        if self._remote_project_path is None:
+            cmd = "if test -f /var/lib/inmanta/.inmanta_use_new_disk_layout ; then echo True ; fi"
+            use_new_disk_layout: bool = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip() == "True"
+
+            if use_new_disk_layout:
+                self._remote_project_path = pathlib.Path("/var/lib/inmanta/server/", str(self.environment), "compiler")
+            else:
+                self._remote_project_path = pathlib.Path(
+                    "/var/lib/inmanta/server/environments/",
+                    str(self.environment),
+                )
+
+        return self._remote_project_path
+
+    @property
+    def remote_project_cache_path(self) -> pathlib.Path:
+        """
+        Path on the remote orchestrator where the project's cache will live.
+        """
+        if self._remote_project_cache_path is None:
+            self._remote_project_cache_path = self.remote_project_path.with_name(self.remote_project_path.name + "_cache")
+
+        return self._remote_project_cache_path
 
     def run_command(
         self,

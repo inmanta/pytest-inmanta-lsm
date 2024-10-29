@@ -23,6 +23,8 @@ from inmanta.config import LenientConfigParser
 
 LOGGER = logging.getLogger(__name__)
 
+DOCKER_COMPOSE_COMMAND = None
+
 
 def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     """
@@ -32,21 +34,16 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     LOGGER.info(f"Running command: {cmd}")
     env_vars = dict(os.environ)
     env_vars.pop("PYTHONPATH", None)
-    try:
-        result = subprocess.run(
-            args=cmd,
-            cwd=str(cwd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            encoding="utf-8",
-            text=True,
-            universal_newlines=True,
-            env=env_vars,
-        )
-    except FileNotFoundError as e:
-        if e.filename == "docker-compose":
-            raise FileNotFoundError("The `docker-compose` command is not found. You need it to have a local orchestrator.")
-        raise e
+    result = subprocess.run(
+        args=cmd,
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        text=True,
+        universal_newlines=True,
+        env=env_vars,
+    )
 
     LOGGER.debug(f"Return code: {result.returncode}")
     LOGGER.debug("Stdout: %s", result.stdout)
@@ -143,6 +140,11 @@ class OrchestratorContainer:
         docker_compose_dir = self.compose_file.parent
         shutil.copytree(str(docker_compose_dir), str(self._cwd), dirs_exist_ok=True)
 
+        # Make sure our compose topology is named docker-compose.yml, this makes the cleanup
+        # a lot easier if anyone comes across the folder
+        if self.compose_file.name != "docker-compose.yml":
+            (self._cwd / self.compose_file.name).replace(self._cwd / "docker-compose.yml")
+
         shutil.copy(str(self.config_file), str(self._cwd / "my-server-conf.cfg"))
         shutil.copy(str(self.env_file), str(self._cwd / "my-env-file"))
 
@@ -221,22 +223,40 @@ class OrchestratorContainer:
     def orchestrator_port(self) -> int:
         return int(self.config.get("server", "bind-port", vars={"fallback": "8888"}))
 
+    @property
+    def docker_compose(self) -> list[str]:
+        global DOCKER_COMPOSE_COMMAND
+        if DOCKER_COMPOSE_COMMAND is None:
+            try:
+                subprocess.run(args=["docker-compose", "version"])
+                DOCKER_COMPOSE_COMMAND = ["docker-compose"]
+            except FileNotFoundError:
+                try:
+                    subprocess.run(args=["docker", "compose", "version"])
+                    DOCKER_COMPOSE_COMMAND = ["docker", "compose"]
+                except FileNotFoundError:
+                    raise FileNotFoundError(
+                        "The `docker-compose` and `docker compose` commands were not found. "
+                        "You need one of them to have a local orchestrator."
+                    )
+        return DOCKER_COMPOSE_COMMAND
+
     def _up(self) -> None:
         # Pull container images
-        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "pull"]
+        cmd = [*self.docker_compose, "--verbose", "pull"]
         run_cmd(cmd=cmd, cwd=self.cwd)
         # Starting the lab
-        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "up", "-d"]
+        cmd = [*self.docker_compose, "--verbose", "up", "-d"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
         # Getting the containers ids
-        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "ps", "-q"]
+        cmd = [*self.docker_compose, "--verbose", "ps", "-q"]
         stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
         self._containers = stdout.strip("\n").split("\n")
 
     def _down(self) -> None:
         # Stopping the lab
-        cmd = ["docker-compose", f"--file={self.compose_file.name}", "--verbose", "down", "-v"]
+        cmd = [*self.docker_compose, "--verbose", "down", "-v"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
     def __enter__(self) -> "OrchestratorContainer":
@@ -260,7 +280,7 @@ class OrchestratorContainer:
         if exc_type == DoNotCleanOrchestratorContainer:
             LOGGER.info(
                 "The orchestrator won't be cleaned up, do it manually once you are done with it.  "
-                f"`cd {self._cwd} && docker-compose down -v`"
+                f"`cd {self._cwd} && {' '.join(self.docker_compose)} down -v`"
             )
             return True
 

@@ -159,7 +159,7 @@ def remote_orchestrator_container(
                 str(legacy_compose_file),
             )
             compose_file = legacy_compose_file
-        elif iso_major_version_match.group("tag") in ["dev", "dev-ng"]:
+        elif iso_major_version_match.group("tag") in ["7-dev", "dev", "dev-ng"]:
             # Latest dev, use the the latest compose file, this is always safe because we don't distribute this externally
             compose_file = latest_compose_file
         elif version.Version(iso_major_version_match.group("version")) >= version.Version("7.1"):
@@ -398,7 +398,6 @@ def remote_orchestrator_access(
 
     # Configure the environment on the remote orchestrator
     remote_orchestrator.orchestrator_environment.configure_environment(remote_orchestrator.client)
-
     return remote_orchestrator
 
 

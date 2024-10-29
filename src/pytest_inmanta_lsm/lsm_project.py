@@ -691,18 +691,30 @@ class LsmProject:
             transfer_type=inmanta_lsm.const.TransferTrigger.AUTO,
         )
 
-        def next_state(state: str) -> None:
+        def next_state(state: str, is_error_transition: bool = False) -> None:
             """
             Apply this state to our service, if it is different from the current
             state, also increment the version
 
             :param state: The new state to apply
+            :param is_error_transition: Is it an error transition?
             """
             if service.state == state:
                 return
 
             service.last_updated = datetime.datetime.now()
             service.version += 1
+
+            try:
+                is_preserving_same_desired_state = (
+                    transfer.error_same_desired_state if is_error_transition else transfer.target_same_desired_state
+                )
+                if not is_preserving_same_desired_state:
+                    service.desired_state_version += 1
+            except AttributeError:
+                # We don't need to do anything: we are dealing with an old orchestrator
+                pass
+
             service.state = state
 
         try:
@@ -714,16 +726,19 @@ class LsmProject:
                 service.id,
                 service.service_entity,
             )
+            # Normally we should be able to skip compiles if desired state is preserved across some transfers. However, as
+            # Resource Based transfers are not supported here, we cannot skip compilation for states preserving the desired
+            # state
             self.compile(
                 service_id=service.id,
                 validation=transfer.validate_,
             )
             perform_attribute_operation(service, transfer.target_operation)
-            next_state(transfer.target)
+            next_state(state=transfer.target)
         except Exception:
             perform_attribute_operation(service, transfer.error_operation)
             if transfer.error is not None:
-                next_state(transfer.error)
+                next_state(state=transfer.error, is_error_transition=True)
             raise
 
         return service
@@ -756,23 +771,32 @@ class LsmProject:
         service_entity = self.get_service_entity(service_entity_name)
 
         # Create the service instance object
-        service = inmanta_lsm.model.ServiceInstance(
-            id=service_id or uuid.uuid4(),
-            environment=uuid.UUID(self.environment),
-            service_entity=service_entity_name,
-            version=1,
-            config={},
-            state=service_entity.lifecycle.initial_state,
-            candidate_attributes=service_entity.add_defaults(attributes),  # type: ignore
-            active_attributes=None,
-            rollback_attributes=None,
-            created_at=datetime.datetime.now(),
-            last_updated=datetime.datetime.now(),
-            callback=[],
-            deleted=False,
-            deployment_progress=None,
-            service_identity_attribute_value=None,
-        )
+        service_instance_attributes = {
+            "id": service_id or uuid.uuid4(),
+            "environment": uuid.UUID(self.environment),
+            "service_entity": service_entity_name,
+            "version": 1,
+            "desired_state_version": 1,
+            "config": {},
+            "state": service_entity.lifecycle.initial_state,
+            "candidate_attributes": service_entity.add_defaults(attributes),  # type: ignore
+            "active_attributes": None,
+            "rollback_attributes": None,
+            "created_at": datetime.datetime.now(),
+            "last_updated": datetime.datetime.now(),
+            "callback": [],
+            "deleted": False,
+            "deployment_progress": None,
+            "service_identity_attribute_value": None,
+        }
+
+        # The `desired_state_version` field has only recently been added to inmanta_lsm.
+        # This ensures compatibility with older versions of the orchestrator.
+        try:
+            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)
+        except AttributeError:
+            service_instance_attributes.pop("desired_state_version", None)
+            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)
 
         # Add the service to our inventory
         self.add_service(service)
@@ -914,8 +938,7 @@ class LsmProject:
         for service_id in service_ids.split(" "):
             service = self.get_service(service_id)
 
-        env: dict[str, str] = {}
-        env[inmanta_lsm.const.ENV_INSTANCE_ID] = service_ids
+        env: dict[str, str] = {inmanta_lsm.const.ENV_INSTANCE_ID: service_ids}
 
         if validation:
             if len(service_ids.split(" ")) != 1:
