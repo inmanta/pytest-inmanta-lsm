@@ -1,4 +1,4 @@
-# v 3.9.0 (?)
+# v 3.9.0 (2024-10-29)
 Changes in this release:
 - Add support for iso 8 new on-disk layout.
 - Extends the mocking mechanism to support the LSM Transfer Optimization feature
