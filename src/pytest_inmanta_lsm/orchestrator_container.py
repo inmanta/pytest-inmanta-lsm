@@ -140,6 +140,11 @@ class OrchestratorContainer:
         docker_compose_dir = self.compose_file.parent
         shutil.copytree(str(docker_compose_dir), str(self._cwd), dirs_exist_ok=True)
 
+        # Make sure our compose topology is named docker-compose.yml, this makes the cleanup
+        # a lot easier if anyone comes across the folder
+        if self.compose_file.name != "docker-compose.yml":
+            (self._cwd / self.compose_file.name).replace(self._cwd / "docker-compose.yml")
+
         shutil.copy(str(self.config_file), str(self._cwd / "my-server-conf.cfg"))
         shutil.copy(str(self.env_file), str(self._cwd / "my-env-file"))
 
@@ -238,20 +243,20 @@ class OrchestratorContainer:
 
     def _up(self) -> None:
         # Pull container images
-        cmd = [*self.docker_compose, f"--file={self.compose_file.name}", "--verbose", "pull"]
+        cmd = [*self.docker_compose, "--verbose", "pull"]
         run_cmd(cmd=cmd, cwd=self.cwd)
         # Starting the lab
-        cmd = [*self.docker_compose, f"--file={self.compose_file.name}", "--verbose", "up", "-d"]
+        cmd = [*self.docker_compose, "--verbose", "up", "-d"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
         # Getting the containers ids
-        cmd = [*self.docker_compose, f"--file={self.compose_file.name}", "--verbose", "ps", "-q"]
+        cmd = [*self.docker_compose, "--verbose", "ps", "-q"]
         stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
         self._containers = stdout.strip("\n").split("\n")
 
     def _down(self) -> None:
         # Stopping the lab
-        cmd = [*self.docker_compose, f"--file={self.compose_file.name}", "--verbose", "down", "-v"]
+        cmd = [*self.docker_compose, "--verbose", "down", "-v"]
         run_cmd(cmd=cmd, cwd=self.cwd)
 
     def __enter__(self) -> "OrchestratorContainer":
