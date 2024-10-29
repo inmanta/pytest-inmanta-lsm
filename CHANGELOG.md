@@ -5,6 +5,7 @@ Changes in this release:
 - Allow iso 7-dev containers to be deployed with latest docker-compose file.
 - Add init process and healthcheck to orchestrator containers started by pytest-inmanta-lsm
 - Allow `docker-compose` and `docker compose` commands
+- Make sure that auto-started containerized orchestrator can always be stopped with `docker compose down -v`
 
 # v 3.8.0 (2024-08-20)
 Changes in this release:
