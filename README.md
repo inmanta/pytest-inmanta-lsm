@@ -31,7 +31,7 @@ To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to
     - All the options of scenario 1 and 2, with the difference that `<srv-ip>` and `<ssh-ip>` will be different.
 
 4. The orchestrator is running in a container, where only the orchestrator process is running.  Remote access to the orchestrator file system is possible via `docker exec` on the host where the orchestrator container is running.  We assume here that the host running the container is reachable via ssh with user `rocky`, and that `rocky` is part of the `sudo` group, allowing it to enter any running container.
-    - All the options of scenario 1 and 2, but using `--lsm-rsh=ssh rocky@<host-ip> sudo docker exec -w /var/lib/inmanta -u inmanta -i` and `--lsm-rh=<container-id>` (or `INMANTA_LSM_REMOTE_SHELL=ssh rocky@<host-ip> sudo docker exec -w /var/lib/inmanta -u inmanta -i` and `INMANTA_LSM_REMOTE_HOST=<container-id>`), telling pytest-inmanta-lsm to rely on ssh to access the remote host where the orchestrator container is running at `<host-ip>`, then user docker to enter the orchestrator container named `<orchestrator-id>`.
+    - All the options of scenario 1 and 2, but using `--lsm-rsh=ssh rocky@<host-ip> sudo docker exec -w /var/lib/inmanta -u inmanta -i` and `--lsm-rh=<container-id-or-name>` (or `INMANTA_LSM_REMOTE_SHELL=ssh rocky@<host-ip> sudo docker exec -w /var/lib/inmanta -u inmanta -i` and `INMANTA_LSM_REMOTE_HOST=<container-id-or-name>`), telling pytest-inmanta-lsm to rely on ssh to access the remote host where the orchestrator container is running at `<host-ip>`, then user docker to enter the orchestrator container named `<orchestrator-id-or-name>`.
 
 
 ## Usage examples
@@ -467,9 +467,11 @@ Then any of the other option starting with `lsm-ctr` prefix to configure pytest-
 > :warning: **Some options have no effect when `--lsm-ctr` is set**.  This is the case of:
 >  - `--lsm-host` The host will be overwritten with the ip of the container
 >  - `--lsm-srv-port` The port will be overwritten with the port the server in the container is listening to
->  - `--lsm-ssh-port` The port will be `22`
->  - `--lsm-ssh-user` The user will be `inmanta`
+>  - `--lsm-ssh-port` The port will be ignored
+>  - `--lsm-ssh-user` The user will be ignored
 >  - `--lsm-container-env` This is set to true automatically
+>  - `--lsm-rsh` This will be set to `docker exec -w /var/li/inmanta -u inmanta -i`
+>  - `--lsm-rh` This will be set to the orchestrator container name
 
 > :bulb: **Some options change their behavior when `--lsm-ctr` is set**.  This is the case of:
 >  - `--lsm-no-clean` When set, the docker orchestrator won't be cleaned up when the tests are done.  You will have to do it manually.
