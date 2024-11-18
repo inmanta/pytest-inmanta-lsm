@@ -17,7 +17,7 @@ It requires an LSM enabled orchestrator, with no ssl or authentication enabled, 
 
 ## Remote access configuration
 
-To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to have access to both the api, and the file system of the orchestrator.  There exists a number of options to configure pytest-inmanta-lsm to reach these.  All of them are shortly presented in the [Options and environment variables section](#options-and-environment-variables), but let's go through a few concrete examples here below:
+To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to have access to both the api, and the file system of the orchestrator.
 
 1. **The orchestrator has been installed with rpm, and has been started with systemd.**  You have ssh access to the host where it is running.  You need to tell pytest-inmanta-lsm the following things:
     | | **Cli option** | **Env var** | **Explanation** |
@@ -28,7 +28,8 @@ To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to
     | How to open a shell on the host? | `--lsm-rh=<ssh-user>@<ssh-ip>` | `INMANTA_LSM_REMOTE_HOST=<ssh-user>@<ssh-ip>` |  Where `<ssh-ip>` is the host ip and `<ssh-user>` the user to use to access the host.  Additional ssh options, like a different port, may be passed in `--lsm-rsh` option.  The ssh user must either be `inmanta` or be part of the `sudo` group to be able to become `inmanta`.  In this scenario, `<srv-ip>` and `<ssh-ip>` are identical. |
 
     ```bash
-    pytest --lsm-host=<srv-ip> --lsm-srv-port=<srv-port> --lsm-rsh='ssh -p 22' --lsm-rh=<ssh-user>@<srv-ip>
+    # Example
+    pytest --lsm-host=192.168.1.10 --lsm-srv-port=8888 --lsm-rsh=ssh --lsm-rh=rocky@192.168.1.10
     ```
 
 2. **The orchestrator is running in a container, where only the orchestrator process is running.**  Remote access to the orchestrator file system is possible via ssh in a **sidecar container**, which shares some volumes with the orchestrator container.  This scenario is a bit special, as for any command executed towards the orchestrator api, from the ssh sidecar, we must use the ip of the orchestrator container, and not localhost.  For this setup to work, the ssh sidecar container must have access to the orchestrator container api port and the inmanta config in the ssh sidecar must also point to the other container.  You need to tell pytest-inmanta-lsm the following things:
@@ -41,7 +42,12 @@ To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to
     | How to open a shell on the host? | `--lsm-rh=<ssh-user>@<ssh-ip>` | `INMANTA_LSM_REMOTE_HOST=<ssh-user>@<ssh-ip>` |  Where `<ssh-ip>` is the host ip and `<ssh-user>` the user to use to access the host.  Additional ssh options, like a different port, may be passed in `--lsm-rsh` option.  The ssh user must either be `inmanta` or be part of the `sudo` group to be able to become `inmanta`.  In this scenario, `<srv-ip>` and `<ssh-ip>` will differ. |
 
     ```bash
-    pytest --lsm-container-env --lsm-host=<srv-ip> --lsm-srv-port=<srv-port> --lsm-rsh='ssh -p 22' --lsm-rh=<ssh-user>@<ssh-ip>
+    # Example 1, Docker's port binding has been used to publish the orchestrator api port and sidecar ssh port
+    # Port mapping on the remote host does: 192.168.1.10:8888:8888 (server container) and 192.168.1.10:2222:22 (sidecar container)
+    pytest --lsm-container-env --lsm-host=192.168.1.10 --lsm-srv-port=8888 --lsm-rsh='ssh -p 2222' --lsm-rh=inmanta@192.168.1.10
+
+    # Example 2, the containers are running locally, we can access their local ips directly
+    pytest --lsm-container-env --lsm-host=172.20.20.3 --lsm-srv-port=8888 --lsm-rsh=ssh --lsm-rh=inmanta@172.20.20.4
     ```
 
 3. **The orchestrator is running in a container, where only the orchestrator process is running.**  Remote access to the orchestrator file system is possible via `docker exec` on the host where the orchestrator container is running.
@@ -54,7 +60,9 @@ To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to
     | How to open a shell on the host? | `--lsm-rh=<container-id-or-name>` | `INMANTA_LSM_REMOTE_HOST=<container-id-or-name>` | Tell pytest-inmanta-lsm that the container where the orchestrator is running is named `<<container-id-or-name>>` |
 
     ```bash
-    pytest --lsm-container-env --lsm-host=<srv-ip> --lsm-srv-port=<srv-port> --lsm-rsh='ssh -p 22 <ssh-user>@<ssh-ip> sudo docker exec -w /var/lib/inmanta -u inmanta -i' --lsm-rh=<container-id-or-name>
+    # Example, Docker's port binding has been used to publish the orchestrator api port
+    # Port mapping on the remote host does: 192.168.1.10:8888:8888 (server container)
+    pytest --lsm-container-env --lsm-host=192.168.1.10 --lsm-srv-port=8888 --lsm-rsh='ssh rocky@192.168.1.10 sudo docker exec -w /var/lib/inmanta -u inmanta -i' --lsm-rh=orchestrator-server
     ```
 
 4. **The orchestrator is running in a container, in which both the server process and the sshd process are running.**  This is only the case for old versions of the orchestrator container (prior to iso8).  You need to tell pytest-inmanta-lsm the following things:
@@ -67,8 +75,15 @@ To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to
     | How to open a shell on the host? | `--lsm-rh=<ssh-user>@<ssh-ip>` | `INMANTA_LSM_REMOTE_HOST=<ssh-user>@<ssh-ip>` |  Where `<ssh-ip>` is the host ip and `<ssh-user>` the user to use to access the host.  Additional ssh options, like a different port, may be passed in `--lsm-rsh` option.  The ssh user must either be `inmanta` or be part of the `sudo` group to be able to become `inmanta`.  In this scenario, `<srv-ip>` and `<ssh-ip>` are identical. |
 
     ```bash
-    pytest --lsm-container-env --lsm-host=<srv-ip> --lsm-srv-port=<srv-port> --lsm-rsh='ssh -p 22' --lsm-rh=<ssh-user>@<ssh-ip>
+    # Example 1, Docker's port binding has been used to publish the orchestrator api port and sidecar ssh port
+    # Port mapping on the remote host does: 192.168.1.10:8888:8888 (server container) and 192.168.1.10:2222:22 (server container)
+    pytest --lsm-container-env --lsm-host=192.168.1.10 --lsm-srv-port=8888 --lsm-rsh='ssh -p 2222' --lsm-rh=inmanta@192.168.1.10
+
+    # Example 2, the containers are running locally, we can access their local ips directly
+    pytest --lsm-container-env --lsm-host=172.20.20.3 --lsm-srv-port=8888 --lsm-rsh=ssh --lsm-rh=inmanta@172.20.20.3
     ```
+
+> :bulb: The reference to each of the options presented above can be found in the [Options and environment variables section](#options-and-environment-variables).
 
 ## Usage examples
 
