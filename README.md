@@ -29,7 +29,7 @@ To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to
 
     ```bash
     # Example
-    pytest --lsm-host=192.168.1.10 --lsm-srv-port=8888 --lsm-rsh=ssh --lsm-rh=rocky@192.168.1.10
+    pytest --lsm-host=192.168.1.10 --lsm-srv-port=8888 --lsm-rsh=ssh --lsm-rh=inmanta@192.168.1.10
     ```
 
 2. **The orchestrator is running in a container, where only the orchestrator process is running.**  Remote access to the orchestrator file system is possible via ssh in a **sidecar container**, which shares some volumes with the orchestrator container.  This scenario is a bit special, as for any command executed towards the orchestrator api, from the ssh sidecar, we must use the ip of the orchestrator container, and not localhost.  For this setup to work, the ssh sidecar container must have access to the orchestrator container api port and the inmanta config in the ssh sidecar must also point to the other container.  You need to tell pytest-inmanta-lsm the following things:
