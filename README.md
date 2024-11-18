@@ -60,9 +60,12 @@ To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to
     | How to open a shell on the host? | `--lsm-rh=<container-id-or-name>` | `INMANTA_LSM_REMOTE_HOST=<container-id-or-name>` | Tell pytest-inmanta-lsm that the container where the orchestrator is running is named `<<container-id-or-name>>` |
 
     ```bash
-    # Example, Docker's port binding has been used to publish the orchestrator api port
+    # Example 1, Docker's port binding has been used to publish the orchestrator api port
     # Port mapping on the remote host does: 192.168.1.10:8888:8888 (server container)
     pytest --lsm-container-env --lsm-host=192.168.1.10 --lsm-srv-port=8888 --lsm-rsh='ssh rocky@192.168.1.10 sudo docker exec -w /var/lib/inmanta -u inmanta -i' --lsm-rh=orchestrator-server
+
+    # Example 2, the containers are running locally, we can access their local ips directly
+    pytest --lsm-container-env --lsm-host=172.20.20.3 --lsm-srv-port=8888 --lsm-rsh='sudo docker exec -w /var/lib/inmanta -u inmanta -i' --lsm-rh=orchestrator-server
     ```
 
 4. **The orchestrator is running in a container, in which both the server process and the sshd process are running.**  This is only the case for old versions of the orchestrator container (prior to iso8).  You need to tell pytest-inmanta-lsm the following things:
