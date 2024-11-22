@@ -9,7 +9,6 @@
 import dataclasses
 import functools
 import logging
-import os.path
 import pathlib
 import shlex
 import subprocess
@@ -466,10 +465,11 @@ class RemoteOrchestrator:
         This path depends on the on-disk layout of the remote orchestrator.
         """
         if self._remote_project_path is None:
-            base_directory = "/var/lib/inmanta/"
-            use_new_disk_layout: bool = os.path.isfile(f"{base_directory}.inmanta_use_new_disk_layout") or os.path.isfile(
-                f"{base_directory}.inmanta_disk_layout_version"
+            cmd = (
+                "if [[ -f /var/lib/inmanta/.inmanta_use_new_disk_layout || -f /var/lib/inmanta/.inmanta_disk_layout_version ]];"
+                "then echo True ; fi"
             )
+            use_new_disk_layout: bool = self.run_command([cmd], shell=True, user=None, stderr=subprocess.PIPE).strip() == "True"
 
             if use_new_disk_layout:
                 self._remote_project_path = pathlib.Path("/var/lib/inmanta/server/", str(self.environment), "compiler")
