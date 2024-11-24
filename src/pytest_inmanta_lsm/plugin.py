@@ -18,6 +18,7 @@ import time
 import uuid
 from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
+import urllib.parse
 
 import pkg_resources
 import pytest
@@ -69,6 +70,8 @@ from pytest_inmanta_lsm.remote_orchestrator import (
     OrchestratorEnvironment,
     RemoteOrchestrator,
 )
+
+from inmanta.data import model
 
 try:
     # make sure that lsm methods are loaded
@@ -415,6 +418,33 @@ def remote_orchestrator_shared(
     tested is v2, it is installed in editable mode, as it is required to send it to the remote
     orchestrator.
     """
+    # Check if the environment is protected.  If it is, abort now with a clear error message
+    settings = remote_orchestrator_access.sync_request(
+        "environment_setting_get",
+        model.EnvironmentSettingsReponse,
+        tid=remote_orchestrator_access.environment,
+        id="protected_environment",
+    )
+    if settings.settings["protected_environment"]:
+        # Create a url that points to the settings page in the web console, and highlights the
+        # relevant setting
+        settings_url = urllib.parse.urlunsplit(
+            [
+                *remote_orchestrator_access.url_split[:2],  # schema, netloc
+                "/console/settings",  # path
+                urllib.parse.urlencode(
+                    {
+                        "env": remote_orchestrator_access.environment,
+                        "state.Settings.tab": "Configuration",
+                    },
+                ),  # query
+                ":~:text=protected_environment",  # fragment
+            ],
+        )
+        raise RuntimeError(
+            f"Environment at {settings_url} is protected, it can't be used with pytest-inmanta-lsm."
+        )
+
     # no need to do anything if this version of inmanta does not support v2 modules
     if hasattr(module, "ModuleV2"):
         verify_v2_editable_install()

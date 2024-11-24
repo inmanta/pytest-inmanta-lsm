@@ -302,6 +302,20 @@ class RemoteOrchestrator:
                 inmanta_config.Config.set(section, "token", self.token)
 
     @property
+    def url_split(self) -> urllib.parse.SplitResult:
+        """
+        Get the base url for all requests sent to the orchestrator.
+        The format returned matches what urllib.parse.urlsplit would return, and what
+        urllib.parse.urlunsplit can accept as input.
+        https://docs.python.org/3/library/urllib.parse.html
+        """
+        port: int = int(inmanta_config.Config.get("client_rest_transport", "port") or 8888)
+        host: str = inmanta_config.Config.get("client_rest_transport", "host") or "localhost"
+        ssl: bool = inmanta_config.Config.getboolean("client_rest_transport", "ssl", False)
+        protocol = "https" if ssl else "http"
+        return urllib.parse.urlsplit(f"{protocol}://{host}:{port}")
+
+    @property
     def session(self) -> requests.Session:
         """
         Get a requests.Session object pre-configured to communicate with the remote
@@ -334,10 +348,6 @@ class RemoteOrchestrator:
         # communicate with it
         token: typing.Optional[str] = inmanta_config.Config.get("client_rest_transport", "token", None)
         ca_certs: typing.Optional[str] = inmanta_config.Config.get("client_rest_transport", "ssl_ca_cert_file", None)
-        port: int = int(inmanta_config.Config.get("client_rest_transport", "port") or 8888)
-        host: str = inmanta_config.Config.get("client_rest_transport", "host") or "localhost"
-        ssl: bool = inmanta_config.Config.getboolean("client_rest_transport", "ssl", False)
-        protocol = "https" if ssl else "http"
 
         # Setup authentication (if required)
         if token is not None:
@@ -361,7 +371,7 @@ class RemoteOrchestrator:
         self._session.request = functools.partial(  # type: ignore[method-assign]
             request_with_base_url,
             self._session.request,
-            f"{protocol}://{host}:{port}",
+            urllib.parse.urlunsplit(self.url_split),
         )
 
         return self._session
