@@ -15,16 +15,17 @@ import shutil
 import tempfile
 import textwrap
 import time
+import urllib.parse
 import uuid
 from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
-import urllib.parse
 
 import pkg_resources
 import pytest
 import pytest_inmanta.plugin
 import pytest_inmanta.test_parameter
 from inmanta import module
+from inmanta.data import model
 from packaging import version
 from pytest_inmanta.plugin import Project
 from pytest_inmanta.test_parameter import (
@@ -70,8 +71,6 @@ from pytest_inmanta_lsm.remote_orchestrator import (
     OrchestratorEnvironment,
     RemoteOrchestrator,
 )
-
-from inmanta.data import model
 
 try:
     # make sure that lsm methods are loaded
@@ -441,9 +440,7 @@ def remote_orchestrator_shared(
                 ":~:text=protected_environment",  # fragment
             ],
         )
-        raise RuntimeError(
-            f"Environment is protected, it can't be used with pytest-inmanta-lsm: {settings_url}"
-        )
+        raise RuntimeError(f"Environment is protected, it can't be used with pytest-inmanta-lsm: {settings_url}")
 
     # no need to do anything if this version of inmanta does not support v2 modules
     if hasattr(module, "ModuleV2"):
