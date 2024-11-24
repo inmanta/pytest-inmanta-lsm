@@ -442,7 +442,7 @@ def remote_orchestrator_shared(
             ],
         )
         raise RuntimeError(
-            f"Environment at {settings_url} is protected, it can't be used with pytest-inmanta-lsm."
+            f"Environment is protected, it can't be used with pytest-inmanta-lsm: {settings_url}"
         )
 
     # no need to do anything if this version of inmanta does not support v2 modules
