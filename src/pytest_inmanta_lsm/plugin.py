@@ -437,6 +437,8 @@ def remote_orchestrator_shared(
                         "state.Settings.tab": "Configuration",
                     },
                 ),  # query
+                # Highlight the setting on the web console page
+                # https://web.dev/articles/text-fragments#start
                 ":~:text=protected_environment",  # fragment
             ],
         )
