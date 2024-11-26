@@ -1,3 +1,8 @@
+# v 3.10.0 (2024-11-26)
+Changes in this release:
+- Make sure protected environments can never be cleaned up by pytest-inmanta-lsm fixtures.
+- Fix bug in script that determines the disk layout version.
+
 # v 3.9.0 (2024-10-29)
 Changes in this release:
 - Add support for iso 8 new on-disk layout.
