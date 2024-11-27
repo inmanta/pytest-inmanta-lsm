@@ -26,12 +26,6 @@ services:
       INMANTA_SERVER_BIND_PORT: 8888
       INMANTA_LICENSE_ENTITLEMENT_FILE: /etc/inmanta/license/com.inmanta.jwe
       INMANTA_LICENSE_LICENSE_KEY: /etc/inmanta/license/com.inmanta.license
-    healthcheck:
-      test: ["CMD-SHELL", "curl http://127.0.0.1:8888/api/v1/serverstatus"]
-      interval: 10s
-      retries: 5
-      start_period: 30s
-      timeout: 10s
     volumes:
       - ${INMANTA_LSM_CONTAINER_LICENSE_FILE}:/etc/inmanta/license/com.inmanta.license
       - ${INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE}:/etc/inmanta/license/com.inmanta.jwe
