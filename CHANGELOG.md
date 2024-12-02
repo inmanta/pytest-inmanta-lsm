@@ -1,5 +1,6 @@
 # v 3.11.0 (?)
 Changes in this release:
+- Fix rsync for iso8 project, add .env-py* to excluded paths.
 
 # v 3.10.0 (2024-11-26)
 Changes in this release:
