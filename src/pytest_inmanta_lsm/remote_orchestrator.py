@@ -733,7 +733,7 @@ class RemoteOrchestrator:
         # All the files to exclude when syncing the project, either because
         # we will sync them separately later, or because their content doesn't
         # have anything to do on the remote orchestrator
-        excludes = [".env", "env", ".cfcache", "__pycache__"]
+        excludes = [".env", "env", ".cfcache", "__pycache__", ".env-py*"]
 
         # Exclude modules dirs, as we will sync them separately later
         for modules_dir_path in modules_dir_paths:
