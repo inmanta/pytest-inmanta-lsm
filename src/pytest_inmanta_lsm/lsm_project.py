@@ -538,6 +538,7 @@ class LsmProject:
         This is not supported yet by LsmProject mock.  Until then, behaves as if the
         api didn't know this endpoint (lsm module will fallback to the legacy one).
         """
+        # https://github.com/inmanta/pytest-inmanta-lsm/issues/467
         return inmanta.protocol.common.Result(
             code=500,
             result={
