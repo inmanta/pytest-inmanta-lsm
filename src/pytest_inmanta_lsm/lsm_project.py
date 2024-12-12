@@ -527,7 +527,7 @@ class LsmProject:
         service.last_updated = datetime.datetime.now()
 
         return inmanta.protocol.common.Result(code=200, result={})
-    
+
     def lsm_service_catalog_get_entity_version(
         self,
         tid: uuid.UUID,
