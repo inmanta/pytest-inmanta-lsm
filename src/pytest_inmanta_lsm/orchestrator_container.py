@@ -197,7 +197,7 @@ class OrchestratorContainer:
         """
         self.compose_file = compose_file
         self.orchestrator_image = orchestrator_image
-        self.postgres_version = (
+        self.postgres_version = str(
             postgres_version
             or get_product_compatibility(get_image_version(self.orchestrator_image))["system_requirements"]["postgres_version"]
         )
