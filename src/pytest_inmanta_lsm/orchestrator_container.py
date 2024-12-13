@@ -9,6 +9,7 @@
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 from configparser import Interpolation
@@ -19,11 +20,89 @@ from textwrap import dedent
 from types import TracebackType
 from typing import List, Optional, Tuple, Type
 
+import requests
 from inmanta.config import LenientConfigParser
+from packaging import version
 
 LOGGER = logging.getLogger(__name__)
 
 DOCKER_COMPOSE_COMMAND = None
+
+
+def get_image_version(image: str) -> version.Version:
+    """
+    Get the product version from the container image tag.
+    """
+    matched = re.fullmatch(
+        r".*\/service-orchestrator:(?P<tag>(?P<version>\d+(\.\d+)*)(-dev|-rc|-dev-ng)?|dev|dev-ng)",
+        image,
+    )
+    if matched is None:
+        raise ValueError(f"Unsupported image format: {image}")
+
+    tag = matched.group("tag")
+    v = matched.group("version")
+
+    if tag in ["dev", "dev-ng"]:
+        # The is the latest dev version of the product
+        return version.Version("8.dev")
+
+    if tag.endswith("-dev") or tag.endswith("-dev-ng"):
+        # This is a dev version
+        return version.Version(f"{v}.dev")
+
+    if tag.endswith("-rc"):
+        # This is an rc version
+        return version.Version(f"{v}.rc")
+
+    # Stable version
+    return version.Version(v)
+
+
+def get_product_compatibility(v: version.Version) -> dict:
+    """
+    Get the product compatibility information from inmanta's documentation page.
+    For example, for iso7-dev, return the content of
+    https://docs.inmanta.com/inmanta-service-orchestrator-dev/7/reference/compatibility.json
+
+    ..code-block:: json
+
+        {
+            "python_package_constraints": {
+                "inmanta-core": "~=11.0.dev",
+                "inmanta-license": "~=4.0.dev",
+                "inmanta-lsm": "~=4.0.dev",
+                "inmanta-support": "~=3.2.dev",
+                "inmanta-ui": "~=5.1.dev",
+                "inmanta-module-connect": "~=2.0",
+                "inmanta-module-lsm": "~=2.27",
+                "inmanta-module-std": "~=5.0"
+            },
+            "system_requirements": {
+                "python_version": "3.11",
+                "rhel_versions": [
+                    9,
+                    8
+                ],
+                "postgres_version": 13
+            },
+            "module_compatibility_ranges": {
+                "inmanta-module-connect": "~=2.0",
+                "inmanta-module-lsm": "~=2.27",
+                "inmanta-module-std": "~=5.0"
+            }
+        }
+
+    :param version: The version of the product we want to know the compatibility for
+    """
+    if v.is_prerelease:
+        url = f"https://docs.inmanta.com/inmanta-service-orchestrator-dev/{v.major}/reference/compatibility.json"
+    else:
+        url = f"https://docs.inmanta.com/inmanta-service-orchestrator/{v.major}/reference/compatibility.json"
+
+    resp = requests.get(url)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
@@ -94,7 +173,7 @@ class OrchestratorContainer:
         compose_file: Path,
         *,
         orchestrator_image: str,
-        postgres_version: str,
+        postgres_version: str | None = None,
         public_key_file: Path,
         license_file: str,
         entitlement_file: str,
@@ -118,7 +197,10 @@ class OrchestratorContainer:
         """
         self.compose_file = compose_file
         self.orchestrator_image = orchestrator_image
-        self.postgres_version = postgres_version
+        self.postgres_version = (
+            postgres_version
+            or get_product_compatibility(get_image_version(self.orchestrator_image))["system_requirements"]["postgres_version"]
+        )
         self.public_key_file = public_key_file
         self.license_file = license_file
         self.entitlement_file = entitlement_file

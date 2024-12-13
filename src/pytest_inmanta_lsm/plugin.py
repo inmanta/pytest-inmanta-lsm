@@ -9,7 +9,6 @@
 import logging
 import os
 import pathlib
-import re
 import shlex
 import shutil
 import tempfile
@@ -38,6 +37,7 @@ from pytest_inmanta_lsm import lsm_project
 from pytest_inmanta_lsm.orchestrator_container import (
     DoNotCleanOrchestratorContainer,
     OrchestratorContainer,
+    get_image_version,
 )
 from pytest_inmanta_lsm.parameters import (
     inm_lsm_ca_cert,
@@ -137,6 +137,12 @@ def remote_orchestrator_container(
         yield None
         return
 
+    def get_optional_option(option: TestParameter[ParameterType]) -> Optional[ParameterType]:
+        try:
+            return option.resolve(request.config)
+        except ParameterNotSetException:
+            return None
+
     orchestrator_image = inm_lsm_ctr_image.resolve(request.config)
     latest_compose_file = pathlib.Path(__file__).parent / "resources/docker-compose.yml"
     latest_compose_file_with_http_license = pathlib.Path(__file__).parent / "resources/docker-compose-http-license.yml"
@@ -147,11 +153,9 @@ def remote_orchestrator_container(
         # The compose file is not set, we can then either use the default one, or
         # the default legacy one (for <iso7.1).  To decide which one is the most
         # appropriate, we parse the container image tag and extract the iso version
-        iso_major_version_match = re.fullmatch(
-            r".*\/service-orchestrator:(?P<tag>(?P<version>\d+(\.\d+)*)(-dev|-rc|-dev-ng)?|dev|dev-ng)",
-            orchestrator_image,
-        )
-        if not iso_major_version_match:
+        try:
+            v = get_image_version(orchestrator_image)
+        except ValueError:
             # The tag is not something we know, probably a custom container image, we then
             # use the previous docker-compose file, as the custom container image probably
             # expects it to stay like this.
@@ -160,11 +164,12 @@ def remote_orchestrator_container(
                 orchestrator_image,
                 str(legacy_compose_file),
             )
-            compose_file = legacy_compose_file
-        elif iso_major_version_match.group("tag") in ["7-dev", "dev", "dev-ng"]:
+            v = version.Version("0")
+
+        if v >= version.Version("7.dev"):
             # Latest dev, use the the latest compose file, this is always safe because we don't distribute this externally
             compose_file = latest_compose_file
-        elif version.Version(iso_major_version_match.group("version")) >= version.Version("7.1"):
+        elif v >= version.Version("7.1"):
             # The server has the --db-wait-time option
             # https://github.com/inmanta/inmanta-core/pull/7217
             compose_file = latest_compose_file
@@ -187,7 +192,7 @@ def remote_orchestrator_container(
     with OrchestratorContainer(
         compose_file=compose_file,
         orchestrator_image=orchestrator_image,
-        postgres_version=inm_lsm_ctr_db_version.resolve(request.config),
+        postgres_version=get_optional_option(inm_lsm_ctr_db_version),
         public_key_file=inm_lsm_ctr_pub_key.resolve(request.config),
         license_file=license_file,
         entitlement_file=entitlement_file,
