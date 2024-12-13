@@ -1,3 +1,8 @@
+# v 3.11.0 (2024-12-13)
+Changes in this release:
+- Fix rsync for iso8 project, add .env-py* to excluded paths.
+- Explicitly reject multi-version lsm requests in mock, waiting for proper support.
+
 # v 3.10.0 (2024-11-26)
 Changes in this release:
 - Make sure protected environments can never be cleaned up by pytest-inmanta-lsm fixtures.

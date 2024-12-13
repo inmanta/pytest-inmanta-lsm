@@ -360,6 +360,13 @@ class LsmProject:
 
         self.monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_service_catalog_get_entity_version",
+            self.lsm_service_catalog_get_entity_version,
+            raising=False,
+        )
+
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_service_catalog_get_entity",
             self.lsm_service_catalog_get_entity,
             raising=False,
@@ -520,6 +527,24 @@ class LsmProject:
         service.last_updated = datetime.datetime.now()
 
         return inmanta.protocol.common.Result(code=200, result={})
+
+    def lsm_service_catalog_get_entity_version(
+        self,
+        tid: uuid.UUID,
+        service_entity: str,
+        version: int,
+    ) -> inmanta.protocol.common.Result:
+        """
+        This is not supported yet by LsmProject mock.  Until then, behaves as if the
+        api didn't know this endpoint (lsm module will fallback to the legacy one).
+        """
+        # https://github.com/inmanta/pytest-inmanta-lsm/issues/467
+        return inmanta.protocol.common.Result(
+            code=500,
+            result={
+                "message": "LsmProject doesn't support multi-version lsm yet",
+            },
+        )
 
     def lsm_service_catalog_get_entity(
         self,
