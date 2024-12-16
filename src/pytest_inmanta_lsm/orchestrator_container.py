@@ -8,7 +8,6 @@
 
 import json
 import logging
-import os
 import shutil
 import subprocess
 from configparser import Interpolation
@@ -34,8 +33,6 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     if the command failed.
     """
     LOGGER.info("Running command: %s", cmd)
-    env_vars = dict(os.environ)
-    env_vars.pop("PYTHONPATH", None)
     result = subprocess.run(
         args=cmd,
         cwd=str(cwd),
@@ -44,7 +41,6 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
         encoding="utf-8",
         text=True,
         universal_newlines=True,
-        env=env_vars,
     )
 
     LOGGER.debug("Return code: %d", result.returncode)
@@ -72,7 +68,7 @@ def get_image_version(image: str) -> version.Version:
         ],
         cwd=Path(),
     )
-    return version.Version(raw_version)
+    return version.Version(raw_version.strip())
 
 
 def _get_product_compatibility(v: version.Version) -> dict:
