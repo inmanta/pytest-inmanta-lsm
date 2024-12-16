@@ -8,6 +8,7 @@
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 from configparser import Interpolation
@@ -33,6 +34,8 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     if the command failed.
     """
     LOGGER.info("Running command: %s", cmd)
+    env_vars = dict(os.environ)
+    env_vars.pop("PYTHONPATH", None)
     result = subprocess.run(
         args=cmd,
         cwd=str(cwd),
@@ -41,6 +44,7 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
         encoding="utf-8",
         text=True,
         universal_newlines=True,
+        env=env_vars,
     )
 
     LOGGER.debug("Return code: %d", result.returncode)
@@ -228,12 +232,12 @@ class OrchestratorContainer:
         db_hostname = f"{self._cwd.name}-postgres-1"
 
         env_file = f"""
-            INMANTA_LSM_CONTAINER_DB_HOSTNAME={db_hostname}
-            INMANTA_LSM_CONTAINER_DB_VERSION={self.postgres_version}
-            INMANTA_LSM_CONTAINER_ORCHESTRATOR_IMAGE={self.orchestrator_image}
-            INMANTA_LSM_CONTAINER_PUBLIC_KEY_FILE={self.public_key_file}
-            INMANTA_LSM_CONTAINER_LICENSE_FILE={self.license_file}
-            INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE={self.entitlement_file}
+            DB_HOSTNAME={db_hostname}
+            DB_VERSION={self.postgres_version}
+            ORCHESTRATOR_IMAGE={self.orchestrator_image}
+            ORCHESTRATOR_PUBLIC_KEY_FILE={self.public_key_file}
+            ORCHESTRATOR_LICENSE_FILE={self.license_file}
+            ORCHESTRATOR_ENTITLEMENT_FILE={self.entitlement_file}
         """
         env_file = dedent(env_file.strip("\n"))
 
