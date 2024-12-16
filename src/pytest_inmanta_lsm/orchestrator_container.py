@@ -32,7 +32,7 @@ DOCKER_COMPOSE_COMMAND = None
 def get_latest_product_major() -> int:
     """
     Resolve the latest released product major version based on the docs.
-    Go to the "latest" page, and check were it redirects us.
+    Go to the "latest" page, and check where it redirects us.
     https://docs.inmanta.com/inmanta-service-orchestrator/7/index.html
 
     :raises LookupError: If anything goes wrong while trying to resolve
