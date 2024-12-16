@@ -9,7 +9,6 @@
 import json
 import logging
 import os
-import re
 import shutil
 import subprocess
 from configparser import Interpolation
@@ -29,69 +28,23 @@ LOGGER = logging.getLogger(__name__)
 DOCKER_COMPOSE_COMMAND = None
 
 
-def get_latest_product_major() -> int:
-    """
-    Resolve the latest released product major version based on the docs.
-    Go to the "latest" page, and check where it redirects us.
-    https://docs.inmanta.com/inmanta-service-orchestrator/7/index.html
-
-    :raises LookupError: If anything goes wrong while trying to resolve
-        the product version.
-    """
-    url = "https://docs.inmanta.com/inmanta-service-orchestrator/latest/index.html"
-    resp = requests.get(url, allow_redirects=False)
-    if resp.status_code not in range(300, 400):
-        # Not the redirect we expected
-        raise LookupError(
-            f"Failed to discover latest released product version based on documentation url: {url} ({resp.status_code})"
-        )
-
-    redirect: str = resp.headers["Location"]
-    matched = re.fullmatch(
-        r"https://docs.inmanta.com/inmanta-service-orchestrator/(\d+)/index.html",
-        redirect,
-    )
-    if not matched:
-        # Not the redirect url we expected
-        raise LookupError(f"Failed to parse redirect url: {redirect}")
-
-    return int(matched.group(1))
-
-
 def get_image_version(image: str) -> version.Version:
     """
-    Get the product version from the container image tag.
+    Get the product version from the container image tag.  Inspect the inmanta-service-orchestrator
+    package installed inside the container image to figure it out.
     """
-    matched = re.fullmatch(
-        r".*\/service-orchestrator:(?P<tag>(?P<version>\d+(\.\d+)*)(-dev|-rc|-dev-ng)?|dev|dev-ng)",
-        image,
+    raw_version, _ = run_cmd(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--entrypoint=/opt/inmanta/bin/python",
+            image,
+            "-c",
+            "import importlib.metadata; print(importlib.metadata.version('inmanta-service-orchestrator'))",
+        ]
     )
-    if matched is None:
-        raise ValueError(f"Unsupported image format: {image}")
-
-    tag = matched.group("tag")
-    v = matched.group("version")
-
-    if tag in ["dev", "dev-ng"]:
-        # The is the latest dev version of the product
-        try:
-            latest_release = get_latest_product_major()
-        except LookupError as e:
-            LOGGER.error("%s", str(e))
-            latest_release = 99
-
-        return version.Version(f"{latest_release + 1}.dev")
-
-    if tag.endswith("-dev") or tag.endswith("-dev-ng"):
-        # This is a dev version
-        return version.Version(f"{v}.dev")
-
-    if tag.endswith("-rc"):
-        # This is an rc version
-        return version.Version(f"{v}.rc")
-
-    # Stable version
-    return version.Version(v)
+    return version.Version(raw_version)
 
 
 def get_product_compatibility(v: version.Version) -> dict:
