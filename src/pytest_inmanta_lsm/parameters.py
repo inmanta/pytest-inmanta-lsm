@@ -185,7 +185,11 @@ inm_lsm_ctr_image = StringTestParameter(
 inm_lsm_ctr_db_version = StringTestParameter(
     argument="--lsm-ctr-db-version",
     environment_variable="INMANTA_LSM_CONTAINER_DB_VERSION",
-    usage="The version of postgresql to use for the db of the orchestrator",
+    usage=(
+        "The version of postgresql to use for the db of the orchestrator, "
+        "set to 'auto' for automatic resolving based on orchestrator image version"
+    ),
+    default="13",
     group=param_group,
 )
 
