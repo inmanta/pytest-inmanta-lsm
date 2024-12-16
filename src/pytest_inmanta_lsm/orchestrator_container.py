@@ -29,6 +29,35 @@ LOGGER = logging.getLogger(__name__)
 DOCKER_COMPOSE_COMMAND = None
 
 
+def get_latest_product_major() -> int:
+    """
+    Resolve the latest released product major version based on the docs.
+    Go to the "latest" page, and check were it redirects us.
+    https://docs.inmanta.com/inmanta-service-orchestrator/7/index.html
+
+    :raises LookupError: If anything goes wrong while trying to resolve
+        the product version.
+    """
+    url = "https://docs.inmanta.com/inmanta-service-orchestrator/latest/index.html"
+    resp = requests.get(url, allow_redirects=False)
+    if resp.status_code not in range(300, 400):
+        # Not the redirect we expected
+        raise LookupError(
+            f"Failed to discover latest released product version based on documentation url: {url} ({resp.status_code})"
+        )
+
+    redirect: str = resp.headers["Location"]
+    matched = re.fullmatch(
+        r"https://docs.inmanta.com/inmanta-service-orchestrator/(\d+)/index.html",
+        redirect,
+    )
+    if not matched:
+        # Not the redirect url we expected
+        raise LookupError(f"Failed to parse redirect url: {redirect}")
+
+    return int(matched.group(1))
+
+
 def get_image_version(image: str) -> version.Version:
     """
     Get the product version from the container image tag.
@@ -45,7 +74,13 @@ def get_image_version(image: str) -> version.Version:
 
     if tag in ["dev", "dev-ng"]:
         # The is the latest dev version of the product
-        return version.Version("8.dev")
+        try:
+            latest_release = get_latest_product_major()
+        except LookupError as e:
+            LOGGER.error("%s", str(e))
+            latest_release = 99
+
+        return version.Version(f"{latest_release + 1}.dev")
 
     if tag.endswith("-dev") or tag.endswith("-dev-ng"):
         # This is a dev version
