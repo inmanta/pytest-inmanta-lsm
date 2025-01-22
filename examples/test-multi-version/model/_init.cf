@@ -1,0 +1,125 @@
+"""
+    Pytest Inmanta LSM
+
+    :copyright: 2025 Inmanta
+    :contact: code@inmanta.com
+    :license: Inmanta EULA
+"""
+
+import lsm
+import lsm::fsm
+import std::testing
+
+entity Parent extends lsm::ServiceEntity:
+    string name
+    string description
+    string description__description="The description of the parent."
+    lsm::attribute_modifier description__modifier="rw+"
+end
+
+index Parent(instance_id)
+
+
+entity Child extends lsm::ServiceEntity:
+    string name
+end
+
+Child.parent_entity [1] lsm::__service__, lsm::__rwplus__ Parent
+
+index Child(instance_id)
+index Child(parent_entity, name)
+
+
+# Add relations between service entity bindings
+
+binding_parent = lsm::ServiceBinding(
+    default_version=0,
+    service_entity_name="parent",
+    versions=[
+        lsm::ServiceBindingVersion(
+            service_entity="test_multi_version::Parent",
+            lifecycle=lsm::fsm::simple_with_delete_validate,
+            service_identity="name",
+            version=0
+        )
+    ]
+)
+
+binding_child = lsm::ServiceBinding(
+    default_version=0,
+    service_entity_name="child",
+    versions=[
+        lsm::ServiceBindingVersion(
+            service_entity="test_multi_version::Child",
+            lifecycle=lsm::fsm::simple_with_delete_validate,
+            owner = lsm::get_service_binding_version(binding_parent, 0),
+            relation_to_owner = "parent_entity",
+            service_identity="name",
+            version=0,
+        ),
+    ]
+)
+
+for instance in lsm::all(binding_parent):
+    Parent(
+        instance_id = instance["id"],
+        entity_binding = lsm::get_service_binding_version(binding_parent, 0),
+        **instance["attributes"],
+    )
+end
+
+for instance in lsm::all(binding_child):
+    Child(
+        instance_id = instance["id"],
+        entity_binding = lsm::get_service_binding_version(binding_child, 0),
+        name = instance["attributes"]["name"],
+        parent_entity = Parent[instance_id=instance["attributes"]["parent_entity"]]
+    )
+end
+
+
+implement Parent using parents
+implement Child using parents
+
+
+implementation tracer for lsm::ServiceEntity:
+    tester = std::testing::NullResource(
+        name=self.name,
+    )
+    self.resources += tester
+    self.owned_resources += tester
+end
+
+implement Parent using tracer
+implement Child using tracer
+
+
+
+entity SecondTree extends lsm::ServiceEntity:
+""" A service to have a second, disjoint tree of services, one level high in this case """
+     string name
+end
+
+index SecondTree(instance_id)
+
+binding_second = lsm::ServiceBinding(
+    default_version=0,
+    service_entity_name="second_parent",
+    versions=[
+        lsm::ServiceBindingVersion(
+            service_entity="test_multi_version::SecondTree",
+            lifecycle=lsm::fsm::simple_with_delete_validate,
+            service_identity="name",
+        )
+    ]
+)
+
+for instance in lsm::all(binding_second):
+    SecondTree(
+        instance_id = instance["id"],
+        entity_binding = lsm::get_service_binding_version(binding_second, 0),
+        **instance["attributes"],
+    )
+end
+implement SecondTree using parents
+implement SecondTree using tracer
