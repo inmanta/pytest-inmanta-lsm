@@ -24,6 +24,12 @@ entity Child extends lsm::ServiceEntity:
     string name
 end
 
+entity ChildV2 extends Child:
+    string description
+    string description__description="The description of the child."
+    lsm::attribute_modifier description__modifier="rw+"
+end
+
 Child.parent_entity [1] lsm::__service__, lsm::__rwplus__ Parent
 
 index Child(instance_id)
@@ -46,7 +52,7 @@ binding_parent = lsm::ServiceBinding(
 )
 
 binding_child = lsm::ServiceBinding(
-    default_version=0,
+    default_version=1,
     service_entity_name="child",
     versions=[
         lsm::ServiceBindingVersion(
@@ -56,6 +62,14 @@ binding_child = lsm::ServiceBinding(
             relation_to_owner = "parent_entity",
             service_identity="name",
             version=0,
+        ),
+        lsm::ServiceBindingVersion(
+            service_entity="test_multi_version::ChildV2",
+            lifecycle=lsm::fsm::simple_with_delete_validate,
+            owner = lsm::get_service_binding_version(binding_parent, 0),
+            relation_to_owner = "parent_entity",
+            service_identity="name",
+            version=1,
         ),
     ]
 )
@@ -114,12 +128,22 @@ binding_second = lsm::ServiceBinding(
     ]
 )
 
-for instance in lsm::all(binding_second):
-    SecondTree(
+for instance in lsm::all(binding_second, include_purged_embedded_entities=true):
+    parent = SecondTree(
         instance_id = instance["id"],
         entity_binding = lsm::get_service_binding_version(binding_second, 0),
-        **instance["attributes"],
+        name=instance["attributes"]["name"],
+        other = SecondTreeChild(child_name = instance["attributes"]["name"])
     )
 end
 implement SecondTree using parents
 implement SecondTree using tracer
+
+entity SecondTreeChild extends lsm::EmbeddedEntity:
+    string child_name
+end
+
+index SecondTreeChild(_parent, child_name)
+
+implement SecondTreeChild using std::none
+SecondTree.other [0:1] -- SecondTreeChild._parent [1]

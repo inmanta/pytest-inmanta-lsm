@@ -362,12 +362,12 @@ class LsmProject:
             raising=False,
         )
 
-        self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
-            "lsm_service_catalog_get_entity_version",
-            self.lsm_service_catalog_get_entity_version,
-            raising=False,
-        )
+        # self.monkeypatch.setattr(
+        #     inmanta_plugins.lsm.global_cache.get_client(),
+        #     "lsm_service_catalog_get_entity_version",
+        #     self.lsm_service_catalog_get_entity_version,
+        #     raising=False,
+        # )
 
         self.monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
@@ -390,6 +390,13 @@ class LsmProject:
             raising=False,
         )
 
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_service_catalog_update_entity_versions",
+            self.lsm_service_catalog_update_entity_versions,
+            raising=False,
+        )
+
     def lsm_global_cache_reset(self, original_global_cache_reset_method: typing.Callable[[], None]) -> None:
         """
         This is a placeholder for the lsm global_cache reset method.  First it calls the original method,
@@ -401,6 +408,13 @@ class LsmProject:
 
         # Monkeypatch the client because it was just re-created by the reset function
         self.monkeypatch_client()
+
+    def get_entity_version(self, service_entity: str, version: typing.Optional[int] = None) -> int:
+        """
+        Returns the version to use for this service entity
+        """
+
+        return version if version is not None else self.service_entities_default_versions.get(service_entity, 0)
 
     def lsm_services_list(self, tid: uuid.UUID, service_entity: str) -> inmanta.protocol.common.Result:
         """
@@ -539,8 +553,7 @@ class LsmProject:
         version: int,
     ) -> inmanta.protocol.common.Result:
         """
-        This is not supported yet by LsmProject mock.  Until then, behaves as if the
-        api didn't know this endpoint (lsm module will fallback to the legacy one).
+        This is a mock for the lsm api, this method is called ???
         """
         # TODO: Not sure where this came up yet
         return inmanta.protocol.common.Result(
@@ -581,7 +594,7 @@ class LsmProject:
         ), "The service catalog has not been initialized, please call self.export_service_entities"
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
 
-        entity_version = version if version is not None else self.service_entities_default_versions.get(service_entity, 0)
+        entity_version = self.get_entity_version(service_entity, version)
 
         if (service_entity, entity_version) not in self.service_entities:
             return inmanta.protocol.common.Result(code=404)
@@ -635,6 +648,39 @@ class LsmProject:
 
         # Just the same as doing a create, we overwrite whatever value was already there
         return self.lsm_service_catalog_create_entity(tid, service_entity_definition)
+
+    def lsm_service_catalog_update_entity_versions(
+        self,
+        tid: uuid.UUID,
+        service_entity: str,
+        service_entity_definitions: list[inmanta_lsm.model.ServiceEntity],
+        default_version: int,
+    ):
+        """
+        This is a mock for the lsm api, this method is called during export of multi version
+        service entities.
+        """
+        assert (
+            self.service_entities is not None
+        ), "The service catalog has not been initialized, please call self.export_service_entities"
+        assert str(tid) == self.environment, f"{tid} != {self.environment}"
+
+        self.service_entities_default_versions[service_entity] = default_version
+        for sed in service_entity_definitions:
+            self.service_entities[(service_entity, sed.version)] = sed
+        relevant_versions = [se for se in self.service_entities.values() if se.name == service_entity]
+        sev = inmanta_lsm.model.ServiceEntityVersions(versions=relevant_versions, default_version=default_version)
+        return inmanta.protocol.common.Result(
+            code=200,
+            result={
+                "data": json.loads(
+                    json.dumps(
+                        sev,
+                        default=inmanta.util.api_boundary_json_encoder,
+                    ),
+                ),
+            },
+        )
 
     def export_service_entities(self, model: str) -> None:
         """
@@ -710,6 +756,7 @@ class LsmProject:
         raise a RuntimeError.
 
         :param service_entity_name: The name of the service entity we are looking for
+        :param version: The version of this service entity, if not provided, the default version will be used
         """
         if self.service_entities is None:
             raise RuntimeError(
@@ -717,7 +764,7 @@ class LsmProject:
                 "Please call self.export_service_entities."
             )
 
-        entity_version = version if version is not None else self.service_entities_default_versions.get(service_entity_name, 0)
+        entity_version = self.get_entity_version(service_entity_name, version)
 
         if (service_entity_name, entity_version) not in self.service_entities:
             raise LookupError(
@@ -803,6 +850,7 @@ class LsmProject:
         service_entity_name: str,
         attributes: dict,
         *,
+        service_entity_version: typing.Optional[int] = None,
         auto_transfer: bool = True,
         service_id: typing.Optional[uuid.UUID] = None,
     ) -> inmanta_lsm.model.ServiceInstance:
@@ -817,19 +865,22 @@ class LsmProject:
             a new instance.
         :param attributes: The attributes to create the instance with, defaults values will be
             automatically added to it.
+        :param service_entity_version: The version of the service entity of this instance,
+            if not provided, the default version for this entity is used
         :param auto_transfer: Whether to automatically go through the first auto transfers, triggering
             one compile for each state we pass by.
         :param service_id: The id to give to the newly created service, if None is provided, a random
             id is assigned.
         """
         # Resolve the initial state for our service and resolve attributes defaults
-        service_entity = self.get_service_entity(service_entity_name)
+        service_entity = self.get_service_entity(service_entity_name, service_entity_version)
 
         # Create the service instance object
         service_instance_attributes = {
             "id": service_id or uuid.uuid4(),
             "environment": uuid.UUID(self.environment),
             "service_entity": service_entity_name,
+            "service_entity_version": self.get_entity_version(service_entity_name, service_entity_version),
             "version": 1,
             "desired_state_version": 1,
             "config": {},
@@ -891,7 +942,7 @@ class LsmProject:
         """
         # Get the service and its corresponding service entity
         service = self.get_service(service_id)
-        service_entity = self.get_service_entity(service.service_entity)
+        service_entity = self.get_service_entity(service.service_entity, attributes.get("service_entity_version", None))
 
         # Go into the update state
         try:
