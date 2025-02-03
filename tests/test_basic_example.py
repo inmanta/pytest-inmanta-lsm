@@ -1,9 +1,9 @@
 """
-    Pytest Inmanta LSM
+Pytest Inmanta LSM
 
-    :copyright: 2020 Inmanta
-    :contact: code@inmanta.com
-    :license: Inmanta EULA
+:copyright: 2020 Inmanta
+:contact: code@inmanta.com
+:license: Inmanta EULA
 """
 
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
