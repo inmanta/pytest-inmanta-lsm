@@ -11,13 +11,13 @@ lock:
     variable: INMANTA_LSM_HOST
     quantity: 1
 additional_constraints:
-    - inmanta-lsm>=5.0.dev
+    - inmanta-lsm>=6.0.dev
 env_vars:
     # This option is ignored when the tests run against a docker container.
     INMANTA_LSM_SSH_USER: inmanta
     INMANTA_LSM_SSH_PORT: 2222
     INMANTA_LSM_CONTAINER_ENV: true
-    INMANTA_LSM_MODULE_CONSTRAINTS: "lsm>=2.27"
+    INMANTA_LSM_MODULE_CONSTRAINTS: "lsm>=2.33"
     # The INMANTA_LSM_CONTAINER environment variable is not set here. The test suite sets the
     # --lsm-ctr option for the subset of tests that need to run against a docker container.
     # More information regarding the structure of the test suite can be found in the README.md
