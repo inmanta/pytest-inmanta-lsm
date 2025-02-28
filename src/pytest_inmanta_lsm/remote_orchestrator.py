@@ -286,7 +286,6 @@ class RemoteOrchestrator:
         """
         Setup the config required to make it possible for the client to reach the orchestrator.
         """
-        inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self.environment))
 
         for section in ["compiler_rest_transport", "client_rest_transport"]:
