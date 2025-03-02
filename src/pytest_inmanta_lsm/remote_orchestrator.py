@@ -886,7 +886,7 @@ class RemoteOrchestrator:
             cwd=str(self.remote_project_path),
         )
 
-    def wait_for_released(self, version: int | None = None):
+    def wait_for_released(self, version: int | None = None) -> None:
         """
         Version None means latest
         """
