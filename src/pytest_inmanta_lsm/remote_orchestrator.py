@@ -886,6 +886,21 @@ class RemoteOrchestrator:
             cwd=str(self.remote_project_path),
         )
 
+    def wait_for_released(self, version: int | None = None):
+        """
+        Version None means latest
+        """
+        retry_limited(functools.partial(self.is_released, version), timeout=3)
+
+    def is_released(self, version: int | None = None) -> bool:
+        """Version None means latest"""
+        versions = self.client.list_versions(tid=self.environment)
+        assert versions.code == 200
+        if version is None:
+            return versions.result["versions"][0]["released"]
+        lookup = {v["version"]: v["released"] for v in versions.result["versions"]}
+        return lookup[version]
+
     def wait_until_deployment_finishes(
         self,
         version: int,
@@ -899,24 +914,73 @@ class RemoteOrchestrator:
         :raise AssertionError: In case of wrong state or timeout expiration
         """
 
-        def is_deployment_finished() -> bool:
-            response = self.client.get_version(self.environment, version)
-            assert response.result is not None
-            LOGGER.info(
-                "Deployed %s of %s resources",
-                response.result["model"]["done"],
-                response.result["model"]["total"],
-            )
-            return response.result["model"]["total"] - response.result["model"]["done"] <= 0
+        # Determin api version
+        response = self.client.get_version(self.environment, version)
+        assert response.result is not None
+        new_api = "done" not in response.result["model"]
 
-        retry_limited(is_deployment_finished, timeout)
-        result = self.client.get_version(self.environment, version)
-        assert result.result is not None
-        for resource in result.result["resources"]:
-            LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
-            assert (
-                resource["status"] == desired_state
-            ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
+        if not new_api:
+
+            def is_deployment_finished() -> bool:
+                response = self.client.get_version(self.environment, version)
+                assert response.result is not None
+                LOGGER.info(
+                    "Deployed %s of %s resources",
+                    response.result["model"]["done"],
+                    response.result["model"]["total"],
+                )
+                return response.result["model"]["total"] - response.result["model"]["done"] <= 0
+
+            retry_limited(is_deployment_finished, timeout)
+            result = self.client.get_version(self.environment, version)
+            assert result.result is not None
+            for resource in result.result["resources"]:
+                LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
+                assert (
+                    resource["status"] == desired_state
+                ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
+        else:
+            self.wait_for_released(version)
+
+            def get_key_numbers():
+                result = self.client.resource_list(self.environment, deploy_summary=True, limit=1)
+                assert result.code == 200
+                summary = result.result["metadata"]["deploy_summary"]
+                # {'by_state': {'available': 3, 'cancelled': 0, 'deployed': 12, 'deploying': 0, 'failed': 0, 'skipped': 0,
+                #               'skipped_for_undefined': 0, 'unavailable': 0, 'undefined': 0}, 'total': 15}
+                return (
+                    (
+                        summary["by_state"]["deployed"]
+                        + summary["by_state"]["failed"]
+                        + summary["by_state"]["skipped"]
+                        + summary["by_state"]["skipped_for_undefined"]
+                        + summary["by_state"]["unavailable"]
+                        + summary["by_state"]["undefined"]
+                    ),
+                    summary["by_state"]["failed"],
+                    summary["total"],
+                )
+
+            def is_deployment_finished() -> bool:
+                done, failed, total = get_key_numbers()
+                LOGGER.info(
+                    "Deployed %s of %s resources",
+                    done,
+                    total,
+                )
+                return total - done <= 0
+
+            retry_limited(is_deployment_finished, timeout)
+            result = self.client.get_version(self.environment, version)
+
+            assert result.result is not None
+            # We only check first 1000
+            result = self.client.resource_list(self.environment, limit=1000)
+            for resource in result.result["data"]:
+                LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
+                assert (
+                    resource["status"] == desired_state
+                ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
 
     def get_validation_failure_message(
         self,
