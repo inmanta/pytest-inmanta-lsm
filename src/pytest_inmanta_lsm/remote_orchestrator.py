@@ -921,7 +921,9 @@ class RemoteOrchestrator:
         :raise AssertionError: In case of wrong state or timeout expiration
         """
 
-        # Determin api version
+        # Determine api version.  The resource engine of the orchestrator has evolved.  Checking the
+        # layout of the api response allows us to know whether we are dealing with an old orchestrator
+        # or the new resource scheduler.
         response = self.client.get_version(self.environment, version)
         assert response.result is not None
         new_api = "done" not in response.result["model"]
