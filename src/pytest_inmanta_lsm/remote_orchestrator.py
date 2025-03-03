@@ -971,7 +971,7 @@ class RemoteOrchestrator:
                 )
 
             def is_deployment_finished() -> bool:
-                done, failed, total = get_key_numbers()
+                done, failed, total = get_deployment_progress()
                 LOGGER.info(
                     "Deployed %s of %s resources",
                     done,
