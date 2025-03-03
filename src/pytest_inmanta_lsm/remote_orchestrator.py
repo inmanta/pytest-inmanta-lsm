@@ -888,7 +888,8 @@ class RemoteOrchestrator:
 
     def wait_for_released(self, version: int | None = None) -> None:
         """
-        Version None means latest
+        Wait for a given version to be released by the orchestrator.
+        :param version: The version to wait for, or None to wait for the latest.
         """
         retry_limited(functools.partial(self.is_released, version), timeout=3)
 
