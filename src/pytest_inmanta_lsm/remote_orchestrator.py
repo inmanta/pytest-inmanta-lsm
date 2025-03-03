@@ -951,7 +951,7 @@ class RemoteOrchestrator:
         else:
             self.wait_for_released(version)
 
-            def get_key_numbers():
+            def get_deployment_progress():
                 result = self.client.resource_list(self.environment, deploy_summary=True, limit=1)
                 assert result.code == 200
                 summary = result.result["metadata"]["deploy_summary"]
