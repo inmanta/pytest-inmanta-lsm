@@ -894,7 +894,10 @@ class RemoteOrchestrator:
         retry_limited(functools.partial(self.is_released, version), timeout=3)
 
     def is_released(self, version: int | None = None) -> bool:
-        """Version None means latest"""
+        """
+        Verify if a given version has already been released by the orchestrator.
+        :param version: The version to check, or None to verify the latest version.
+        """
         versions = self.client.list_versions(tid=self.environment)
         assert versions.code == 200
         if version is None:
