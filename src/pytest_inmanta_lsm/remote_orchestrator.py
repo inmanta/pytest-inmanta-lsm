@@ -953,7 +953,7 @@ class RemoteOrchestrator:
 
             def get_deployment_progress():
                 result = self.client.resource_list(self.environment, deploy_summary=True, limit=1)
-                assert result.code == 200
+                assert result.code == 200, str(result.result)
                 summary = result.result["metadata"]["deploy_summary"]
                 # {'by_state': {'available': 3, 'cancelled': 0, 'deployed': 12, 'deploying': 0, 'failed': 0, 'skipped': 0,
                 #               'skipped_for_undefined': 0, 'unavailable': 0, 'undefined': 0}, 'total': 15}
