@@ -909,12 +909,13 @@ class RemoteOrchestrator:
         self,
         version: int,
         timeout: int = 600,
-        desired_state: str = "deployed",
+        desired_state: str | None = "deployed",
     ) -> None:
         """
         :param version: Version number which will be checked on orchestrator
         :param timeout: Value of timeout in seconds
-        :param desired_state: Expected state of each resource when the deployment is ready
+        :param desired_state: Expected state of each resource when the deployment is ready. If None,
+            doesn't check for the state reached by each resource.
         :raise AssertionError: In case of wrong state or timeout expiration
         """
 
@@ -938,6 +939,12 @@ class RemoteOrchestrator:
                 return response.result["model"]["total"] - response.result["model"]["done"] <= 0
 
             retry_limited(is_deployment_finished, timeout)
+
+            if desired_state is None:
+                # We are done waiting, and there is nothing more to verify
+                return
+
+            # Verify that none of the resources in the version have an unexpected state
             result = self.client.get_version(self.environment, version)
             assert result.result is not None
             for resource in result.result["resources"]:
@@ -945,6 +952,7 @@ class RemoteOrchestrator:
                 assert (
                     resource["status"] == desired_state
                 ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
+
         else:
             self.wait_for_released(version)
 
@@ -977,11 +985,23 @@ class RemoteOrchestrator:
                 return total - done <= 0
 
             retry_limited(is_deployment_finished, timeout)
-            result = self.client.get_version(self.environment, version)
 
-            assert result.result is not None
-            # We only check first 1000
-            result = self.client.resource_list(self.environment, limit=1000)
+            if desired_state is None:
+                # We are done waiting, and there is nothing more to verify
+                return
+
+            # Here we care about the resource which didn't reach the expected
+            # desired state, and we raise an assertion error for the first one
+            # that doesn't match, so we can simply fetch the first mismatching
+            # resource from the api.
+            result = self.client.resource_list(
+                self.environment,
+                limit=1,
+                # Default filtering excludes orphaned resources.  Here we filter on another
+                # state, but we still don't want to see the orphaned resources so we filter
+                # them out too.
+                filter={"status": [f"!{desired_state}", "!orphaned"]},
+            )
             for resource in result.result["data"]:
                 LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
                 assert (
