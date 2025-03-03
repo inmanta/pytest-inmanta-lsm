@@ -18,6 +18,7 @@ import uuid
 from pprint import pformat
 from uuid import UUID
 
+import inmanta.const
 import inmanta.data.model
 import inmanta.model
 import inmanta.module
@@ -963,13 +964,11 @@ class RemoteOrchestrator:
                 # {'by_state': {'available': 3, 'cancelled': 0, 'deployed': 12, 'deploying': 0, 'failed': 0, 'skipped': 0,
                 #               'skipped_for_undefined': 0, 'unavailable': 0, 'undefined': 0}, 'total': 15}
                 return (
-                    (
-                        summary["by_state"]["deployed"]
-                        + summary["by_state"]["failed"]
-                        + summary["by_state"]["skipped"]
-                        + summary["by_state"]["skipped_for_undefined"]
-                        + summary["by_state"]["unavailable"]
-                        + summary["by_state"]["undefined"]
+                    sum(
+                        summary["by_state"][state.value]
+                        for state in inmanta.const.DONE_STATES
+                        # https://github.com/inmanta/inmanta-core/blob/d25205bdd49016596ad7653597a2cc99a8ed3992/src/inmanta/data/model.py#L379
+                        if state != inmanta.const.ResourceState.dry
                     ),
                     summary["by_state"]["failed"],
                     summary["total"],
@@ -1000,7 +999,13 @@ class RemoteOrchestrator:
                 # Default filtering excludes orphaned resources.  Here we filter on another
                 # state, but we still don't want to see the orphaned resources so we filter
                 # them out too.
-                filter={"status": [f"!{desired_state}", "!orphaned"]},
+                filter={
+                    "status": [
+                        state.value
+                        for state in inmanta.const.DONE_STATES
+                        if state.value not in [desired_state, "dry"]  # orphaned is not part of DONE_STATES
+                    ],
+                },
             )
             for resource in result.result["data"]:
                 LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
