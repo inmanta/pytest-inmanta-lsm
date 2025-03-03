@@ -902,7 +902,7 @@ class RemoteOrchestrator:
         :param version: The version to check, or None to verify the latest version.
         """
         versions = self.client.list_versions(tid=self.environment)
-        assert versions.code == 200
+        assert versions.code == 200, str(versions.result)
         if version is None:
             return versions.result["versions"][0]["released"]
         lookup = {v["version"]: v["released"] for v in versions.result["versions"]}
