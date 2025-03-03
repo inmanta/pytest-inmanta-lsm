@@ -996,15 +996,11 @@ class RemoteOrchestrator:
             result = self.client.resource_list(
                 self.environment,
                 limit=1,
-                # Default filtering excludes orphaned resources.  Here we filter on another
-                # state, but we still don't want to see the orphaned resources so we filter
-                # them out too.
+                # Filtering on the api uses an OR for all the states that can be accepted,
+                # so we query them all except for the desired one (and dry, because it has
+                # no meaning there)
                 filter={
-                    "status": [
-                        state.value
-                        for state in inmanta.const.DONE_STATES
-                        if state.value not in [desired_state, "dry"]  # orphaned is not part of DONE_STATES
-                    ],
+                    "status": [state.value for state in inmanta.const.DONE_STATES if state.value not in [desired_state, "dry"]],
                 },
             )
             for resource in result.result["data"]:
