@@ -1,9 +1,9 @@
 """
-    Pytest Inmanta LSM
+Pytest Inmanta LSM
 
-    :copyright: 2020 Inmanta
-    :contact: code@inmanta.com
-    :license: Inmanta EULA
+:copyright: 2020 Inmanta
+:contact: code@inmanta.com
+:license: Inmanta EULA
 """
 
 from inmanta import resources

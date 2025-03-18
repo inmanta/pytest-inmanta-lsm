@@ -2,6 +2,7 @@
 Changes in this release:
 - Automatically resolve postgres container version required by product container image.
 - Added support for multi-version lsm on the mock.
+- Fixed wait_until_deployment_finishes for iso8
 
 # v 3.11.0 (2024-12-13)
 Changes in this release:

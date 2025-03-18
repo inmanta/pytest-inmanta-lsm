@@ -1,7 +1,7 @@
 """
-    :copyright: 2022 Inmanta
-    :contact: code@inmanta.com
-    :license: Inmanta EULA
+:copyright: 2022 Inmanta
+:contact: code@inmanta.com
+:license: Inmanta EULA
 """
 
 import collections
