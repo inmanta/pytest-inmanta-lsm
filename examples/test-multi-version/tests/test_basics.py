@@ -91,7 +91,7 @@ def test_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None
     # Create a child service without providing a service_entity_version
     service = lsm_project.create_service(
         service_entity_name="second_parent",
-        attributes={"name": "second_tree"},
+        attributes={"name": "second_tree", "description": "test"},
         # With auto_transfer=True, we follow the first auto transfers of the service's
         # lifecycle, triggering a compile (validating compile when appropriate) for
         # each state we meets.
@@ -106,3 +106,13 @@ def test_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None
     # Move to the up state
     service.state = "up"
     lsm_project.compile(service_id=service.id)
+
+    new_attributes = copy.deepcopy(service.active_attributes)
+    new_attributes["description"] = "my-other-description"
+    lsm_project.update_service(
+        service_id=service.id,
+        attributes=new_attributes,
+        auto_transfer=True,
+    )
+    # Assert that the service has been updated and is now in update_inprogress state
+    assert parent_service.state == "update_inprogress"

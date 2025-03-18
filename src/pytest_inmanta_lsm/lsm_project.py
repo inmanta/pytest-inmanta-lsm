@@ -555,6 +555,7 @@ class LsmProject:
         """
         This is a mock for the lsm api, this method is called ???
         """
+        raise Exception
         # TODO: Not sure where this came up yet
         return inmanta.protocol.common.Result(
             code=500,
@@ -730,7 +731,6 @@ class LsmProject:
                 types,
                 False,
             )
-        print(self.service_entities)
 
     def get_service(self, service_id: typing.Union[uuid.UUID, str]) -> inmanta_lsm.model.ServiceInstance:
         """

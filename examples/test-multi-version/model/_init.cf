@@ -74,7 +74,7 @@ binding_child = lsm::ServiceBinding(
     ]
 )
 
-for instance in lsm::all(binding_parent):
+for instance in lsm::all(binding_parent, include_purged_embedded_entities=true):
     Parent(
         instance_id = instance["id"],
         entity_binding = lsm::get_service_binding_version(binding_parent, 0),
@@ -82,7 +82,7 @@ for instance in lsm::all(binding_parent):
     )
 end
 
-for instance in lsm::all(binding_child):
+for instance in lsm::all(binding_child, include_purged_embedded_entities=true):
     Child(
         instance_id = instance["id"],
         entity_binding = lsm::get_service_binding_version(binding_child, 0),
@@ -112,6 +112,9 @@ implement Child using tracer
 entity SecondTree extends lsm::ServiceEntity:
 """ A service to have a second, disjoint tree of services, one level high in this case """
      string name
+     string description
+    string description__description="The description of the child."
+    lsm::attribute_modifier description__modifier="rw+"
 end
 
 index SecondTree(instance_id)
@@ -133,8 +136,11 @@ for instance in lsm::all(binding_second, include_purged_embedded_entities=true):
         instance_id = instance["id"],
         entity_binding = lsm::get_service_binding_version(binding_second, 0),
         name=instance["attributes"]["name"],
-        other = SecondTreeChild(child_name = instance["attributes"]["name"])
+        description=instance["attributes"]["description"]
     )
+    if instance["attributes"]["description"] == "test":
+        parent.other = SecondTreeChild(child_name = instance["attributes"]["name"])
+    end
 end
 implement SecondTree using parents
 implement SecondTree using tracer
