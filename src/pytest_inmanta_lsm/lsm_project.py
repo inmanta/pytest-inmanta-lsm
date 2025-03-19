@@ -858,13 +858,14 @@ class LsmProject:
         """
         # Resolve the initial state for our service and resolve attributes defaults
         service_entity = self.get_service_entity(service_entity_name, service_entity_version)
+        assert self.service_entities
 
         # Create the service instance object
         service_instance_attributes = {
             "id": service_id or uuid.uuid4(),
             "environment": uuid.UUID(self.environment),
             "service_entity": service_entity_name,
-            "service_entity_version": self.service_entities[service_entity_name, service_entity_version].version,
+            "service_entity_version": self.service_entities[(service_entity_name, service_entity_version)].version,
             "version": 1,
             "desired_state_version": 1,
             "config": {},
@@ -883,10 +884,10 @@ class LsmProject:
         # The `desired_state_version` field has only recently been added to inmanta_lsm.
         # This ensures compatibility with older versions of the orchestrator.
         try:
-            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)
+            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)  # type: ignore
         except AttributeError:
             service_instance_attributes.pop("desired_state_version", None)
-            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)
+            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)  # type: ignore
 
         # Add the service to our inventory
         self.add_service(service)
