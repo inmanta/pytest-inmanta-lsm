@@ -239,7 +239,7 @@ def shared_resource_set_validation(
             )
 
 
-VersionedServiceEntity: typing.TypeAlias = tuple[str, int]
+VersionedServiceEntity: typing.TypeAlias = tuple[str, int | None]
 
 
 class LsmProject:
@@ -255,8 +255,10 @@ class LsmProject:
         self.project = project
         self.monkeypatch = monkeypatch
         self.partial_compile = partial_compile
-        self.service_entities: typing.Optional[dict[VersionedServiceEntity, inmanta_lsm.model.ServiceEntity]] = None
-        self.service_entities_default_versions: dict[str, int] = {}
+        # The service_entities dict will contain the default version of each entity in duplicate
+        # Meaning that it can be reached via the version number i.e. self.service_entities[("my-entity", 0)]
+        # Or by not providing a version number i.e. self.service_entities[("my-entity", None)]
+        self.service_entities: dict[VersionedServiceEntity, inmanta_lsm.model.ServiceEntity] | None = None
 
         # If `self.export_service_entities` is ever called, we will save the model
         # used for the export in this attribute so that we can reuse it for the next
@@ -408,13 +410,6 @@ class LsmProject:
 
         # Monkeypatch the client because it was just re-created by the reset function
         self.monkeypatch_client()
-
-    def get_entity_version(self, service_entity: str, version: typing.Optional[int] = None) -> int:
-        """
-        Returns the version to use for this service entity
-        """
-
-        return version if version is not None else self.service_entities_default_versions.get(service_entity, 0)
 
     def lsm_services_list(self, tid: uuid.UUID, service_entity: str) -> inmanta.protocol.common.Result:
         """
@@ -588,9 +583,7 @@ class LsmProject:
         ), "The service catalog has not been initialized, please call self.export_service_entities"
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
 
-        entity_version = self.get_entity_version(service_entity, version)
-
-        if (service_entity, entity_version) not in self.service_entities:
+        if (service_entity, version) not in self.service_entities:
             return inmanta.protocol.common.Result(code=404)
 
         return inmanta.protocol.common.Result(
@@ -598,7 +591,7 @@ class LsmProject:
             result={
                 "data": json.loads(
                     json.dumps(
-                        self.service_entities[(service_entity, entity_version)],
+                        self.service_entities[(service_entity, version)],
                         default=inmanta.util.api_boundary_json_encoder,
                     ),
                 ),
@@ -621,7 +614,7 @@ class LsmProject:
 
         # Don't do any validation, just save the service in the catalog
         self.service_entities[(service_entity_definition.name, service_entity_definition.version)] = service_entity_definition
-        self.service_entities_default_versions[service_entity_definition.name] = service_entity_definition.version
+        self.service_entities[(service_entity_definition.name, None)] = service_entity_definition
         return self.lsm_service_catalog_get_entity(tid, service_entity_definition.name, service_entity_definition.version)
 
     def lsm_service_catalog_update_entity(
@@ -659,10 +652,13 @@ class LsmProject:
         ), "The service catalog has not been initialized, please call self.export_service_entities"
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
 
-        self.service_entities_default_versions[service_entity] = default_version
         for sed in service_entity_definitions:
             self.service_entities[(service_entity, sed.version)] = sed
-        relevant_versions = [se for se in self.service_entities.values() if se.name == service_entity]
+            if sed.version == default_version:
+                self.service_entities[(service_entity, None)] = sed
+        relevant_versions = [
+            se for (name, version), se in self.service_entities.items() if name == service_entity and version is not None
+        ]
         sev = inmanta_lsm.model.ServiceEntityVersions(versions=relevant_versions, default_version=default_version)
         return inmanta.protocol.common.Result(
             code=200,
@@ -710,7 +706,6 @@ class LsmProject:
         # Save the model used in the export, and reset the service entity catalog
         self.model = model
         self.service_entities = {}
-        self.service_entities_default_versions = {}
 
         with self.monkeypatch.context() as m:
             # Monkey patch the sync client constructor call, so that the object
@@ -757,14 +752,12 @@ class LsmProject:
                 "Please call self.export_service_entities."
             )
 
-        entity_version = self.get_entity_version(service_entity_name, version)
-
-        if (service_entity_name, entity_version) not in self.service_entities:
+        if (service_entity_name, version) not in self.service_entities:
             raise LookupError(
                 f"Unknown service entity {service_entity_name}.  Known services are: {list(self.service_entities.keys())}."
             )
 
-        return self.service_entities[(service_entity_name, entity_version)]
+        return self.service_entities[(service_entity_name, version)]
 
     def auto_transfer(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
         """
@@ -873,7 +866,7 @@ class LsmProject:
             "id": service_id or uuid.uuid4(),
             "environment": uuid.UUID(self.environment),
             "service_entity": service_entity_name,
-            "service_entity_version": self.get_entity_version(service_entity_name, service_entity_version),
+            "service_entity_version": self.service_entities[service_entity_name, service_entity_version].version,
             "version": 1,
             "desired_state_version": 1,
             "config": {},
