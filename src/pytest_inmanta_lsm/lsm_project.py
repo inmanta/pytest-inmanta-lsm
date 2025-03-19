@@ -572,7 +572,7 @@ class LsmProject:
         )
 
     def lsm_service_catalog_get_entity(
-        self, tid: uuid.UUID, service_entity: str, version: typing.Optional[int] = None
+        self, tid: uuid.UUID, service_entity: str, version: int | None = None
     ) -> inmanta.protocol.common.Result:
         """
         This is a mock for the lsm api, this method is called during export of the
@@ -735,9 +735,7 @@ class LsmProject:
 
         return self.services[str(service_id)]
 
-    def get_service_entity(
-        self, service_entity_name: str, version: typing.Optional[int] = None
-    ) -> inmanta_lsm.model.ServiceEntity:
+    def get_service_entity(self, service_entity_name: str, version: int | None = None) -> inmanta_lsm.model.ServiceEntity:
         """
         Get the service entity with the given name from our service catalog.  If no such service
         entity exists, raise a LookupError.  If the service catalog has not been exported yet,
@@ -836,7 +834,7 @@ class LsmProject:
         service_entity_name: str,
         attributes: dict,
         *,
-        service_entity_version: typing.Optional[int] = None,
+        service_entity_version: int | None = None,
         auto_transfer: bool = True,
         service_id: typing.Optional[uuid.UUID] = None,
     ) -> inmanta_lsm.model.ServiceInstance:
