@@ -362,12 +362,12 @@ class LsmProject:
             raising=False,
         )
 
-        # self.monkeypatch.setattr(
-        #     inmanta_plugins.lsm.global_cache.get_client(),
-        #     "lsm_service_catalog_get_entity_version",
-        #     self.lsm_service_catalog_get_entity_version,
-        #     raising=False,
-        # )
+        self.monkeypatch.setattr(
+            inmanta_plugins.lsm.global_cache.get_client(),
+            "lsm_service_catalog_get_entity_version",
+            self.lsm_service_catalog_get_entity_version,
+            raising=False,
+        )
 
         self.monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
@@ -553,16 +553,9 @@ class LsmProject:
         version: int,
     ) -> inmanta.protocol.common.Result:
         """
-        This is a mock for the lsm api, this method is called ???
+        This is a mock for the lsm api, this method is called when `include_purged_embedded_entities` is set to true
+        when unrolling a service entity binding.
         """
-        raise Exception
-        # TODO: Not sure where this came up yet
-        return inmanta.protocol.common.Result(
-            code=500,
-            result={
-                "message": "LsmProject doesn't support multi-version lsm yet",
-            },
-        )
         assert (
             self.service_entities is not None
         ), "The service catalog has not been initialized, please call self.export_service_entities"
