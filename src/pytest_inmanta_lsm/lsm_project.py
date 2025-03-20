@@ -884,10 +884,10 @@ class LsmProject:
         # The `desired_state_version` field has only recently been added to inmanta_lsm.
         # This ensures compatibility with older versions of the orchestrator.
         try:
-            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)  # type: ignore
+            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)  # type: ignore[arg-type]
         except AttributeError:
             service_instance_attributes.pop("desired_state_version", None)
-            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)  # type: ignore
+            service = inmanta_lsm.model.ServiceInstance(**service_instance_attributes)  # type: ignore[arg-type]
 
         # Add the service to our inventory
         self.add_service(service)
