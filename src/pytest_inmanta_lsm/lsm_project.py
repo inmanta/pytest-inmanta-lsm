@@ -734,16 +734,22 @@ class LsmProject:
                 "Please call self.export_service_entities."
             )
 
-        key, entity_dict = (
-            ((service_entity_name, version), self.service_entity_versions)
-            if version is not None
-            else (service_entity_name, self.service_entities)
-        )
+        if service_entity_name not in self.service_entities:
+            raise LookupError(
+                f"Unknown service entity {service_entity_name}. Known services are: {list(self.service_entities.keys())}."
+            )
 
-        if key not in entity_dict:
-            raise LookupError(f"Unknown service entity {key}.  Known services are: {list(entity_dict.keys())}.")
+        # If we don't want a specific version, take the default one
+        version = version if version is not None else self.service_entities[service_entity_name].version
 
-        return entity_dict[key]  # type: ignore[index]
+        if (service_entity_name, version) not in self.service_entity_versions:
+            # Version doesn't exist
+            raise LookupError(
+                f"Unknown service entity {service_entity_name} version {version}."
+                f" Known services are: {list(self.service_entity_versions.keys())}."
+            )
+
+        return self.service_entity_versions[(service_entity_name, version)]
 
     def auto_transfer(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
         """
