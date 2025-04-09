@@ -1,9 +1,9 @@
 """
-    Pytest Inmanta LSM
+Pytest Inmanta LSM
 
-    :copyright: 2020 Inmanta
-    :contact: code@inmanta.com
-    :license: Inmanta EULA
+:copyright: 2020 Inmanta
+:contact: code@inmanta.com
+:license: Inmanta EULA
 """
 
 import json
@@ -19,7 +19,9 @@ from textwrap import dedent
 from types import TracebackType
 from typing import List, Optional, Tuple, Type
 
+import requests
 from inmanta.config import LenientConfigParser
+from packaging import version
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
     Helper function to run command and log the results.  Raises a CalledProcessError
     if the command failed.
     """
-    LOGGER.info(f"Running command: {cmd}")
+    LOGGER.info("Running command: %s", cmd)
     env_vars = dict(os.environ)
     env_vars.pop("PYTHONPATH", None)
     result = subprocess.run(
@@ -45,11 +47,78 @@ def run_cmd(*, cmd: List[str], cwd: Path) -> Tuple[str, str]:
         env=env_vars,
     )
 
-    LOGGER.debug(f"Return code: {result.returncode}")
+    LOGGER.debug("Return code: %d", result.returncode)
     LOGGER.debug("Stdout: %s", result.stdout)
     LOGGER.debug("Stderr: %s", result.stderr)
     result.check_returncode()
     return result.stdout, result.stderr
+
+
+def get_image_version(image: str) -> version.Version:
+    """
+    Get the product version from the container image tag.  Inspect the inmanta-service-orchestrator
+    package installed inside the container image to figure it out.
+    """
+    run_cmd(cmd=["docker", "pull", image], cwd=Path())
+    raw_version, _ = run_cmd(
+        cmd=[
+            "docker",
+            "run",
+            "--rm",
+            "--entrypoint=/opt/inmanta/bin/python",
+            image,
+            "-c",
+            "import importlib.metadata; print(importlib.metadata.version('inmanta-service-orchestrator'))",
+        ],
+        cwd=Path(),
+    )
+    return version.Version(raw_version.strip())
+
+
+def _get_product_compatibility(v: version.Version) -> dict:
+    """
+    Get the product compatibility information from inmanta's documentation page.
+    For example, for iso7-dev, return the content of
+    https://docs.inmanta.com/inmanta-service-orchestrator-dev/7/reference/compatibility.json
+
+    ..code-block:: json
+
+        {
+            "python_package_constraints": {
+                "inmanta-core": "~=11.0.dev",
+                "inmanta-license": "~=4.0.dev",
+                "inmanta-lsm": "~=4.0.dev",
+                "inmanta-support": "~=3.2.dev",
+                "inmanta-ui": "~=5.1.dev",
+                "inmanta-module-connect": "~=2.0",
+                "inmanta-module-lsm": "~=2.27",
+                "inmanta-module-std": "~=5.0"
+            },
+            "system_requirements": {
+                "python_version": "3.11",
+                "rhel_versions": [
+                    9,
+                    8
+                ],
+                "postgres_version": 13
+            },
+            "module_compatibility_ranges": {
+                "inmanta-module-connect": "~=2.0",
+                "inmanta-module-lsm": "~=2.27",
+                "inmanta-module-std": "~=5.0"
+            }
+        }
+
+    :param version: The version of the product we want to know the compatibility for
+    """
+    if v.is_prerelease:
+        url = f"https://docs.inmanta.com/inmanta-service-orchestrator-dev/{v.major}/reference/compatibility.json"
+    else:
+        url = f"https://docs.inmanta.com/inmanta-service-orchestrator/{v.major}/reference/compatibility.json"
+
+    resp = requests.get(url)
+    resp.raise_for_status()
+    return resp.json()
 
 
 class DoNotCleanOrchestratorContainer(RuntimeError):
@@ -94,7 +163,7 @@ class OrchestratorContainer:
         compose_file: Path,
         *,
         orchestrator_image: str,
-        postgres_version: str,
+        postgres_version: str = "auto",
         public_key_file: Path,
         license_file: str,
         entitlement_file: str,
@@ -106,7 +175,9 @@ class OrchestratorContainer:
             The new file should have at least two services: `postgresql` and `inmanta-server`.
         :param orchestrator_image: The name of the image that should be set in the docker-compose file.
         :param postgres_version: The version of postgres that should be used in the lab.  The version
-            is a string that should match a tag of the official postgres docker image.
+            is a string that should match a tag of the official postgres docker image, or the string "auto",
+            which will trigger an automatic resolving of the appropriate version for this orchestrator
+            image.
         :param public_key_file: A public rsa key that will be added to the container, so that you can
             ssh to it.
         :param license_file: A license file that should be used to start the orchestrator, without it,
@@ -118,7 +189,16 @@ class OrchestratorContainer:
         """
         self.compose_file = compose_file
         self.orchestrator_image = orchestrator_image
-        self.postgres_version = postgres_version
+        self.orchestrator_version = get_image_version(self.orchestrator_image)
+
+        if postgres_version == "auto":
+            # Automatically discover the appropriate postgres version based on the product documentation
+            self.postgres_version = str(
+                _get_product_compatibility(self.orchestrator_version)["system_requirements"]["postgres_version"]
+            )
+        else:
+            self.postgres_version = postgres_version
+
         self.public_key_file = public_key_file
         self.license_file = license_file
         self.entitlement_file = entitlement_file
@@ -152,12 +232,12 @@ class OrchestratorContainer:
         db_hostname = f"{self._cwd.name}-postgres-1"
 
         env_file = f"""
-            INMANTA_LSM_CONTAINER_DB_HOSTNAME={db_hostname}
-            INMANTA_LSM_CONTAINER_DB_VERSION={self.postgres_version}
-            INMANTA_LSM_CONTAINER_ORCHESTRATOR_IMAGE={self.orchestrator_image}
-            INMANTA_LSM_CONTAINER_PUBLIC_KEY_FILE={self.public_key_file}
-            INMANTA_LSM_CONTAINER_LICENSE_FILE={self.license_file}
-            INMANTA_LSM_CONTAINER_ENTITLEMENT_FILE={self.entitlement_file}
+            DB_HOSTNAME={db_hostname}
+            DB_VERSION={self.postgres_version}
+            ORCHESTRATOR_IMAGE={self.orchestrator_image}
+            ORCHESTRATOR_PUBLIC_KEY_FILE={self.public_key_file}
+            ORCHESTRATOR_LICENSE_FILE={self.license_file}
+            ORCHESTRATOR_ENTITLEMENT_FILE={self.entitlement_file}
         """
         env_file = dedent(env_file.strip("\n"))
 

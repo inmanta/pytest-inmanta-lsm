@@ -1,9 +1,9 @@
 """
-    Pytest Inmanta LSM
+Pytest Inmanta LSM
 
-    :copyright: 2020 Inmanta
-    :contact: code@inmanta.com
-    :license: Inmanta EULA
+:copyright: 2020 Inmanta
+:contact: code@inmanta.com
+:license: Inmanta EULA
 """
 
 import dataclasses
@@ -18,6 +18,7 @@ import uuid
 from pprint import pformat
 from uuid import UUID
 
+import inmanta.const
 import inmanta.data.model
 import inmanta.model
 import inmanta.module
@@ -286,7 +287,6 @@ class RemoteOrchestrator:
         """
         Setup the config required to make it possible for the client to reach the orchestrator.
         """
-        inmanta_config.Config.load_config()
         inmanta_config.Config.set("config", "environment", str(self.environment))
 
         for section in ["compiler_rest_transport", "client_rest_transport"]:
@@ -887,37 +887,127 @@ class RemoteOrchestrator:
             cwd=str(self.remote_project_path),
         )
 
+    def wait_for_released(self, version: int | None = None) -> None:
+        """
+        Wait for a given version to be released by the orchestrator.
+        :param version: The version to wait for, or None to wait for the latest.
+        """
+        retry_limited(functools.partial(self.is_released, version), timeout=3)
+
+    def is_released(self, version: int | None = None) -> bool:
+        """
+        Verify if a given version has already been released by the orchestrator.
+        :param version: The version to check, or None to verify the latest version.
+        """
+        versions = self.client.list_versions(tid=self.environment)
+        assert versions.code == 200, str(versions.result)
+        if version is None:
+            return versions.result["versions"][0]["released"]
+        lookup = {v["version"]: v["released"] for v in versions.result["versions"]}
+        return lookup[version]
+
     def wait_until_deployment_finishes(
         self,
         version: int,
         timeout: int = 600,
-        desired_state: str = "deployed",
+        desired_state: str | None = "deployed",
     ) -> None:
         """
         :param version: Version number which will be checked on orchestrator
         :param timeout: Value of timeout in seconds
-        :param desired_state: Expected state of each resource when the deployment is ready
+        :param desired_state: Expected state of each resource when the deployment is ready. If None,
+            doesn't check for the state reached by each resource.
         :raise AssertionError: In case of wrong state or timeout expiration
         """
 
-        def is_deployment_finished() -> bool:
-            response = self.client.get_version(self.environment, version)
-            assert response.result is not None
-            LOGGER.info(
-                "Deployed %s of %s resources",
-                response.result["model"]["done"],
-                response.result["model"]["total"],
-            )
-            return response.result["model"]["total"] - response.result["model"]["done"] <= 0
+        # Determine api version.  The resource engine of the orchestrator has evolved.  Checking the
+        # layout of the api response allows us to know whether we are dealing with an old orchestrator
+        # or the new resource scheduler.
+        response = self.client.get_version(self.environment, version)
+        assert response.result is not None
+        new_api = "done" not in response.result["model"]
 
-        retry_limited(is_deployment_finished, timeout)
-        result = self.client.get_version(self.environment, version)
-        assert result.result is not None
-        for resource in result.result["resources"]:
-            LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
-            assert (
-                resource["status"] == desired_state
-            ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
+        if not new_api:
+
+            def is_deployment_finished() -> bool:
+                response = self.client.get_version(self.environment, version)
+                assert response.result is not None
+                LOGGER.info(
+                    "Deployed %s of %s resources",
+                    response.result["model"]["done"],
+                    response.result["model"]["total"],
+                )
+                return response.result["model"]["total"] - response.result["model"]["done"] <= 0
+
+            retry_limited(is_deployment_finished, timeout)
+
+            if desired_state is None:
+                # We are done waiting, and there is nothing more to verify
+                return
+
+            # Verify that none of the resources in the version have an unexpected state
+            result = self.client.get_version(self.environment, version)
+            assert result.result is not None
+            for resource in result.result["resources"]:
+                LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
+                assert (
+                    resource["status"] == desired_state
+                ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
+
+        else:
+            self.wait_for_released(version)
+
+            def get_deployment_progress():
+                result = self.client.resource_list(self.environment, deploy_summary=True, limit=1)
+                assert result.code == 200, str(result.result)
+                summary = result.result["metadata"]["deploy_summary"]
+                # {'by_state': {'available': 3, 'cancelled': 0, 'deployed': 12, 'deploying': 0, 'failed': 0, 'skipped': 0,
+                #               'skipped_for_undefined': 0, 'unavailable': 0, 'undefined': 0}, 'total': 15}
+                return (
+                    sum(
+                        summary["by_state"][state.value]
+                        for state in inmanta.const.DONE_STATES
+                        # https://github.com/inmanta/inmanta-core/blob/d25205bdd49016596ad7653597a2cc99a8ed3992/src/inmanta/data/model.py#L379
+                        if state != inmanta.const.ResourceState.dry
+                    ),
+                    summary["by_state"]["failed"],
+                    summary["total"],
+                )
+
+            def is_deployment_finished() -> bool:
+                done, failed, total = get_deployment_progress()
+                LOGGER.info(
+                    "Deployed %s of %s resources",
+                    done,
+                    total,
+                )
+                return total - done <= 0
+
+            retry_limited(is_deployment_finished, timeout)
+
+            if desired_state is None:
+                # We are done waiting, and there is nothing more to verify
+                return
+
+            # Here we care about the resource which didn't reach the expected
+            # desired state, and we raise an assertion error for the first one
+            # that doesn't match, so we can simply fetch the first mismatching
+            # resource from the api.
+            result = self.client.resource_list(
+                self.environment,
+                limit=1,
+                # Filtering on the api uses an OR for all the states that can be accepted,
+                # so we query them all except for the desired one (and dry, because it has
+                # no meaning there)
+                filter={
+                    "status": [state.value for state in inmanta.const.DONE_STATES if state.value not in [desired_state, "dry"]],
+                },
+            )
+            for resource in result.result["data"]:
+                LOGGER.info(f"Resource Status:\n{resource['status']}\n{pformat(resource, width=140)}\n")
+                assert (
+                    resource["status"] == desired_state
+                ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
 
     def get_validation_failure_message(
         self,
