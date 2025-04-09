@@ -1,4 +1,4 @@
-# v 3.12.0 (?)
+# v 3.12.0 (2025-04-09)
 Changes in this release:
 - Automatically resolve postgres container version required by product container image.
 - Added support for multi-version lsm on the mock.
