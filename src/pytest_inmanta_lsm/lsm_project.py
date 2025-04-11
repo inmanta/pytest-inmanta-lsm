@@ -247,13 +247,11 @@ class LsmProject:
         self,
         environment: uuid.UUID,
         project: pytest_inmanta.plugin.Project,
-        monkeypatch: pytest.MonkeyPatch,
         partial_compile: bool,
     ) -> None:
         inmanta.config.Config.set("config", "environment", str(environment))
         self.services: dict[str, inmanta_lsm.model.ServiceInstance] = {}
         self.project = project
-        self.monkeypatch = monkeypatch
         self.partial_compile = partial_compile
         # The service_entities dict will contain the default version of each entity
         self.service_entities: dict[str, inmanta_lsm.model.ServiceEntity] | None = None
@@ -267,14 +265,6 @@ class LsmProject:
         # A dict holding all the previously exported shared resources, this is populated
         # and updated in each call to `self.post_partial_compile_validation`
         self.shared_resource_set: dict[inmanta.resources.Id, inmanta.resources.Resource] = {}
-
-        # We monkeypatch the client and the global cache now so that the project.compile
-        # method can still be used normally, to perform "global" compiles (not specific to
-        # a service)
-        # The monkeypatching we do later in the `compile` method is only there to specify to
-        # lsm which service has "triggered" the compilation.
-        self.monkeypatch_client()
-        self.monkeypatch_lsm_global_cache_reset()
 
     @property
     def environment(self) -> str:
@@ -295,33 +285,7 @@ class LsmProject:
             .export_resources
         }
 
-    def monkeypatch_lsm_global_cache_reset(self) -> None:
-        """
-        This helper method monkeypatches the reset method of the global_cache of the lsm module.
-        We make sure to pass to save the original reset method implementation so that it can be
-        called by the monkeypatched method.
-
-        This method should only be called once, in the constructor.  If it is called multiple times,
-        the reset method will be monkeypatched multiple times.  It should not hurt, but it is useless.
-        """
-        try:
-            # Import lsm module in function scope for usage with v1 modules
-            import inmanta_plugins.lsm  # type: ignore
-        except ImportError as e:
-            raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
-
-        # Monkeypatch the global cache reset function to be sure that every time it
-        # is called we also monkey patch the client
-        self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache,
-            "reset",
-            functools.partial(
-                self.lsm_global_cache_reset,
-                inmanta_plugins.lsm.global_cache.reset,
-            ),
-        )
-
-    def monkeypatch_client(self) -> None:
+    def monkeypatch_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """
         This helper method monkeypatches the inmanta client object used by the lsm global cache, to
         make sure that all calls to the lsm api are instead handled locally.  For now we only need to
@@ -338,80 +302,68 @@ class LsmProject:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
 
         # Then we monkeypatch the client
-        self.monkeypatch.setattr(
+        monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_list",
             self.lsm_services_list,
             raising=False,
         )
 
-        self.monkeypatch.setattr(
+        monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_get_by_id",
             self.lsm_services_get_by_id,
             raising=False,
         )
 
-        self.monkeypatch.setattr(
+        monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_update_attributes",
             self.lsm_services_update_attributes,
             raising=False,
         )
 
-        self.monkeypatch.setattr(
+        monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_services_update_attributes_v2",
             self.lsm_services_update_attributes_v2,
             raising=False,
         )
 
-        self.monkeypatch.setattr(
+        monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_service_catalog_get_entity_version",
             self.lsm_service_catalog_get_entity_version,
             raising=False,
         )
 
-        self.monkeypatch.setattr(
+        monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_service_catalog_get_entity",
             self.lsm_service_catalog_get_entity,
             raising=False,
         )
 
-        self.monkeypatch.setattr(
+        monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_service_catalog_create_entity",
             self.lsm_service_catalog_create_entity,
             raising=False,
         )
 
-        self.monkeypatch.setattr(
+        monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_service_catalog_update_entity",
             self.lsm_service_catalog_update_entity,
             raising=False,
         )
 
-        self.monkeypatch.setattr(
+        monkeypatch.setattr(
             inmanta_plugins.lsm.global_cache.get_client(),
             "lsm_service_catalog_update_entity_versions",
             self.lsm_service_catalog_update_entity_versions,
             raising=False,
         )
-
-    def lsm_global_cache_reset(self, original_global_cache_reset_method: typing.Callable[[], None]) -> None:
-        """
-        This is a placeholder for the lsm global_cache reset method.  First it calls the original method,
-        to ensure that we keep its behavior, whatever it is.  Then it re-monkeypatches the client, as it has
-        been re-created in the reset call.
-        """
-        # First we call the original reset method, letting it do its reset thing
-        original_global_cache_reset_method()
-
-        # Monkeypatch the client because it was just re-created by the reset function
-        self.monkeypatch_client()
 
     def lsm_services_list(self, tid: uuid.UUID, service_entity: str) -> inmanta.protocol.common.Result:
         """
@@ -1003,26 +955,25 @@ class LsmProject:
                 "should be used for all later compiles."
             )
 
-        if service_id is None:
-            # This is not a service-specific compile, we can just run the compile
-            # without setting any environment variables
-            self.project.compile(model, no_dedent=False)
-            return
-
         # Sort out the type variance of service_id
-        if isinstance(service_id, (str, uuid.UUID)):
-            # strings are also sequences
-            service_ids = str(service_id)
-        elif isinstance(service_id, typing.Sequence):
-            service_ids = " ".join(str(i) for i in service_id)
-        else:
-            raise TypeError(f"Unexpected argument type for service_id, got {service_id} ({type(service_id)})")
+        match service_id:
+            case str() | uuid.UUID():
+                # Strings are also sequences, they need to be checked first
+                service_ids = str(service_id)
+            case typing.Sequence():
+                service_ids = " ".join(str(i) for i in service_id)
+            case None:
+                service_ids = ""
+            case _:
+                raise TypeError(f"Unexpected argument type for service_id, got {service_id} ({type(service_id)})")
 
         # Make sure all instances exist in the inventory
         for service_id in service_ids.split(" "):
             service = self.get_service(service_id)
 
-        env: dict[str, str] = {inmanta_lsm.const.ENV_INSTANCE_ID: service_ids}
+        env: dict[str, str] = {}
+        if service_ids:
+            env[inmanta_lsm.const.ENV_INSTANCE_ID] = service_ids
 
         if validation:
             if len(service_ids.split(" ")) != 1:
@@ -1049,7 +1000,8 @@ class LsmProject:
             service_ids,
             env,
         )
-        with self.monkeypatch.context() as m:
+        with pytest.MonkeyPatch.context() as m:
+            self.monkeypatch_client(m)
             for k, v in env.items():
                 m.setenv(k, v)
             self.project.compile(model, no_dedent=False)
@@ -1123,7 +1075,7 @@ class LsmProject:
 
         # Get the previously compiled model and perform a full compile, this should work at any stage
         model = pathlib.Path(self.project._test_project_dir, "main.cf").read_text()
-        self.project.compile(model)
+        self.compile(model, service_id=None, validation=False)
 
         # Check that we have as many resource sets as there are services
         assert get_resource_sets(self.project).keys() == self.exporting_services.keys()
