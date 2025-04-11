@@ -1,5 +1,6 @@
 # v 3.13.0 (?)
 Changes in this release:
+- Addressed memory leak caused by LsmProject monkeypatching.
 
 # v 3.12.0 (2025-04-09)
 Changes in this release:

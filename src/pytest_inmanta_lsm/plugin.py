@@ -105,7 +105,6 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
 
 @pytest.fixture(name="lsm_project")
 def lsm_project_fixture(
-    monkeypatch: pytest.MonkeyPatch,
     project: pytest_inmanta.plugin.Project,
     remote_orchestrator_partial: bool,
 ) -> "lsm_project.LsmProject":
@@ -119,7 +118,6 @@ def lsm_project_fixture(
     return lsm_project.LsmProject(
         uuid.uuid4(),
         project,
-        monkeypatch,
         partial_compile=remote_orchestrator_partial,
     )
 
