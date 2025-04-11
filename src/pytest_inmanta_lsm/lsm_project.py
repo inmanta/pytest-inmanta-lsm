@@ -5,6 +5,7 @@
 """
 
 import collections
+import collections.abc
 import copy
 import datetime
 import functools
@@ -959,24 +960,24 @@ class LsmProject:
         match service_id:
             case str() | uuid.UUID():
                 # Strings are also sequences, they need to be checked first
-                service_ids = str(service_id)
-            case typing.Sequence():
-                service_ids = " ".join(str(i) for i in service_id)
+                service_ids = [str(service_id)]
+            case collections.abc.Sequence():
+                service_ids = [str(i) for i in service_id]
             case None:
-                service_ids = ""
+                service_ids = []
             case _:
                 raise TypeError(f"Unexpected argument type for service_id, got {service_id} ({type(service_id)})")
 
         # Make sure all instances exist in the inventory
-        for service_id in service_ids.split(" "):
+        for service_id in service_ids:
             service = self.get_service(service_id)
 
         env: dict[str, str] = {}
         if service_ids:
-            env[inmanta_lsm.const.ENV_INSTANCE_ID] = service_ids
+            env[inmanta_lsm.const.ENV_INSTANCE_ID] = " ".join(service_ids)
 
         if validation:
-            if len(service_ids.split(" ")) != 1:
+            if len(service_ids) != 1:
                 raise Exception(
                     f"when performing a validation compile, only one service id can be passed, got {repr(service_ids)}"
                 )
