@@ -289,78 +289,78 @@ class LsmProject:
     def monkeypatch_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """
         This helper method monkeypatches the inmanta client object used by the lsm global cache, to
-        make sure that all calls to the lsm api are instead handled locally.  For now we only need to
-        patch two calls:
-        - lsm_services_list: This way we will return as being part of the lsm inventory the services
-            that have been added to this instance of the LsmProject object.
-        - lsm_services_update_attributes: This way we can, during allocation, update the values of the
-            services we have in our local/mocked inventory.
+        make sure that all calls to the lsm api are instead handled locally.
         """
         try:
             # Import lsm module in function scope for usage with v1 modules
             import inmanta_plugins.lsm  # type: ignore
         except ImportError as e:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
+        
+        # Make sure that the sync client object that is created during compile
+        # is the one we monkeypatch
+        sync_client = inmanta_plugins.lsm.global_cache.get_client()
+        monkeypatch.setattr(inmanta.protocol.endpoints, "SyncClient", lambda _: sync_client)
 
         # Then we monkeypatch the client
         monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_services_list",
             self.lsm_services_list,
             raising=False,
         )
 
         monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_services_get_by_id",
             self.lsm_services_get_by_id,
             raising=False,
         )
 
         monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_services_update_attributes",
             self.lsm_services_update_attributes,
             raising=False,
         )
 
         monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_services_update_attributes_v2",
             self.lsm_services_update_attributes_v2,
             raising=False,
         )
 
         monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_get_entity_version",
             self.lsm_service_catalog_get_entity_version,
             raising=False,
         )
 
         monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_get_entity",
             self.lsm_service_catalog_get_entity,
             raising=False,
         )
 
         monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_create_entity",
             self.lsm_service_catalog_create_entity,
             raising=False,
         )
 
         monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_update_entity",
             self.lsm_service_catalog_update_entity,
             raising=False,
         )
 
         monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_update_entity_versions",
             self.lsm_service_catalog_update_entity_versions,
             raising=False,
@@ -623,8 +623,9 @@ class LsmProject:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
 
         # Make a compile without any services in the catalog
-        with self.monkeypatch.context() as m:
+        with pytest.MonkeyPatch.context() as m:
             m.setattr(self, "services", {})
+            self.monkeypatch_client(m)
             self.project.compile(model, no_dedent=False)
 
         # Get the exporter, it should have been set during the compile
@@ -644,11 +645,10 @@ class LsmProject:
         self.service_entities = {}
         self.service_entity_versions = {}
 
-        with self.monkeypatch.context() as m:
+        with pytest.MonkeyPatch.context() as m:
             # Monkey patch the sync client constructor call, so that the object
             # constructed inside of the lsm function has the patches we want it to have
-            sync_client = inmanta_plugins.lsm.global_cache.get_client()
-            m.setattr(inmanta.protocol.endpoints, "SyncClient", lambda _: sync_client)
+            self.monkeypatch_client(m)
 
             # Delegate the proper export to the existing logic in lsm module
             inmanta_plugins.lsm.do_export_service_entities(
@@ -969,8 +969,8 @@ class LsmProject:
                 raise TypeError(f"Unexpected argument type for service_id, got {service_id} ({type(service_id)})")
 
         # Make sure all instances exist in the inventory
-        for service_id in service_ids:
-            service = self.get_service(service_id)
+        for srv in service_ids:
+            service = self.get_service(srv)
 
         env: dict[str, str] = {}
         if service_ids:
@@ -981,20 +981,21 @@ class LsmProject:
                 raise Exception(
                     f"when performing a validation compile, only one service id can be passed, got {repr(service_ids)}"
                 )
-            service = self.get_service(service_ids)
+
+            # Get the service's current version to set it in the env var
+            service = self.get_service(service_ids[0])
             env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
 
+            # If we have a validation compile, we need to set an additional env var
+            env[inmanta_lsm.const.ENV_MODEL_STATE] = inmanta_lsm.model.ModelState.candidate
+
         try:
-            env[inmanta_lsm.const.ENV_PARTIAL_COMPILE] = str(self.partial_compile)
+            env[inmanta_lsm.const.ENV_PARTIAL_COMPILE] = str(self.partial_compile and bool(service_ids))
         except AttributeError:
             # This attribute only exists for iso5+, iso4 doesn't support partial compile.
             # We then simply don't set the value.
             if self.partial_compile:
                 warnings.warn("Partial compile is enabled but it is not supported, it will be ignored.")
-
-        if validation:
-            # If we have a validation compile, we need to set an additional env var
-            env[inmanta_lsm.const.ENV_MODEL_STATE] = inmanta_lsm.model.ModelState.candidate
 
         LOGGER.debug(
             "Triggering compile for service %s with the following environment variables: %s",
