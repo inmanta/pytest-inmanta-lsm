@@ -247,11 +247,13 @@ class LsmProject:
         self,
         environment: uuid.UUID,
         project: pytest_inmanta.plugin.Project,
+        monkeypatch: pytest.MonkeyPatch,
         partial_compile: bool,
     ) -> None:
         inmanta.config.Config.set("config", "environment", str(environment))
         self.services: dict[str, inmanta_lsm.model.ServiceInstance] = {}
         self.project = project
+        self.monkeypatch = monkeypatch
         self.partial_compile = partial_compile
         # The service_entities dict will contain the default version of each entity
         self.service_entities: dict[str, inmanta_lsm.model.ServiceEntity] | None = None
@@ -265,6 +267,13 @@ class LsmProject:
         # A dict holding all the previously exported shared resources, this is populated
         # and updated in each call to `self.post_partial_compile_validation`
         self.shared_resource_set: dict[inmanta.resources.Id, inmanta.resources.Resource] = {}
+
+        # We monkeypatch the client and the global cache now so that the project.compile
+        # method can still be used normally, to perform "global" compiles (not specific to
+        # a service)
+        # The monkeypatching we do later in the `compile` method is only there to specify to
+        # lsm which service has "triggered" the compilation.
+        self.monkeypatch_client()
 
     @property
     def environment(self) -> str:
@@ -285,7 +294,7 @@ class LsmProject:
             .export_resources
         }
 
-    def monkeypatch_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def monkeypatch_client(self) -> None:
         """
         This helper method monkeypatches the inmanta client object used by the lsm global cache, to
         make sure that all calls to the lsm api are instead handled locally.
@@ -299,66 +308,66 @@ class LsmProject:
         # Make sure that the sync client object that is created during compile
         # is the one we monkeypatch
         sync_client = inmanta_plugins.lsm.global_cache.get_client()
-        monkeypatch.setattr(inmanta.protocol.endpoints, "SyncClient", lambda _: sync_client)
+        self.monkeypatch.setattr(inmanta.protocol.endpoints, "SyncClient", lambda _: sync_client)
 
         # Then we monkeypatch the client
-        monkeypatch.setattr(
+        self.monkeypatch.setattr(
             sync_client,
             "lsm_services_list",
             self.lsm_services_list,
             raising=False,
         )
 
-        monkeypatch.setattr(
+        self.monkeypatch.setattr(
             sync_client,
             "lsm_services_get_by_id",
             self.lsm_services_get_by_id,
             raising=False,
         )
 
-        monkeypatch.setattr(
+        self.monkeypatch.setattr(
             sync_client,
             "lsm_services_update_attributes",
             self.lsm_services_update_attributes,
             raising=False,
         )
 
-        monkeypatch.setattr(
+        self.monkeypatch.setattr(
             sync_client,
             "lsm_services_update_attributes_v2",
             self.lsm_services_update_attributes_v2,
             raising=False,
         )
 
-        monkeypatch.setattr(
+        self.monkeypatch.setattr(
             sync_client,
             "lsm_service_catalog_get_entity_version",
             self.lsm_service_catalog_get_entity_version,
             raising=False,
         )
 
-        monkeypatch.setattr(
+        self.monkeypatch.setattr(
             sync_client,
             "lsm_service_catalog_get_entity",
             self.lsm_service_catalog_get_entity,
             raising=False,
         )
 
-        monkeypatch.setattr(
+        self.monkeypatch.setattr(
             sync_client,
             "lsm_service_catalog_create_entity",
             self.lsm_service_catalog_create_entity,
             raising=False,
         )
 
-        monkeypatch.setattr(
+        self.monkeypatch.setattr(
             sync_client,
             "lsm_service_catalog_update_entity",
             self.lsm_service_catalog_update_entity,
             raising=False,
         )
 
-        monkeypatch.setattr(
+        self.monkeypatch.setattr(
             sync_client,
             "lsm_service_catalog_update_entity_versions",
             self.lsm_service_catalog_update_entity_versions,
@@ -624,7 +633,6 @@ class LsmProject:
         # Make a compile without any services in the catalog
         with pytest.MonkeyPatch.context() as m:
             m.setattr(self, "services", {})
-            self.monkeypatch_client(m)
             self.project.compile(model, no_dedent=False)
 
         # Get the exporter, it should have been set during the compile
@@ -644,17 +652,12 @@ class LsmProject:
         self.service_entities = {}
         self.service_entity_versions = {}
 
-        with pytest.MonkeyPatch.context() as m:
-            # Monkey patch the sync client constructor call, so that the object
-            # constructed inside of the lsm function has the patches we want it to have
-            self.monkeypatch_client(m)
-
-            # Delegate the proper export to the existing logic in lsm module
-            inmanta_plugins.lsm.do_export_service_entities(
-                exporter,
-                types,
-                False,
-            )
+        # Delegate the proper export to the existing logic in lsm module
+        inmanta_plugins.lsm.do_export_service_entities(
+            exporter,
+            types,
+            False,
+        )
 
     def get_service(self, service_id: typing.Union[uuid.UUID, str]) -> inmanta_lsm.model.ServiceInstance:
         """
@@ -1002,7 +1005,6 @@ class LsmProject:
             env,
         )
         with pytest.MonkeyPatch.context() as m:
-            self.monkeypatch_client(m)
             for k, v in env.items():
                 m.setenv(k, v)
             self.project.compile(model, no_dedent=False)
