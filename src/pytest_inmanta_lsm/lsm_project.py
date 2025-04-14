@@ -8,7 +8,6 @@ import collections
 import collections.abc
 import copy
 import datetime
-import functools
 import hashlib
 import json
 import logging
@@ -296,7 +295,7 @@ class LsmProject:
             import inmanta_plugins.lsm  # type: ignore
         except ImportError as e:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
-        
+
         # Make sure that the sync client object that is created during compile
         # is the one we monkeypatch
         sync_client = inmanta_plugins.lsm.global_cache.get_client()
