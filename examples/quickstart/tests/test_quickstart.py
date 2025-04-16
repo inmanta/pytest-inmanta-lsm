@@ -259,7 +259,7 @@ def test_transient_state(project: plugin.Project, remote_orchestrator: remote_or
     instance.delete(wait_for_state="terminated", timeout=60)
 
 
-def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+def test_model_legacy(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     # Export the service entities
     lsm_project.export_service_entities("import quickstart")
 
@@ -306,7 +306,51 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     assert service.state == "update_inprogress"
 
 
-def test_partial_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+    # Export the service entities
+    lsm_project.export_service_entities("import quickstart")
+
+    # Create a service.  This will add it to our inventory, in its initial state
+    # (as defined in the lifecycle), and fill in any default attributes we didn't
+    # provide.
+    service = lsm_project.create_service(
+        service_entity_name="vlan-assignment",
+        attributes={
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
+        # With auto_transfer=True, we follow the first auto transfers of the service's
+        # lifecycle, triggering a compile (validating compile when appropriate) for
+        # each state we meets.
+        auto_transfer=True,
+    )
+
+    # Assert that the service has been created and is now in creating state
+    assert service.state == "creating"
+
+    # Assert that the default value has been added to our attributes
+    assert "value_with_default" in service.active_attributes
+
+    # Move to the up state
+    service.state = "up"
+    lsm_project.exporting_compile()
+
+    # Trigger an update on our service from the up state.  Change the vlan id
+    new_attributes = copy.deepcopy(service.active_attributes)
+    new_attributes["vlan_id"] = 15
+    lsm_project.update_service(
+        service_id=service.id,
+        attributes=new_attributes,
+        auto_transfer=True,
+    )
+
+    # Assert that the service has been updated and is now in update_inprogress state
+    assert service.state == "update_inprogress"
+
+
+def test_partial_compile_legacy(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     """
     Validate that this service can work with partial compile.
     """
@@ -369,6 +413,70 @@ def test_partial_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject)
     service.deleted = True
     service.version += 1
     lsm_project.compile(service_id=service.id)
+    lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
+
+
+def test_partial_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+    """
+    Validate that this service can work with partial compile.
+    """
+
+    # Define the set of shared and owned resource for our service
+    shared_resources = []
+    owned_resources = [
+        r"lsm::LifecycleTransfer\[.*\]",
+        r"quickstart::NullResource\[.*\]",
+    ]
+
+    # Export the service entities
+    lsm_project.export_service_entities("import quickstart")
+
+    # Make sure partial compile is enabled
+    lsm_project.partial_compile = True
+
+    # Create a service.  This will add it to our inventory, in its initial state
+    # (as defined in the lifecycle), and fill in any default attributes we didn't
+    # provide.
+    service = lsm_project.create_service(
+        service_entity_name="vlan-assignment",
+        attributes={
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
+        # With auto_transfer=True, we follow the first auto transfers of the service's
+        # lifecycle, triggering a compile (validating compile when appropriate) for
+        # each state we meets.
+        auto_transfer=True,
+        service_id=uuid.UUID(int=42),
+    )
+    assert service.id == uuid.UUID(int=42)
+    lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
+
+    # Go to the next states, compile, and validate that it works with partial
+    # compile
+    service.state = "up"
+    service.version += 1
+    lsm_project.exporting_compile([service.id])
+    lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
+
+    lsm_project.update_service(
+        service_id=service.id,
+        attributes=service.active_attributes,  # no update
+        auto_transfer=True,
+    )
+    lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
+
+    service.state = "deleting"
+    service.version += 1
+    lsm_project.exporting_compile([service.id])
+    lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
+
+    service.state = "terminated"
+    service.deleted = True
+    service.version += 1
+    lsm_project.exporting_compile([service.id])
     lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
 
 
