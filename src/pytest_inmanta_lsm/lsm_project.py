@@ -1016,9 +1016,7 @@ class LsmProject:
         if not self.partial_compile:
             # Specific services are requested for the compile but partial compile is not
             # supported, this is a user error
-            raise ValueError(
-                "Partial compile is not supported but a partial compile was attempted anyway"
-            )
+            raise ValueError("Partial compile is not supported but a partial compile was attempted anyway")
 
         # Verify that each service exists in the catalog
         for srv in service_ids:
@@ -1062,9 +1060,7 @@ class LsmProject:
         match (service_id, validation):
             case (None, True):
                 # Stay backward compatible, even though this is confusing
-                warnings.warn(
-                    "Validating compile requested without any service to validate.  Assuming full exporting compile."
-                )
+                warnings.warn("Validating compile requested without any service to validate.  Assuming full exporting compile.")
                 return self.exporting_compile(model=model)
             case (None, False):
                 # Normal full compile
@@ -1077,16 +1073,12 @@ class LsmProject:
                 return self.exporting_compile([service_id], model=model)
             case (collections.abc.Sequence(), True):
                 # Validation of multiple services, this is not allowed
-                raise ValueError(
-                    "Validating compile can not be done for multiple instances at once"
-                )
+                raise ValueError("Validating compile can not be done for multiple instances at once")
             case (collections.abc.Sequence(), False):
                 # Partial compile
                 return self.exporting_compile(service_id, model=model)
             case _:
-                raise ValueError(
-                    f"Unexpected input value combination: service_id={service_id}, validation={validation}"
-                )
+                raise ValueError(f"Unexpected input value combination: service_id={service_id}, validation={validation}")
 
     def post_partial_compile_validation(
         self,
