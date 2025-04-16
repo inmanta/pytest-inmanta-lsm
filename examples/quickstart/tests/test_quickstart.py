@@ -451,6 +451,7 @@ def test_partial_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject)
         auto_transfer=True,
         service_id=uuid.UUID(int=42),
     )
+    assert service.state == "creating"
     assert service.id == uuid.UUID(int=42)
     lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
 
@@ -466,6 +467,7 @@ def test_partial_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject)
         attributes=service.active_attributes,  # no update
         auto_transfer=True,
     )
+    assert service.state == "update_inprogress"
     lsm_project.post_partial_compile_validation(service.id, shared_resources, owned_resources)
 
     service.state = "deleting"
