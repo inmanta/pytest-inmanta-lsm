@@ -1076,7 +1076,8 @@ class LsmProject:
                     # Partial compile is not supported, log a warning as the call doesn't make sense
                     # and default to the old behavior (full compile)
                     warnings.warn(
-                        "Specifying service_id in exporting compile while partial compile is not supported.  Assuming full exporting compile."
+                        "Specifying service_id in exporting compile while partial compile is not supported.  "
+                        "Assuming full exporting compile."
                     )
                     return self.exporting_compile(model=model)
             case (collections.abc.Sequence(), True):
