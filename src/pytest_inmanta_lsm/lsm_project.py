@@ -1015,8 +1015,12 @@ class LsmProject:
 
         if not self.partial_compile:
             # Specific services are requested for the compile but partial compile is not
-            # supported, this is a user error
-            raise ValueError("Partial compile is not supported but a partial compile was attempted anyway")
+            # enabled, this is a user error
+            raise ValueError(
+                "Selecting specific services for an exporting compile is only possible "
+                "with partial compile, but it is currently not enabled.  To enable partial "
+                "compile in your test, set LsmProject.partial_compile to True."
+            )
 
         # Verify that each service exists in the catalog
         for srv in service_ids:
