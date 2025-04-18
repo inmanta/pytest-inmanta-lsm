@@ -278,12 +278,9 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     # Assert that the default value has been added to our attributes
     assert "value_with_default" in service.active_attributes
 
-    # Do a second compile, in the non-validating creating state
-    lsm_project.compile(service_id=service.id)
-
     # Move to the up state
     service.state = "up"
-    lsm_project.compile(service_id=service.id)
+    lsm_project.exporting_compile([service.id])
 
     # Trigger an update on our service from the up state.  Change the vlan id
     new_attributes = copy.deepcopy(service.active_attributes)
