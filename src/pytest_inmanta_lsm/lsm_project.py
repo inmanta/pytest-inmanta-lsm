@@ -1069,8 +1069,16 @@ class LsmProject:
                 # Normal validation compile
                 return self.validating_compile(service_id, model=model)
             case (str() | uuid.UUID(), False):
-                # Partial compile
-                return self.exporting_compile([service_id], model=model)
+                if self.partial_compile:
+                    # Partial compile
+                    return self.exporting_compile([service_id], model=model)
+                else:
+                    # Partial compile is not supported, log a warning as the call doesn't make sense
+                    # and default to the old behavior (full compile)
+                    warnings.warn(
+                        "Specifying service_id in exporting compile while partial compile is not supported.  Assuming full exporting compile."
+                    )
+                    return self.exporting_compile(model=model)
             case (collections.abc.Sequence(), True):
                 # Validation of multiple services, this is not allowed
                 raise ValueError("Validating compile can not be done for multiple instances at once")
