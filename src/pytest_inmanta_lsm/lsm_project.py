@@ -977,7 +977,7 @@ class LsmProject:
         # Collect the environment variables that will need to be set for the compile
         env = {
             inmanta_lsm.const.ENV_INSTANCE_VERSION: str(service.version),
-            inmanta_lsm.const.ENV_MODEL_STATE: str(inmanta_lsm.model.ModelState.candidate),
+            inmanta_lsm.const.ENV_MODEL_STATE: inmanta_lsm.model.ModelState.candidate.value,
             inmanta_lsm.const.ENV_INSTANCE_ID: str(service_id),
             inmanta_lsm.const.ENV_PARTIAL_COMPILE: str(self.partial_compile),
         }
