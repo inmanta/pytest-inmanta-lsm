@@ -25,6 +25,7 @@ import inmanta.module
 import inmanta.protocol.endpoints
 import pydantic
 import requests
+import toml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from packaging.version import Version
@@ -253,12 +254,12 @@ class RemoteOrchestrator:
         # remote api might be different (i.e. podman exec -i <container-name> vs curl <container-ip>)
         self.remote_host = remote_host if remote_host is not None else host
 
+        # Setting up the client configuration before constructing and using the clients
+        self.setup_config()
+
         # Build the client once, it loads the config on every call
         self.client = inmanta.protocol.endpoints.SyncClient("client")
         self.async_client = inmanta.protocol.endpoints.Client("client")
-
-        # Setting up the client when the config is loaded
-        self.setup_config()
 
         # Save the version of the remote orchestrator server
         self._server_version: typing.Optional[Version] = None
@@ -300,6 +301,23 @@ class RemoteOrchestrator:
                     inmanta_config.Config.set(section, "ssl_ca_cert_file", self.ca_cert)
             if self.token:
                 inmanta_config.Config.set(section, "token", self.token)
+
+        # Create a raw config object, with only the part of the configuration that will be
+        # common for the local and remote project compiles (environment and authentication)
+        raw_config = {
+            "config": {"environment": str(self.environment)},
+            "compiler_rest_transport": {},
+            "client_rest_transport": {},
+        }
+        if self.token:
+            raw_config["compiler_rest_transport"]["token"] = self.token
+            raw_config["client_rest_transport"]["token"] = self.token
+
+        # Persist environment and token info in the inmanta config file of the project
+        # to make sure it is sent to the remote orchestrator
+        project_path = pathlib.Path(self.local_project._path)
+        config_file_path = project_path / ".inmanta"
+        config_file_path.write_text(toml.dumps(raw_config))
 
     @property
     def url_split(self) -> urllib.parse.SplitResult:
