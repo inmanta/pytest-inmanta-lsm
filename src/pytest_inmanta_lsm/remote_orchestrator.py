@@ -253,12 +253,12 @@ class RemoteOrchestrator:
         # remote api might be different (i.e. podman exec -i <container-name> vs curl <container-ip>)
         self.remote_host = remote_host if remote_host is not None else host
 
+        # Setting up the client when the config is loaded
+        self.setup_config()
+
         # Build the client once, it loads the config on every call
         self.client = inmanta.protocol.endpoints.SyncClient("client")
         self.async_client = inmanta.protocol.endpoints.Client("client")
-
-        # Setting up the client when the config is loaded
-        self.setup_config()
 
         # Save the version of the remote orchestrator server
         self._server_version: typing.Optional[Version] = None
