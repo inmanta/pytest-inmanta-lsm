@@ -15,7 +15,6 @@ import subprocess
 import typing
 import urllib.parse
 import uuid
-import toml
 from pprint import pformat
 from uuid import UUID
 
@@ -26,6 +25,7 @@ import inmanta.module
 import inmanta.protocol.endpoints
 import pydantic
 import requests
+import toml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from packaging.version import Version
