@@ -254,7 +254,7 @@ class RemoteOrchestrator:
         # remote api might be different (i.e. podman exec -i <container-name> vs curl <container-ip>)
         self.remote_host = remote_host if remote_host is not None else host
 
-        # Setting up the client when the config is loaded
+        # Setting up the client configuration before constructing and using the clients
         self.setup_config()
 
         # Build the client once, it loads the config on every call
