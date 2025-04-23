@@ -15,6 +15,7 @@ import subprocess
 import typing
 import urllib.parse
 import uuid
+import toml
 from pprint import pformat
 from uuid import UUID
 
@@ -300,6 +301,23 @@ class RemoteOrchestrator:
                     inmanta_config.Config.set(section, "ssl_ca_cert_file", self.ca_cert)
             if self.token:
                 inmanta_config.Config.set(section, "token", self.token)
+
+        # Create a raw config object, with only the part of the configuration that will be
+        # common for the local and remote project compiles (environment and authentication)
+        raw_config = {
+            "config": {"environment": str(self.environment)},
+            "compiler_rest_transport": {},
+            "client_rest_transport": {},
+        }
+        if self.token:
+            raw_config["compiler_rest_transport"]["token"] = self.token
+            raw_config["client_rest_transport"]["token"] = self.token
+
+        # Persist environment and token info in the inmanta config file of the project
+        # to make sure it is sent to the remote orchestrator
+        project_path = pathlib.Path(self.local_project._path)
+        config_file_path = project_path / ".inmanta"
+        config_file_path.write_text(toml.dumps(raw_config))
 
     @property
     def url_split(self) -> urllib.parse.SplitResult:
