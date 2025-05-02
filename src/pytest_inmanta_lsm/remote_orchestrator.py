@@ -329,7 +329,12 @@ class RemoteOrchestrator:
         """
         port: int = int(inmanta_config.Config.get("client_rest_transport", "port") or 8888)
         host: str = inmanta_config.Config.get("client_rest_transport", "host") or "localhost"
-        ssl: bool = inmanta_config.TransportConfig(name=self.endpoint.name).ssl.get()
+        
+        if hasattr(inmanta_config.Config, "getboolean"):
+            ssl = inmanta_config.Config.getboolean("client_rest_transport", "ssl", False)
+        else:
+            ssl = inmanta_config.TransportConfig(name=self.endpoint.name).ssl.get()
+
         protocol = "https" if ssl else "http"
         return urllib.parse.urlsplit(f"{protocol}://{host}:{port}")
 
