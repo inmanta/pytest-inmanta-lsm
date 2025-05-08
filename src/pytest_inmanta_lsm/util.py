@@ -68,7 +68,7 @@ async def execute_scenarios(
     )
 
     # Filter the list of exceptions
-    exceptions = [exc for exc in exceptions if exc is not None]
+    exceptions = [exc for exc in exceptions if isinstance(exc, Exception)]
 
     if len(exceptions) == 0:
         # No exception to raise
