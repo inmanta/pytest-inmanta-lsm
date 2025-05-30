@@ -1,4 +1,4 @@
-inmanta-dev-dependencies==2.164.0
+inmanta-dev-dependencies==2.165.0
 types-PyYAML
 types-requests
 types-setuptools
