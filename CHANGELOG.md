@@ -1,4 +1,4 @@
-# v 3.13.0 (?)
+# v 3.13.0 (2025-06-19)
 Changes in this release:
 - Addressed memory leak caused by LsmProject monkeypatching.
 - Add more explicit LsmProject.exporting_compile and LsmProject.validating_compile methods.
