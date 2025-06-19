@@ -1,3 +1,10 @@
+# v 3.13.0 (2025-06-19)
+Changes in this release:
+- Addressed memory leak caused by LsmProject monkeypatching.
+- Add more explicit LsmProject.exporting_compile and LsmProject.validating_compile methods.
+- Fix usage of pytest-inmanta-lsm with an orchestrator that has authentication enabled.
+- Fix usage of sync_execute_scenarios with async functions which return a non-None value.
+
 # v 3.12.0 (2025-04-09)
 Changes in this release:
 - Automatically resolve postgres container version required by product container image.

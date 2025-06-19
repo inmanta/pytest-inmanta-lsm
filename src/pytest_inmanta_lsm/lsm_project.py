@@ -5,9 +5,9 @@
 """
 
 import collections
+import collections.abc
 import copy
 import datetime
-import functools
 import hashlib
 import json
 import logging
@@ -274,7 +274,6 @@ class LsmProject:
         # The monkeypatching we do later in the `compile` method is only there to specify to
         # lsm which service has "triggered" the compilation.
         self.monkeypatch_client()
-        self.monkeypatch_lsm_global_cache_reset()
 
     @property
     def environment(self) -> str:
@@ -295,41 +294,10 @@ class LsmProject:
             .export_resources
         }
 
-    def monkeypatch_lsm_global_cache_reset(self) -> None:
-        """
-        This helper method monkeypatches the reset method of the global_cache of the lsm module.
-        We make sure to pass to save the original reset method implementation so that it can be
-        called by the monkeypatched method.
-
-        This method should only be called once, in the constructor.  If it is called multiple times,
-        the reset method will be monkeypatched multiple times.  It should not hurt, but it is useless.
-        """
-        try:
-            # Import lsm module in function scope for usage with v1 modules
-            import inmanta_plugins.lsm  # type: ignore
-        except ImportError as e:
-            raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
-
-        # Monkeypatch the global cache reset function to be sure that every time it
-        # is called we also monkey patch the client
-        self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache,
-            "reset",
-            functools.partial(
-                self.lsm_global_cache_reset,
-                inmanta_plugins.lsm.global_cache.reset,
-            ),
-        )
-
     def monkeypatch_client(self) -> None:
         """
         This helper method monkeypatches the inmanta client object used by the lsm global cache, to
-        make sure that all calls to the lsm api are instead handled locally.  For now we only need to
-        patch two calls:
-        - lsm_services_list: This way we will return as being part of the lsm inventory the services
-            that have been added to this instance of the LsmProject object.
-        - lsm_services_update_attributes: This way we can, during allocation, update the values of the
-            services we have in our local/mocked inventory.
+        make sure that all calls to the lsm api are instead handled locally.
         """
         try:
             # Import lsm module in function scope for usage with v1 modules
@@ -337,81 +305,74 @@ class LsmProject:
         except ImportError as e:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
 
+        # Make sure that the sync client object that is created during compile
+        # is the one we monkeypatch
+        sync_client = inmanta_plugins.lsm.global_cache.get_client()
+        self.monkeypatch.setattr(inmanta.protocol.endpoints, "SyncClient", lambda _: sync_client)
+
         # Then we monkeypatch the client
         self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_services_list",
             self.lsm_services_list,
             raising=False,
         )
 
         self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_services_get_by_id",
             self.lsm_services_get_by_id,
             raising=False,
         )
 
         self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_services_update_attributes",
             self.lsm_services_update_attributes,
             raising=False,
         )
 
         self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_services_update_attributes_v2",
             self.lsm_services_update_attributes_v2,
             raising=False,
         )
 
         self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_get_entity_version",
             self.lsm_service_catalog_get_entity_version,
             raising=False,
         )
 
         self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_get_entity",
             self.lsm_service_catalog_get_entity,
             raising=False,
         )
 
         self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_create_entity",
             self.lsm_service_catalog_create_entity,
             raising=False,
         )
 
         self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_update_entity",
             self.lsm_service_catalog_update_entity,
             raising=False,
         )
 
         self.monkeypatch.setattr(
-            inmanta_plugins.lsm.global_cache.get_client(),
+            sync_client,
             "lsm_service_catalog_update_entity_versions",
             self.lsm_service_catalog_update_entity_versions,
             raising=False,
         )
-
-    def lsm_global_cache_reset(self, original_global_cache_reset_method: typing.Callable[[], None]) -> None:
-        """
-        This is a placeholder for the lsm global_cache reset method.  First it calls the original method,
-        to ensure that we keep its behavior, whatever it is.  Then it re-monkeypatches the client, as it has
-        been re-created in the reset call.
-        """
-        # First we call the original reset method, letting it do its reset thing
-        original_global_cache_reset_method()
-
-        # Monkeypatch the client because it was just re-created by the reset function
-        self.monkeypatch_client()
 
     def lsm_services_list(self, tid: uuid.UUID, service_entity: str) -> inmanta.protocol.common.Result:
         """
@@ -670,7 +631,7 @@ class LsmProject:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
 
         # Make a compile without any services in the catalog
-        with self.monkeypatch.context() as m:
+        with pytest.MonkeyPatch.context() as m:
             m.setattr(self, "services", {})
             self.project.compile(model, no_dedent=False)
 
@@ -691,18 +652,12 @@ class LsmProject:
         self.service_entities = {}
         self.service_entity_versions = {}
 
-        with self.monkeypatch.context() as m:
-            # Monkey patch the sync client constructor call, so that the object
-            # constructed inside of the lsm function has the patches we want it to have
-            sync_client = inmanta_plugins.lsm.global_cache.get_client()
-            m.setattr(inmanta.protocol.endpoints, "SyncClient", lambda _: sync_client)
-
-            # Delegate the proper export to the existing logic in lsm module
-            inmanta_plugins.lsm.do_export_service_entities(
-                exporter,
-                types,
-                False,
-            )
+        # Delegate the proper export to the existing logic in lsm module
+        inmanta_plugins.lsm.do_export_service_entities(
+            exporter,
+            types,
+            False,
+        )
 
     def get_service(self, service_id: typing.Union[uuid.UUID, str]) -> inmanta_lsm.model.ServiceInstance:
         """
@@ -774,7 +729,7 @@ class LsmProject:
         def next_state(state: str, is_error_transition: bool = False) -> None:
             """
             Apply this state to our service, if it is different from the current
-            state, also increment the version
+            state, also increment the version and perform an exporting compile.
 
             :param state: The new state to apply
             :param is_error_transition: Is it an error transition?
@@ -784,42 +739,52 @@ class LsmProject:
 
             service.last_updated = datetime.datetime.now()
             service.version += 1
+            service.state = state
 
+            # Whether the transition to the next state requires a compile
+            needs_compile = False
             try:
                 is_preserving_same_desired_state = (
                     transfer.error_same_desired_state if is_error_transition else transfer.target_same_desired_state
                 )
                 if not is_preserving_same_desired_state:
                     service.desired_state_version += 1
+                    needs_compile = True
             except AttributeError:
-                # We don't need to do anything: we are dealing with an old orchestrator
-                pass
+                # No same state transfer optimization available: we are dealing with an older orchestrator
+                # Legacy behavior requires compile for each state transition
+                needs_compile = True
 
-            service.state = state
+            if not needs_compile:
+                return
+            elif not self.partial_compile:
+                # Full compile
+                self.exporting_compile()
+            else:
+                # Partial compile
+                self.exporting_compile([service.id])
 
-        try:
-            # Trigger a compile for the transition
-            LOGGER.info(
-                "Triggering compile on state %s before auto transfer (%s) for service %s (%s)",
-                service.state,
-                transfer.description,
-                service.id,
-                service.service_entity,
-            )
-            # Normally we should be able to skip compiles if desired state is preserved across some transfers. However, as
-            # Resource Based transfers are not supported here, we cannot skip compilation for states preserving the desired
-            # state
-            self.compile(
-                service_id=service.id,
-                validation=transfer.validate_,
-            )
+        LOGGER.info(
+            "Following auto transfer in state %s (%s) for service %s (%s)",
+            service.state,
+            transfer.description,
+            service.id,
+            service.service_entity,
+        )
+        if transfer.validate_:
+            # Trigger a compile for the transition and decide which way to go (target/error)
+            try:
+                self.validating_compile(service.id)
+                perform_attribute_operation(service, transfer.target_operation)
+                next_state(state=transfer.target)
+            except Exception:
+                perform_attribute_operation(service, transfer.error_operation)
+                next_state(state=transfer.error, is_error_transition=True)
+                raise
+        else:
+            # Not a validating transfer, nothing to do, just go to the next state
             perform_attribute_operation(service, transfer.target_operation)
             next_state(state=transfer.target)
-        except Exception:
-            perform_attribute_operation(service, transfer.error_operation)
-            if transfer.error is not None:
-                next_state(state=transfer.error, is_error_transition=True)
-            raise
 
         return service
 
@@ -971,6 +936,111 @@ class LsmProject:
 
         self.services[str(service.id)] = service
 
+    def _get_model(self, model: str | None = None) -> str:
+        """
+        Helper method to resolve the model that should be compiled based on the user input and previously
+        exported model.
+        :param model: If not None, the model to compile.
+        """
+        # Make sure we have a model to compile
+        if model is not None:
+            return model
+        elif self.model is not None:
+            return self.model
+        else:
+            raise ValueError(
+                "No model to compile, please provide a model in argument or "
+                "run the export_service_entities method, with the model that "
+                "should be used for all later compiles."
+            )
+
+    def validating_compile(
+        self,
+        service_id: str | uuid.UUID,
+        *,
+        model: str | None = None,
+    ) -> None:
+        """
+        Perform a validation compile for the given service.  The service must be part of the inventory.
+        Use the provided model for the compilation.  If none is provided, defaults to the model used
+        to export the service definition if there is any, fails otherwise.
+
+        :param service: The service to validate.
+        :param model: The model to run the compile with.
+        """
+        # Get the model to use for the compile
+        model = self._get_model(model)
+
+        # Get the service's current version
+        service = self.get_service(service_id)
+
+        # Collect the environment variables that will need to be set for the compile
+        env = {
+            inmanta_lsm.const.ENV_INSTANCE_VERSION: str(service.version),
+            inmanta_lsm.const.ENV_MODEL_STATE: inmanta_lsm.model.ModelState.candidate.value,
+            inmanta_lsm.const.ENV_INSTANCE_ID: str(service_id),
+            inmanta_lsm.const.ENV_PARTIAL_COMPILE: str(self.partial_compile),
+        }
+
+        LOGGER.debug(
+            "Triggering validating compile for service %s with the following environment variables: %s",
+            service_id,
+            env,
+        )
+        with pytest.MonkeyPatch.context() as m:
+            for k, v in env.items():
+                m.setenv(k, v)
+            self.project.compile(model, no_dedent=False)
+
+    def exporting_compile(
+        self,
+        service_ids: collections.abc.Sequence[str | uuid.UUID] | None = None,
+        *,
+        model: str | None = None,
+    ) -> None:
+        """
+        Perform an exporting compile for the given services, or all services present in the inventory
+        if no services is specified.
+        Use the provided model for the compilation.  If none is provided, defaults to the model used
+        to export the service definition if there is any, fails otherwise.
+        """
+        # Get the model to use for the compile
+        model = self._get_model(model)
+
+        if service_ids is None:
+            # Triggering a full compile
+            LOGGER.debug("Triggering full compile")
+            self.project.compile(model, no_dedent=False)
+            return
+
+        if not self.partial_compile:
+            # Specific services are requested for the compile but partial compile is not
+            # enabled, this is a user error
+            raise ValueError(
+                "Selecting specific services for an exporting compile is only possible "
+                "with partial compile, but it is currently not enabled.  To enable partial "
+                "compile in your test, set LsmProject.partial_compile to True."
+            )
+
+        # Verify that each service exists in the catalog
+        for srv in service_ids:
+            self.get_service(srv)
+
+        # Collect the environment variables that will need to be set for the compile
+        env = {
+            inmanta_lsm.const.ENV_PARTIAL_COMPILE: "True",
+            inmanta_lsm.const.ENV_INSTANCE_ID: " ".join(str(srv) for srv in service_ids),
+        }
+        LOGGER.debug(
+            "Triggering partial exporting compile for services %s with the following environment variables: %s",
+            service_ids,
+            env,
+        )
+        with pytest.MonkeyPatch.context() as m:
+            for k, v in env.items():
+                m.setenv(k, v)
+            self.project.compile(model, no_dedent=False)
+
     def compile(
         self,
         model: typing.Optional[str] = None,
@@ -991,68 +1061,37 @@ class LsmProject:
             For validation only one ID can be provided. For other compiles, multiple can be provided
         :param validation: Whether this is a validation compile or not.
         """
-        # Make sure we have a model to compile
-        if model is not None:
-            pass
-        elif self.model is not None:
-            model = self.model
-        else:
-            raise ValueError(
-                "No model to compile, please provide a model in argument or "
-                "run the export_service_entities method, with the model that "
-                "should be used for all later compiles."
-            )
-
-        if service_id is None:
-            # This is not a service-specific compile, we can just run the compile
-            # without setting any environment variables
-            self.project.compile(model, no_dedent=False)
-            return
-
-        # Sort out the type variance of service_id
-        if isinstance(service_id, (str, uuid.UUID)):
-            # strings are also sequences
-            service_ids = str(service_id)
-        elif isinstance(service_id, typing.Sequence):
-            service_ids = " ".join(str(i) for i in service_id)
-        else:
-            raise TypeError(f"Unexpected argument type for service_id, got {service_id} ({type(service_id)})")
-
-        # Make sure all instances exist in the inventory
-        for service_id in service_ids.split(" "):
-            service = self.get_service(service_id)
-
-        env: dict[str, str] = {inmanta_lsm.const.ENV_INSTANCE_ID: service_ids}
-
-        if validation:
-            if len(service_ids.split(" ")) != 1:
-                raise Exception(
-                    f"when performing a validation compile, only one service id can be passed, got {repr(service_ids)}"
-                )
-            service = self.get_service(service_ids)
-            env[inmanta_lsm.const.ENV_INSTANCE_VERSION] = str(service.version)
-
-        try:
-            env[inmanta_lsm.const.ENV_PARTIAL_COMPILE] = str(self.partial_compile)
-        except AttributeError:
-            # This attribute only exists for iso5+, iso4 doesn't support partial compile.
-            # We then simply don't set the value.
-            if self.partial_compile:
-                warnings.warn("Partial compile is enabled but it is not supported, it will be ignored.")
-
-        if validation:
-            # If we have a validation compile, we need to set an additional env var
-            env[inmanta_lsm.const.ENV_MODEL_STATE] = inmanta_lsm.model.ModelState.candidate
-
-        LOGGER.debug(
-            "Triggering compile for service %s with the following environment variables: %s",
-            service_ids,
-            env,
-        )
-        with self.monkeypatch.context() as m:
-            for k, v in env.items():
-                m.setenv(k, v)
-            self.project.compile(model, no_dedent=False)
+        match (service_id, validation):
+            case (None, True):
+                # Stay backward compatible, even though this is confusing
+                warnings.warn("Validating compile requested without any service to validate.  Assuming full exporting compile.")
+                return self.exporting_compile(model=model)
+            case (None, False):
+                # Normal full compile
+                return self.exporting_compile(model=model)
+            case (str() | uuid.UUID(), True):
+                # Normal validation compile
+                return self.validating_compile(service_id, model=model)
+            case (str() | uuid.UUID(), False):
+                if self.partial_compile:
+                    # Partial compile
+                    return self.exporting_compile([service_id], model=model)
+                else:
+                    # Partial compile is not supported, log a warning as the call doesn't make sense
+                    # and default to the old behavior (full compile)
+                    warnings.warn(
+                        "Specifying service_id in exporting compile while partial compile is not supported.  "
+                        "Assuming full exporting compile."
+                    )
+                    return self.exporting_compile(model=model)
+            case (collections.abc.Sequence(), True):
+                # Validation of multiple services, this is not allowed
+                raise ValueError("Validating compile can not be done for multiple instances at once")
+            case (collections.abc.Sequence(), False):
+                # Partial compile
+                return self.exporting_compile(service_id, model=model)
+            case _:
+                raise ValueError(f"Unexpected input value combination: service_id={service_id}, validation={validation}")
 
     def post_partial_compile_validation(
         self,
@@ -1123,7 +1162,7 @@ class LsmProject:
 
         # Get the previously compiled model and perform a full compile, this should work at any stage
         model = pathlib.Path(self.project._test_project_dir, "main.cf").read_text()
-        self.project.compile(model)
+        self.exporting_compile(model=model)
 
         # Check that we have as many resource sets as there are services
         assert get_resource_sets(self.project).keys() == self.exporting_services.keys()

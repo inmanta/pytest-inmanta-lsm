@@ -21,8 +21,8 @@ def read(fname):
 
 setup(
     name="pytest-inmanta-lsm",
-    version="3.12.0",
-    python_requires=">=3.6",  # also update classifiers
+    version="3.13.0",
+    python_requires=">=3.11",  # also update classifiers
     author="Inmanta",
     author_email="code@inmanta.com",
     license="inmanta EULA",
@@ -49,10 +49,8 @@ setup(
         "Development Status :: 5 - Production/Stable",
         "Framework :: Pytest",
         "Intended Audience :: Developers",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Operating System :: OS Independent",
         "Topic :: Software Development :: Testing",
         "Topic :: System :: Systems Administration",

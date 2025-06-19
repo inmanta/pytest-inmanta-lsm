@@ -105,8 +105,8 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
 
 @pytest.fixture(name="lsm_project")
 def lsm_project_fixture(
-    monkeypatch: pytest.MonkeyPatch,
     project: pytest_inmanta.plugin.Project,
+    monkeypatch: pytest.MonkeyPatch,
     remote_orchestrator_partial: bool,
 ) -> "lsm_project.LsmProject":
     core_version = version.Version(pkg_resources.get_distribution("inmanta-core").version)
@@ -119,7 +119,7 @@ def lsm_project_fixture(
     return lsm_project.LsmProject(
         uuid.uuid4(),
         project,
-        monkeypatch,
+        monkeypatch=monkeypatch,
         partial_compile=remote_orchestrator_partial,
     )
 
