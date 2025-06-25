@@ -11,6 +11,7 @@ lock:
     variable: INMANTA_LSM_HOST
     quantity: 1
 additional_constraints:
+    # TODO: replace this one and module one with -c from docs
     - inmanta-lsm>=6.0.dev
 env_vars:
     # This option is ignored when the tests run against a docker container.
