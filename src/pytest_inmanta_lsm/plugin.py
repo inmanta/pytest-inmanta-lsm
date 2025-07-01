@@ -58,6 +58,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_no_clean,
     inm_lsm_no_halt,
     inm_lsm_partial_compile,
+    inm_lsm_pip_c,
     inm_lsm_project_name,
     inm_lsm_remote_host,
     inm_lsm_remote_shell,
@@ -370,6 +371,7 @@ def remote_orchestrator_access(
         container_env=container_env,
         remote_shell=shlex.split(remote_shell) if remote_shell is not None else None,
         remote_host=remote_host,
+        pip_constraint=get_optional_option(inm_lsm_pip_c),
     )
 
     # Make sure the remote orchestrator is running

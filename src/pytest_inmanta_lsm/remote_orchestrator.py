@@ -194,6 +194,7 @@ class RemoteOrchestrator:
         container_env: bool = False,
         remote_shell: typing.Optional[typing.Sequence[str]] = None,
         remote_host: typing.Optional[str] = None,
+        pip_constraint: list[str] | None = None,
     ) -> None:
         """
         :param environment: The environment that should be configured on the remote orchestrator
@@ -224,6 +225,7 @@ class RemoteOrchestrator:
         self.token = token
         self.ca_cert = ca_cert
         self.container_env = container_env
+        self.pip_constraint = pip_constraint
 
         self.remote_shell: typing.Sequence[str]
         if remote_shell is not None:
@@ -860,9 +862,15 @@ class RemoteOrchestrator:
         # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
         install_script_path = self.remote_project_path / ".inm_lsm_setup_project.py"
 
+        env = {"PROJECT_PATH": str(self.remote_project_path)}
+        if self.pip_constraint is not None:
+            # Only set the pip constraint env var if it is set for pytest, otherwise
+            # fallback to the config of the remote host.
+            env["PIP_CONSTRAINT"] = " ".join(self.pip_constraint)
+
         result = self.run_command_with_server_env(
             ["/opt/inmanta/bin/python", str(install_script_path)],
-            env={"PROJECT_PATH": str(self.remote_project_path)},
+            env=env,
         )
         LOGGER.debug("Installation logs: %s", result)
 
