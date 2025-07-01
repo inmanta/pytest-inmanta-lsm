@@ -13,6 +13,7 @@ lock:
 additional_constraints:
     - "-c https://docs.inmanta.com/inmanta-service-orchestrator-dev/7/reference/requirements.txt"
 env_vars:
+    PIP_CONSTRAINT: "https://docs.inmanta.com/inmanta-service-orchestrator-dev/7/reference/requirements.txt"
     # This option is ignored when the tests run against a docker container.
     INMANTA_LSM_SSH_USER: inmanta
     INMANTA_LSM_CONTAINER_ENV: true
