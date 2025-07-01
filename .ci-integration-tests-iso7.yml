@@ -13,7 +13,6 @@ lock:
 additional_constraints:
     - "-c https://docs.inmanta.com/inmanta-service-orchestrator-dev/7/reference/requirements.txt"
 env_vars:
-    INMANTA_LSM_MODULE_CONSTRAINTS: "lsm~=2.33.0;std~=5.2.0"
     # This option is ignored when the tests run against a docker container.
     INMANTA_LSM_SSH_USER: inmanta
     INMANTA_LSM_CONTAINER_ENV: true
