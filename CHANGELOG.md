@@ -1,5 +1,6 @@
 # v 3.14.0 (?)
 Changes in this release:
+- Fix format of inmanta config saved in the project synced to remote orchestrator.
 
 # v 3.13.0 (2025-06-19)
 Changes in this release:

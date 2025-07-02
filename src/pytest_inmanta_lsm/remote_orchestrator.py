@@ -6,6 +6,7 @@ Pytest Inmanta LSM
 :license: Inmanta EULA
 """
 
+import configparser
 import dataclasses
 import functools
 import logging
@@ -25,7 +26,6 @@ import inmanta.module
 import inmanta.protocol.endpoints
 import pydantic
 import requests
-import toml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from packaging.version import Version
@@ -304,20 +304,21 @@ class RemoteOrchestrator:
 
         # Create a raw config object, with only the part of the configuration that will be
         # common for the local and remote project compiles (environment and authentication)
-        raw_config = {
-            "config": {"environment": str(self.environment)},
-            "compiler_rest_transport": {},
-            "client_rest_transport": {},
-        }
+        raw_config = configparser.ConfigParser()
+        raw_config.add_section("config")
+        raw_config.add_section("compiler_rest_transport")
+        raw_config.add_section("client_rest_transport")
+        raw_config.set("config", "environment", str(self.environment))
         if self.token:
-            raw_config["compiler_rest_transport"]["token"] = self.token
-            raw_config["client_rest_transport"]["token"] = self.token
+            raw_config.set("compiler_rest_transport", "token", self.token)
+            raw_config.set("client_rest_transport", "token", self.token)
 
         # Persist environment and token info in the inmanta config file of the project
         # to make sure it is sent to the remote orchestrator
         project_path = pathlib.Path(self.local_project._path)
         config_file_path = project_path / ".inmanta"
-        config_file_path.write_text(toml.dumps(raw_config))
+        with open(str(config_file_path), "w+") as fd:
+            raw_config.write(fd)
 
     @property
     def url_split(self) -> urllib.parse.SplitResult:
