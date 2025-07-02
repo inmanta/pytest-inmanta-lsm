@@ -305,6 +305,9 @@ class RemoteOrchestrator:
         # Create a raw config object, with only the part of the configuration that will be
         # common for the local and remote project compiles (environment and authentication)
         raw_config = configparser.ConfigParser()
+        raw_config.add_section("config")
+        raw_config.add_section("compiler_rest_transport")
+        raw_config.add_section("client_rest_transport")
         raw_config.set("config", "environment", str(self.environment))
         if self.token:
             raw_config.set("compiler_rest_transport", "token", self.token)
