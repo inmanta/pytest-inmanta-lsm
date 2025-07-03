@@ -11,6 +11,7 @@ from pathlib import Path
 from pytest_inmanta.test_parameter import (
     BooleanTestParameter,
     IntegerTestParameter,
+    ListTestParameter,
     PathTestParameter,
     StringTestParameter,
 )
@@ -249,5 +250,15 @@ inm_lsm_dump = BooleanTestParameter(
         "value of the remote_orchestrator_dump_on_failure fixture."
     ),
     default=False,
+    group=param_group,
+)
+
+inm_lsm_pip_c = ListTestParameter(
+    argument="--pip-constraint",
+    environment_variable="PIP_CONSTRAINT",
+    usage=(
+        "Pip constraints to apply to the project install on the remote orchestrator.  "
+        "Expected value format is the same as defined here: https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-c"
+    ),
     group=param_group,
 )

@@ -26,6 +26,7 @@ env_vars:
     INMANTA_LSM_CONTAINER_JWE_FILE: http://file.ii.inmanta.com/license/dev.inmanta.com.jwe
     # only add package repo, git repo requires token and is added in the Jenkinsfile
     INMANTA_MODULE_REPO: "package:https://artifacts.internal.inmanta.com/inmanta/dev"
+    PIP_CONSTRAINT: https://docs.inmanta.com/inmanta-service-orchestrator-dev/9/reference/requirements.txt
 directories_to_lint:
     - examples
     - src

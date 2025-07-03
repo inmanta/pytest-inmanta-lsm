@@ -9,8 +9,11 @@ More information regarding how this test suite works, can be found in the README
 """
 
 import os
+import pathlib
+import shutil
+import subprocess
 import sys
-from typing import Optional
+import typing
 
 import pkg_resources
 import pytest
@@ -19,6 +22,7 @@ from inmanta import env, loader, plugins
 from inmanta.loader import PluginModuleFinder
 
 pytest_plugins = ["pytester"]
+HOME = os.getenv("HOME", "")
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +44,7 @@ def deactive_venv():
     old_meta_path = sys.meta_path.copy()
     old_path_hooks = sys.path_hooks.copy()
     old_pythonpath = os.environ.get("PYTHONPATH", None)
-    old_os_venv: Optional[str] = os.environ.get("VIRTUAL_ENV", None)
+    old_os_venv: typing.Optional[str] = os.environ.get("VIRTUAL_ENV", None)
     old_working_set = pkg_resources.working_set
 
     yield
@@ -73,3 +77,44 @@ def deactive_venv():
         PluginModuleFinder.reset()
     plugins.PluginMeta.clear()
     loader.unload_inmanta_plugins()
+
+
+@pytest.fixture
+def testdir(testdir: pytest.Testdir) -> typing.Iterator[pytest.Testdir]:
+    """
+    This fixture ensure that when changing the home directory with the testdir
+    fixture we also copy any docker client config that was there.
+
+    We also ensure that an ssh key pair is available in the user ssh folder.
+    """
+    if os.path.exists(os.path.join(HOME, ".docker")):
+        shutil.copytree(
+            os.path.join(HOME, ".docker"),
+            os.path.join(testdir.tmpdir, ".docker"),
+        )
+
+    ssh_dir = pathlib.Path(HOME) / ".ssh"
+    private_key = ssh_dir / "id_rsa"
+    public_key = ssh_dir / "id_rsa.pub"
+
+    ssh_dir.mkdir(mode=755, parents=True, exist_ok=True)
+
+    if not private_key.exists():
+        result = subprocess.run(["ssh-keygen", "-t", "rsa", "-b", "4096", "-f", str(private_key), "-N", ""])
+        result.check_returncode()
+
+    if not public_key.exists():
+        result = subprocess.run(
+            ["ssh-keygen", "-y", "-f", str(private_key)],
+            stdout=subprocess.PIPE,
+            encoding="utf-8",
+            text=True,
+        )
+        result.check_returncode()
+        public_key.write_text(result.stdout, encoding="utf-8")
+        public_key.chmod(0o0600)
+
+    yield testdir
+
+    if os.path.exists(os.path.join(testdir.tmpdir, ".docker")):
+        shutil.rmtree(os.path.join(testdir.tmpdir, ".docker"))

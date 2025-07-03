@@ -1,5 +1,6 @@
 # v 3.14.0 (?)
 Changes in this release:
+- All to configure `PIP_CONSTRAINT` environment variable on the remote host during project install, using the `--pip-constraint` pytest option.
 - Fix format of inmanta config saved in the project synced to remote orchestrator.
 
 # v 3.13.0 (2025-06-19)
