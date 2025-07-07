@@ -753,7 +753,7 @@ class RemoteOrchestrator:
             return response.text
 
         if parsed.scheme == "file":
-            # Absolute paths will automatically overwrite the full path
+            # Absolute paths will overwrite the full path
             # Relative paths will be appended to the current working dir path
             file = CWD / parsed.path
             return file.read_text()
@@ -909,7 +909,7 @@ class RemoteOrchestrator:
             ["/opt/inmanta/bin/python", str(install_script_path)],
             env={
                 "PROJECT_PATH": str(self.remote_project_path),
-                "PIP_CONSTRAINTS": "constraints.txt",
+                "PIP_CONSTRAINT": "constraints.txt",
             },
         )
         LOGGER.debug("Installation logs: %s", result)
