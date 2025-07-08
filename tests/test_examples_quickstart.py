@@ -9,13 +9,14 @@ Pytest Inmanta LSM
 # Note: These tests only function when the pytest output is not modified by plugins such as pytest-sugar!
 
 import os
-import pathlib
 from collections import abc
 
 import pytest
 import requests
 import utils
 from inmanta import env
+
+from pytest_inmanta_lsm.remote_orchestrator import CWD
 
 
 @pytest.fixture(scope="function")
@@ -55,7 +56,7 @@ def test_basic_example(testdir: pytest.Testdir, module_venv_active: env.VirtualE
     # named constraints.txt.  When running the tests on the quickstart, one iteration of
     # the test will load this file instead of the env var we have set, this allows us to
     # test that pip constraints can also be loaded from files.
-    constraints_file = pathlib.Path("constraints.txt")
+    constraints_file = CWD / "constraints.txt"
     constraints_file.write_text(requests.get(os.environ["PIP_CONSTRAINT"]).text)
 
     utils.add_version_constraint_to_project(testdir.tmpdir)
