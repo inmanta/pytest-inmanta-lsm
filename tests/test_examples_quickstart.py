@@ -55,7 +55,7 @@ def test_basic_example(testdir: pytest.Testdir, module_venv_active: env.VirtualE
     # named constraints.txt.  When running the tests on the quickstart, one iteration of
     # the test will load this file instead of the env var we have set, this allows us to
     # test that pip constraints can also be loaded from files.
-    constraints_file = pathlib.Path(testdir.tmpdir, "constraints.txt")
+    constraints_file = pathlib.Path("constraints.txt")
     constraints_file.write_text(requests.get(os.environ["PIP_CONSTRAINT"]).text)
 
     utils.add_version_constraint_to_project(testdir.tmpdir)
