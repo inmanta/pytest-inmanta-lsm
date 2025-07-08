@@ -904,7 +904,7 @@ class RemoteOrchestrator:
             ["/opt/inmanta/bin/python", str(install_script_path)],
             env={
                 "PROJECT_PATH": str(self.remote_project_path),
-                "PIP_CONSTRAINT": "constraints.txt",
+                "PIP_CONSTRAINT": str(self.remote_project_path / "constraints.txt"),
             },
         )
         LOGGER.debug("Installation logs: %s", result)
