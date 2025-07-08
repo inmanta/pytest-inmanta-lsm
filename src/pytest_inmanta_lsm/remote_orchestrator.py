@@ -760,16 +760,6 @@ class RemoteOrchestrator:
 
         raise ValueError(f"Unsupported pip constraint format: {parsed}")
 
-    def resolve_pip_constraints(self) -> str:
-        """
-        Read all the pip constraint files provided during construction of the object
-        and join all their constraints into a single string, in a format that can
-        be saved into a constraint file.
-        """
-        return "\n\n".join(
-            f"# cf. {pip_constraint}\n" + self.resolve_pip_constraint(pip_constraint) for pip_constraint in self.pip_constraint
-        )
-
     def sync_project_folder(self) -> None:
         """
         Sync the project in the given folder with the remote orchestrator.
@@ -778,7 +768,12 @@ class RemoteOrchestrator:
 
         constraints_file = local_project_path / "constraints.txt"
         LOGGER.debug("Write project constraints to constraints.txt (%s)", constraints_file)
-        constraints_file.write_text(self.resolve_pip_constraint())
+        constraints_file.write_text(
+            "\n\n".join(
+                f"# cf. {pip_constraint}\n" + self.resolve_pip_constraint(pip_constraint)
+                for pip_constraint in self.pip_constraint
+            )
+        )
 
         LOGGER.debug(
             "Sync local project folder at %s with remote orchestrator (%s)",
