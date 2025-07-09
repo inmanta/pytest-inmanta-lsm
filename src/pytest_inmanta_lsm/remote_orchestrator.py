@@ -10,6 +10,7 @@ import configparser
 import dataclasses
 import functools
 import logging
+import os
 import pathlib
 import shlex
 import subprocess
@@ -34,6 +35,9 @@ from pytest_inmanta_lsm import managed_service_instance, retry_limited
 
 LOGGER = logging.getLogger(__name__)
 
+# Resolve the current working directory at load time, before the project fixture has
+# any chance of changing it.
+CWD = pathlib.Path(os.getcwd())
 
 SSH_CMD = [
     "ssh",
@@ -213,6 +217,10 @@ class RemoteOrchestrator:
             append the host name and `sh` to this value, and pass the command to execute as input to the open remote shell.
         :param remote_host: The name of the remote host we can execute command on or send files to.  Defaults
             to the value of the host parameter.
+        :param pip_constraint: Some pip constraints that should be applied during the project install
+            on the remote orchestrator.  These constraint can point be valid http urls, or file on the local
+            machine, they will all be converted to a local file, in the project that is sent to the remote
+            orchestrator.
         """
         self.orchestrator_environment = orchestrator_environment
         self.environment = self.orchestrator_environment.id
@@ -225,7 +233,7 @@ class RemoteOrchestrator:
         self.token = token
         self.ca_cert = ca_cert
         self.container_env = container_env
-        self.pip_constraint = pip_constraint
+        self.pip_constraint = pip_constraint if pip_constraint is not None else []
 
         self.remote_shell: typing.Sequence[str]
         if remote_shell is not None:
@@ -733,17 +741,46 @@ class RemoteOrchestrator:
             LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
             raise e
 
+    def resolve_pip_constraint(self, pip_constraint: str) -> str:
+        """
+        Given the following pip constraint argument, get the content of the constraint
+        file, whether it is a remote url or a local file.
+        """
+        parsed = urllib.parse.urlparse(pip_constraint, scheme="file")
+        if parsed.scheme in ["http", "https"]:
+            response = requests.get(pip_constraint)
+            response.raise_for_status()
+            return response.text
+
+        if parsed.scheme == "file":
+            # Absolute paths will overwrite the full path
+            # Relative paths will be appended to the current working dir path
+            file = CWD / parsed.path
+            return file.read_text()
+
+        raise ValueError(f"Unsupported pip constraint format: {parsed}")
+
     def sync_project_folder(self) -> None:
         """
         Sync the project in the given folder with the remote orchestrator.
         """
+        local_project_path = pathlib.Path(self.local_project._path)
+
+        constraints_file = local_project_path / "constraints.txt"
+        LOGGER.debug("Write project constraints to constraints.txt (%s)", constraints_file)
+        constraints_file.write_text(
+            "\n\n".join(
+                f"# cf. {pip_constraint}\n" + self.resolve_pip_constraint(pip_constraint)
+                for pip_constraint in self.pip_constraint
+            )
+        )
+
         LOGGER.debug(
             "Sync local project folder at %s with remote orchestrator (%s)",
             self.local_project._path,
             str(self.remote_project_path),
         )
 
-        local_project_path = pathlib.Path(self.local_project._path)
         modules_dir_paths: list[pathlib.Path] = [
             local_project_path / module_dir for module_dir in self.local_project.metadata.modulepath
         ]
@@ -863,15 +900,12 @@ class RemoteOrchestrator:
         # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
         install_script_path = self.remote_project_path / ".inm_lsm_setup_project.py"
 
-        env = {"PROJECT_PATH": str(self.remote_project_path)}
-        if self.pip_constraint is not None:
-            # Only set the pip constraint env var if it is set for pytest, otherwise
-            # fallback to the config of the remote host.
-            env["PIP_CONSTRAINT"] = " ".join(self.pip_constraint)
-
         result = self.run_command_with_server_env(
             ["/opt/inmanta/bin/python", str(install_script_path)],
-            env=env,
+            env={
+                "PROJECT_PATH": str(self.remote_project_path),
+                "PIP_CONSTRAINT": str(self.remote_project_path / "constraints.txt"),
+            },
         )
         LOGGER.debug("Installation logs: %s", result)
 
