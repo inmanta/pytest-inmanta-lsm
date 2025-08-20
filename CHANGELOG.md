@@ -1,7 +1,8 @@
 # v 3.14.0 (?)
 Changes in this release:
-- All to configure `PIP_CONSTRAINT` environment variable on the remote host during project install, using the `--pip-constraint` pytest option.
+- Allow to configure `PIP_CONSTRAINT` environment variable on the remote host during project install, using the `--pip-constraint` pytest option.
 - Fix format of inmanta config saved in the project synced to remote orchestrator.
+- Improve export_service_entities functionality in LsmProject and RemoteOrchestrator to mimic the lsm extension better.
 
 # v 3.13.0 (2025-06-19)
 Changes in this release:

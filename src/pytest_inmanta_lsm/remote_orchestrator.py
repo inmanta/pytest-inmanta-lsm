@@ -33,6 +33,12 @@ from packaging.version import Version
 
 from pytest_inmanta_lsm import managed_service_instance, retry_limited
 
+try:
+    from inmanta_lsm.const import ENV_NO_INSTANCES
+except ImportError:
+    # Ensure backwards compatibility with older versions of the inmanta-lsm extensions.
+    ENV_NO_INSTANCES = "lsm_no_instances"
+
 LOGGER = logging.getLogger(__name__)
 
 # Resolve the current working directory at load time, before the project fixture has
@@ -941,10 +947,16 @@ class RemoteOrchestrator:
                 "export",
                 "-e",
                 str(self.environment),
+                # https://github.com/inmanta/inmanta-lsm/blob/f6b9c7b8a861b233c682349e36d478f0afcb89b8/src/inmanta_lsm/service_catalog.py#L695
+                # https://github.com/inmanta/inmanta-core/blob/6d77faea6d409eec645e132c2480e6a9d4bc4e1c/src/inmanta/server/services/compilerservice.py#L493
+                "-j",
+                f"/tmp/{self.environment}.json",
                 "--export-plugin",
                 "service_entities_exporter",
             ],
             cwd=str(self.remote_project_path),
+            # https://github.com/inmanta/inmanta-lsm/blob/f6b9c7b8a861b233c682349e36d478f0afcb89b8/src/inmanta_lsm/service_catalog.py#L705
+            env={ENV_NO_INSTANCES: "true"},
         )
 
     def wait_for_released(self, version: int | None = None) -> None:
