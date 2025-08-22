@@ -11,8 +11,6 @@ import logging
 import typing
 import uuid
 
-import inmanta.util
-
 from pytest_inmanta_lsm import remote_orchestrator, remote_service_instance_async
 
 LOGGER = logging.getLogger(__name__)
@@ -62,7 +60,7 @@ class RemoteServiceInstance:
             result = attr(*args, **kwargs)
             if asyncio.iscoroutine(result):
                 # This is a coroutine, we need to execute it in an event loop
-                return inmanta.util.ensure_event_loop().run_until_complete(result)
+                return asyncio.run(result)
             else:
                 # Not a coroutine, the method has been executed successfully, we can
                 # return its result
