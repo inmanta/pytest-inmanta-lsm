@@ -1,3 +1,6 @@
+# v 3.15.0 (?)
+Changes in this release:
+
 # v 3.14.0 (2025-08-26)
 Changes in this release:
 - Allow to configure `PIP_CONSTRAINT` environment variable on the remote host during project install, using the `--pip-constraint` pytest option.
