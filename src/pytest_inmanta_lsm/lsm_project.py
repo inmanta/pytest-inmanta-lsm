@@ -35,6 +35,12 @@ INMANTA_LSM_MODULE_NOT_LOADED = (
     "    - If you are using v2 modules: make sure the inmanta-module-lsm is installed in your venv."
 )
 
+try:
+    from inmanta_lsm.const import ENV_NO_INSTANCES
+except ImportError:
+    # Ensure backwards compatibility with older versions of the inmanta-lsm extensions.
+    ENV_NO_INSTANCES = "lsm_no_instances"
+
 # Try to import from inmanta.util.dict_path, if not available, fall back to the deprecated inmanta_lsm.dict_path
 try:
     from inmanta.util import dict_path
@@ -632,7 +638,8 @@ class LsmProject:
 
         # Make a compile without any services in the catalog
         with pytest.MonkeyPatch.context() as m:
-            m.setattr(self, "services", {})
+            # https://github.com/inmanta/inmanta-lsm/blob/f6b9c7b8a861b233c682349e36d478f0afcb89b8/src/inmanta_lsm/service_catalog.py#L705
+            m.setenv(ENV_NO_INSTANCES, "true")
             self.project.compile(model, no_dedent=False)
 
         # Get the exporter, it should have been set during the compile

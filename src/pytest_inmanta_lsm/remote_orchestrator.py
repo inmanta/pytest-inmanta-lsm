@@ -6,9 +6,11 @@ Pytest Inmanta LSM
 :license: Inmanta EULA
 """
 
+import configparser
 import dataclasses
 import functools
 import logging
+import os
 import pathlib
 import shlex
 import subprocess
@@ -25,15 +27,23 @@ import inmanta.module
 import inmanta.protocol.endpoints
 import pydantic
 import requests
-import toml
 from inmanta.agent import config as inmanta_config
 from inmanta.protocol.common import Result
 from packaging.version import Version
 
 from pytest_inmanta_lsm import managed_service_instance, retry_limited
 
+try:
+    from inmanta_lsm.const import ENV_NO_INSTANCES
+except ImportError:
+    # Ensure backwards compatibility with older versions of the inmanta-lsm extensions.
+    ENV_NO_INSTANCES = "lsm_no_instances"
+
 LOGGER = logging.getLogger(__name__)
 
+# Resolve the current working directory at load time, before the project fixture has
+# any chance of changing it.
+CWD = pathlib.Path(os.getcwd())
 
 SSH_CMD = [
     "ssh",
@@ -194,6 +204,7 @@ class RemoteOrchestrator:
         container_env: bool = False,
         remote_shell: typing.Optional[typing.Sequence[str]] = None,
         remote_host: typing.Optional[str] = None,
+        pip_constraint: list[str] | None = None,
     ) -> None:
         """
         :param environment: The environment that should be configured on the remote orchestrator
@@ -212,6 +223,10 @@ class RemoteOrchestrator:
             append the host name and `sh` to this value, and pass the command to execute as input to the open remote shell.
         :param remote_host: The name of the remote host we can execute command on or send files to.  Defaults
             to the value of the host parameter.
+        :param pip_constraint: Some pip constraints that should be applied during the project install
+            on the remote orchestrator.  These constraint can point be valid http urls, or file on the local
+            machine, they will all be converted to a local file, in the project that is sent to the remote
+            orchestrator.
         """
         self.orchestrator_environment = orchestrator_environment
         self.environment = self.orchestrator_environment.id
@@ -224,6 +239,7 @@ class RemoteOrchestrator:
         self.token = token
         self.ca_cert = ca_cert
         self.container_env = container_env
+        self.pip_constraint = pip_constraint
 
         self.remote_shell: typing.Sequence[str]
         if remote_shell is not None:
@@ -304,20 +320,21 @@ class RemoteOrchestrator:
 
         # Create a raw config object, with only the part of the configuration that will be
         # common for the local and remote project compiles (environment and authentication)
-        raw_config = {
-            "config": {"environment": str(self.environment)},
-            "compiler_rest_transport": {},
-            "client_rest_transport": {},
-        }
+        raw_config = configparser.ConfigParser()
+        raw_config.add_section("config")
+        raw_config.add_section("compiler_rest_transport")
+        raw_config.add_section("client_rest_transport")
+        raw_config.set("config", "environment", str(self.environment))
         if self.token:
-            raw_config["compiler_rest_transport"]["token"] = self.token
-            raw_config["client_rest_transport"]["token"] = self.token
+            raw_config.set("compiler_rest_transport", "token", self.token)
+            raw_config.set("client_rest_transport", "token", self.token)
 
         # Persist environment and token info in the inmanta config file of the project
         # to make sure it is sent to the remote orchestrator
         project_path = pathlib.Path(self.local_project._path)
         config_file_path = project_path / ".inmanta"
-        config_file_path.write_text(toml.dumps(raw_config))
+        with open(str(config_file_path), "w+") as fd:
+            raw_config.write(fd)
 
     @property
     def url_split(self) -> urllib.parse.SplitResult:
@@ -730,17 +747,47 @@ class RemoteOrchestrator:
             LOGGER.error("Subprocess exited with code %d: %s", e.returncode, str(e.stderr))
             raise e
 
+    def resolve_pip_constraint(self, pip_constraint: str) -> str:
+        """
+        Given the following pip constraint argument, get the content of the constraint
+        file, whether it is a remote url or a local file.
+        """
+        parsed = urllib.parse.urlparse(pip_constraint, scheme="file")
+        if parsed.scheme in ["http", "https"]:
+            response = requests.get(pip_constraint)
+            response.raise_for_status()
+            return response.text
+
+        if parsed.scheme == "file":
+            # Absolute paths will overwrite the full path
+            # Relative paths will be appended to the current working dir path
+            file = CWD / parsed.path
+            return file.read_text()
+
+        raise ValueError(f"Unsupported pip constraint format: {parsed}")
+
     def sync_project_folder(self) -> None:
         """
         Sync the project in the given folder with the remote orchestrator.
         """
+        local_project_path = pathlib.Path(self.local_project._path)
+
+        if self.pip_constraint is not None:
+            constraints_file = local_project_path / "constraints.txt"
+            LOGGER.debug("Write project constraints to constraints.txt (%s)", constraints_file)
+            constraints_file.write_text(
+                "\n\n".join(
+                    f"# cf. {pip_constraint}\n" + self.resolve_pip_constraint(pip_constraint)
+                    for pip_constraint in self.pip_constraint
+                )
+            )
+
         LOGGER.debug(
             "Sync local project folder at %s with remote orchestrator (%s)",
             self.local_project._path,
             str(self.remote_project_path),
         )
 
-        local_project_path = pathlib.Path(self.local_project._path)
         modules_dir_paths: list[pathlib.Path] = [
             local_project_path / module_dir for module_dir in self.local_project.metadata.modulepath
         ]
@@ -860,9 +907,13 @@ class RemoteOrchestrator:
         # venv might not exist yet so can't just access its `inmanta` executable -> install via Python script instead
         install_script_path = self.remote_project_path / ".inm_lsm_setup_project.py"
 
+        env = {"PROJECT_PATH": str(self.remote_project_path)}
+        if self.pip_constraint is not None:
+            env["PIP_CONSTRAINT"] = str(self.remote_project_path / "constraints.txt")
+
         result = self.run_command_with_server_env(
             ["/opt/inmanta/bin/python", str(install_script_path)],
-            env={"PROJECT_PATH": str(self.remote_project_path)},
+            env=env,
         )
         LOGGER.debug("Installation logs: %s", result)
 
@@ -896,10 +947,16 @@ class RemoteOrchestrator:
                 "export",
                 "-e",
                 str(self.environment),
+                # https://github.com/inmanta/inmanta-lsm/blob/f6b9c7b8a861b233c682349e36d478f0afcb89b8/src/inmanta_lsm/service_catalog.py#L695
+                # https://github.com/inmanta/inmanta-core/blob/6d77faea6d409eec645e132c2480e6a9d4bc4e1c/src/inmanta/server/services/compilerservice.py#L493
+                "-j",
+                f"/tmp/{self.environment}.json",
                 "--export-plugin",
                 "service_entities_exporter",
             ],
             cwd=str(self.remote_project_path),
+            # https://github.com/inmanta/inmanta-lsm/blob/f6b9c7b8a861b233c682349e36d478f0afcb89b8/src/inmanta_lsm/service_catalog.py#L705
+            env={ENV_NO_INSTANCES: "true"},
         )
 
     def wait_for_released(self, version: int | None = None) -> None:

@@ -1,0 +1,5 @@
+include inmanta_plugins/quickstart/setup.cfg
+include inmanta_plugins/quickstart/py.typed
+recursive-include inmanta_plugins/quickstart/model *.cf
+graft inmanta_plugins/quickstart/files
+graft inmanta_plugins/quickstart/templates
