@@ -987,7 +987,7 @@ class RemoteOrchestrator:
         """
         retry_limited(functools.partial(self.is_scheduled, version), timeout=timeout)
 
-    def is_scheduled(self, version: int):
+    def is_scheduled(self, version: int) -> bool:
         """
         Verify if a given version is the latest and has already been scheduled by the orchestrator.
         :param version: The version to check.
