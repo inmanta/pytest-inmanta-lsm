@@ -985,11 +985,11 @@ class RemoteOrchestrator:
         :param version: The version to wait for.
         :param timeout: Value of timeout in seconds.
         """
-        retry_limited(functools.partial(self.is_released, version), timeout=timeout)
+        retry_limited(functools.partial(self.is_scheduled, version), timeout=timeout)
 
     def is_scheduled(self, version: int):
         """
-        Verify if a given version has already been scheduled by the orchestrator.
+        Verify if a given version is the latest and has already been scheduled by the orchestrator.
         :param version: The version to check.
         """
         res = self.client.list_desired_state_versions(tid=self.environment, limit=1)
