@@ -959,12 +959,13 @@ class RemoteOrchestrator:
             env={ENV_NO_INSTANCES: "true"},
         )
 
-    def wait_for_released(self, version: int | None = None) -> None:
+    def wait_for_released(self, version: int | None = None, timeout: int = 3) -> None:
         """
         Wait for a given version to be released by the orchestrator.
         :param version: The version to wait for, or None to wait for the latest.
+        :param timeout: Value of timeout in seconds.
         """
-        retry_limited(functools.partial(self.is_released, version), timeout=3)
+        retry_limited(functools.partial(self.is_released, version), timeout=timeout)
 
     def is_released(self, version: int | None = None) -> bool:
         """
@@ -977,6 +978,65 @@ class RemoteOrchestrator:
             return versions.result["versions"][0]["released"]
         lookup = {v["version"]: v["released"] for v in versions.result["versions"]}
         return lookup[version]
+
+    def wait_for_scheduled(self, version: int, timeout: int = 3) -> None:
+        """
+        Wait for a given version to be scheduled by the orchestrator.
+        :param version: The version to wait for.
+        :param timeout: Value of timeout in seconds.
+        """
+        retry_limited(functools.partial(self.is_released, version), timeout=timeout)
+
+    def is_scheduled(self, version: int):
+        """
+        Verify if a given version has already been scheduled by the orchestrator.
+        :param version: The version to check.
+        """
+        res = self.client.list_desired_state_versions(tid=self.environment, limit=1)
+        assert res.code == 200
+        desired_state_version = res.result["data"][0]
+
+        return (
+            desired_state_version["version"] == version
+            and desired_state_version["status"] == inmanta.const.DesiredStateVersionStatus.active
+        )
+
+    def wait_for_deployed(self, timeout: int = 3):
+        """
+        Wait for the latest version to be deployed by the orchestrator.
+        :param timeout: Value of timeout in seconds.
+        """
+        retry_limited(self.is_deployment_finished, timeout)
+
+    def is_deployment_finished(self) -> bool:
+        """
+        Verify if all resources in the latest version are done deploying.
+        """
+
+        def get_deployment_progress():
+            result = self.client.resource_list(self.environment, deploy_summary=True, limit=1)
+            assert result.code == 200, str(result.result)
+            summary = result.result["metadata"]["deploy_summary"]
+            # {'by_state': {'available': 3, 'cancelled': 0, 'deployed': 12, 'deploying': 0, 'failed': 0, 'skipped': 0,
+            #               'skipped_for_undefined': 0, 'unavailable': 0, 'undefined': 0}, 'total': 15}
+            return (
+                sum(
+                    summary["by_state"][state.value]
+                    for state in inmanta.const.DONE_STATES
+                    # https://github.com/inmanta/inmanta-core/blob/d25205bdd49016596ad7653597a2cc99a8ed3992/src/inmanta/data/model.py#L379
+                    if state != inmanta.const.ResourceState.dry
+                ),
+                summary["by_state"]["failed"],
+                summary["total"],
+            )
+
+        done, failed, total = get_deployment_progress()
+        LOGGER.info(
+            "Deployed %s of %s resources",
+            done,
+            total,
+        )
+        return total - done <= 0
 
     def wait_until_deployment_finishes(
         self,
@@ -1027,35 +1087,11 @@ class RemoteOrchestrator:
                 ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
 
         else:
-            self.wait_for_released(version)
+            self.wait_for_released(version, timeout)
 
-            def get_deployment_progress():
-                result = self.client.resource_list(self.environment, deploy_summary=True, limit=1)
-                assert result.code == 200, str(result.result)
-                summary = result.result["metadata"]["deploy_summary"]
-                # {'by_state': {'available': 3, 'cancelled': 0, 'deployed': 12, 'deploying': 0, 'failed': 0, 'skipped': 0,
-                #               'skipped_for_undefined': 0, 'unavailable': 0, 'undefined': 0}, 'total': 15}
-                return (
-                    sum(
-                        summary["by_state"][state.value]
-                        for state in inmanta.const.DONE_STATES
-                        # https://github.com/inmanta/inmanta-core/blob/d25205bdd49016596ad7653597a2cc99a8ed3992/src/inmanta/data/model.py#L379
-                        if state != inmanta.const.ResourceState.dry
-                    ),
-                    summary["by_state"]["failed"],
-                    summary["total"],
-                )
+            self.wait_for_scheduled(version, timeout)
 
-            def is_deployment_finished() -> bool:
-                done, failed, total = get_deployment_progress()
-                LOGGER.info(
-                    "Deployed %s of %s resources",
-                    done,
-                    total,
-                )
-                return total - done <= 0
-
-            retry_limited(is_deployment_finished, timeout)
+            self.wait_for_deployed(timeout)
 
             if desired_state is None:
                 # We are done waiting, and there is nothing more to verify
