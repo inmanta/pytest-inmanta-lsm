@@ -971,6 +971,7 @@ class RemoteOrchestrator:
         """
         Verify if a given version has already been released by the orchestrator.
         :param version: The version to check, or None to verify the latest version.
+        :raises KeyError: if the provided version is not exported yet.
         """
         versions = self.client.list_versions(tid=self.environment)
         assert versions.code == 200, str(versions.result)
@@ -991,6 +992,7 @@ class RemoteOrchestrator:
         """
         Verify if a given version is the latest and has already been scheduled by the orchestrator.
         :param version: The version to check.
+        :raises Exception: if the provided version will never get scheduled.
         """
         res = self.client.list_desired_state_versions(tid=self.environment, limit=1)
         assert res.code == 200
