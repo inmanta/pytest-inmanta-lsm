@@ -1065,7 +1065,6 @@ class RemoteOrchestrator:
         # or the new resource scheduler.
         response = self.client.get_version(self.environment, version)
         assert response.result is not None
-        breakpoint()
         new_api = "done" not in response.result["model"]
 
         if not new_api:
