@@ -996,6 +996,12 @@ class RemoteOrchestrator:
         assert res.code == 200
         desired_state_version = res.result["data"][0]
 
+        if desired_state_version["version"] > version:
+            raise Exception(
+                "Version %s will never be scheduled. A later version (%s) has already been scheduled."
+                % (version, desired_state_version["version"])
+            )
+
         return (
             desired_state_version["version"] == version
             and desired_state_version["status"] == inmanta.const.DesiredStateVersionStatus.active
@@ -1057,6 +1063,7 @@ class RemoteOrchestrator:
         # or the new resource scheduler.
         response = self.client.get_version(self.environment, version)
         assert response.result is not None
+        breakpoint()
         new_api = "done" not in response.result["model"]
 
         if not new_api:
