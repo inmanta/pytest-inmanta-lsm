@@ -1,5 +1,6 @@
 # v 3.15.0 (?)
 Changes in this release:
+- Fix bug in `wait_until_deployment_finishes` method. It will now correctly wait for the version to be scheduled.
 
 # v 3.14.0 (2025-08-26)
 Changes in this release:
