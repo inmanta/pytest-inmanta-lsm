@@ -77,6 +77,28 @@ def get_image_version(image: str) -> version.Version:
 def _get_product_compatibility(image: str) -> dict:
     """
     Get the compatibility.json file from the compatibility folder in the container image.
+    Here is an example of what the compatibility.json file looks like:
+
+    ..code-block:: json
+
+    {
+        "python_package_constraints": {},
+        "system_requirements": {
+            "python_version": "3.12",
+            "rhel_versions": [
+                9,
+                8
+            ],
+            "postgres_version": 16,
+            "opa_version": "1.3.0"
+        },
+        "module_compatibility_ranges": {
+            "inmanta-module-lsm": ">=2.33",
+            "inmanta-module-std": ">=8.1"
+        }
+    }
+
+    :param image: The name of the container image we want to fetch the compatibility.json from
     """
     run_cmd(cmd=["docker", "pull", image], cwd=Path())
     raw_compatibility_file, _ = run_cmd(
