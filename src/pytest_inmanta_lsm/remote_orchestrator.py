@@ -959,13 +959,14 @@ class RemoteOrchestrator:
             env={ENV_NO_INSTANCES: "true"},
         )
 
-    def wait_for_released(self, version: int | None = None, timeout: int = 3) -> None:
+    def wait_for_released(self, version: int | None = None, timeout: int = 3, retry_interval: float=1.0) -> None:
         """
         Wait for a given version to be released by the orchestrator.
         :param version: The version to wait for, or None to wait for the latest.
         :param timeout: Value of timeout in seconds.
+        :param retry_interval: Value of retry interval in seconds.
         """
-        retry_limited(functools.partial(self.is_released, version), timeout=timeout)
+        retry_limited(functools.partial(self.is_released, version), timeout=timeout, retry_interval=retry_interval)
 
     def is_released(self, version: int | None = None) -> bool:
         """
@@ -980,13 +981,13 @@ class RemoteOrchestrator:
         lookup = {v["version"]: v["released"] for v in versions.result["versions"]}
         return lookup[version]
 
-    def wait_for_scheduled(self, version: int, timeout: int = 3) -> None:
+    def wait_for_scheduled(self, version: int, timeout: int = 3, retry_interval:float=1.0) -> None:
         """
         Wait for a given version to be scheduled by the orchestrator.
         :param version: The version to wait for.
         :param timeout: Value of timeout in seconds.
         """
-        retry_limited(functools.partial(self.is_scheduled, version), timeout=timeout)
+        retry_limited(functools.partial(self.is_scheduled, version), timeout=timeout, retry_interval=retry_interval)
 
     def is_scheduled(self, version: int) -> bool:
         """
