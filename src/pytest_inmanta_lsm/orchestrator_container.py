@@ -81,22 +81,22 @@ def _get_product_compatibility(image: str) -> dict:
 
     ..code-block:: json
 
-    {
-        "python_package_constraints": {},
-        "system_requirements": {
-            "python_version": "3.12",
-            "rhel_versions": [
-                9,
-                8
-            ],
-            "postgres_version": 16,
-            "opa_version": "1.3.0"
-        },
-        "module_compatibility_ranges": {
-            "inmanta-module-lsm": ">=2.33",
-            "inmanta-module-std": ">=8.1"
+        {
+            "python_package_constraints": {},
+            "system_requirements": {
+                "python_version": "3.12",
+                "rhel_versions": [
+                    9,
+                    8
+                ],
+                "postgres_version": 16,
+                "opa_version": "1.3.0"
+            },
+            "module_compatibility_ranges": {
+                "inmanta-module-lsm": ">=2.33",
+                "inmanta-module-std": ">=8.1"
+            }
         }
-    }
 
     :param image: The name of the container image we want to fetch the compatibility.json from
     """
@@ -187,7 +187,7 @@ class OrchestratorContainer:
         self.orchestrator_version = get_image_version(self.orchestrator_image)
 
         if postgres_version == "auto":
-            # Automatically discover the appropriate postgres version based on the product documentation
+            # Automatically discover the appropriate postgres version based on the compatibility.json file in the container
             self.postgres_version = str(
                 _get_product_compatibility(self.orchestrator_image)["system_requirements"]["postgres_version"]
             )
