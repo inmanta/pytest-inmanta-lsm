@@ -104,10 +104,12 @@ def _get_product_compatibility(image: str) -> dict:
     raw_compatibility_file, _ = run_cmd(
         cmd=[
             "docker",
-            "exec",
+            "run",
+            "--rm",
+            "--entrypoint=sh",
             image,
-            "cat",
-            "/usr/share/inmanta/compatibility/compatibility.json",
+            "-c",
+            "cat /usr/share/inmanta/compatibility/compatibility.json",
         ],
         cwd=Path(),
     )
