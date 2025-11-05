@@ -19,7 +19,6 @@ from textwrap import dedent
 from types import TracebackType
 from typing import List, Optional, Tuple, Type
 
-import requests
 from inmanta.config import LenientConfigParser
 from packaging import version
 
@@ -75,50 +74,22 @@ def get_image_version(image: str) -> version.Version:
     return version.Version(raw_version.strip())
 
 
-def _get_product_compatibility(v: version.Version) -> dict:
+def _get_product_compatibility(image: str) -> dict:
     """
-    Get the product compatibility information from inmanta's documentation page.
-    For example, for iso7-dev, return the content of
-    https://docs.inmanta.com/inmanta-service-orchestrator-dev/7/reference/compatibility.json
-
-    ..code-block:: json
-
-        {
-            "python_package_constraints": {
-                "inmanta-core": "~=11.0.dev",
-                "inmanta-license": "~=4.0.dev",
-                "inmanta-lsm": "~=4.0.dev",
-                "inmanta-support": "~=3.2.dev",
-                "inmanta-ui": "~=5.1.dev",
-                "inmanta-module-connect": "~=2.0",
-                "inmanta-module-lsm": "~=2.27",
-                "inmanta-module-std": "~=5.0"
-            },
-            "system_requirements": {
-                "python_version": "3.11",
-                "rhel_versions": [
-                    9,
-                    8
-                ],
-                "postgres_version": 13
-            },
-            "module_compatibility_ranges": {
-                "inmanta-module-connect": "~=2.0",
-                "inmanta-module-lsm": "~=2.27",
-                "inmanta-module-std": "~=5.0"
-            }
-        }
-
-    :param version: The version of the product we want to know the compatibility for
+    Get the compatibility.json file from the compatibility folder in the container image.
     """
-    if v.is_prerelease:
-        url = f"https://docs.inmanta.com/inmanta-service-orchestrator-dev/{v.major}/reference/compatibility.json"
-    else:
-        url = f"https://docs.inmanta.com/inmanta-service-orchestrator/{v.major}/reference/compatibility.json"
-
-    resp = requests.get(url)
-    resp.raise_for_status()
-    return resp.json()
+    run_cmd(cmd=["docker", "pull", image], cwd=Path())
+    raw_compatibility_file, _ = run_cmd(
+        cmd=[
+            "docker",
+            "exec",
+            image,
+            "cat",
+            "/usr/share/inmanta/compatibility/compatibility.json",
+        ],
+        cwd=Path(),
+    )
+    return json.loads(raw_compatibility_file)
 
 
 class DoNotCleanOrchestratorContainer(RuntimeError):
@@ -194,7 +165,7 @@ class OrchestratorContainer:
         if postgres_version == "auto":
             # Automatically discover the appropriate postgres version based on the product documentation
             self.postgres_version = str(
-                _get_product_compatibility(self.orchestrator_version)["system_requirements"]["postgres_version"]
+                _get_product_compatibility(self.orchestrator_image)["system_requirements"]["postgres_version"]
             )
         else:
             self.postgres_version = postgres_version
