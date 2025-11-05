@@ -959,7 +959,7 @@ class RemoteOrchestrator:
             env={ENV_NO_INSTANCES: "true"},
         )
 
-    def wait_for_released(self, version: int | None = None, timeout: int = 3, retry_interval: float=1.0) -> None:
+    def wait_for_released(self, *, version: int | None = None, timeout: int = 3, retry_interval: float = 1.0) -> None:
         """
         Wait for a given version to be released by the orchestrator.
         :param version: The version to wait for, or None to wait for the latest.
@@ -981,12 +981,12 @@ class RemoteOrchestrator:
         lookup = {v["version"]: v["released"] for v in versions.result["versions"]}
         return lookup[version]
 
-    def wait_for_scheduled(self, version: int, timeout: int = 3, retry_interval:float=1.0) -> None:
+    def wait_for_scheduled(self, *, version: int, timeout: int = 3, retry_interval: float = 1.0) -> None:
         """
         Wait for a given version to be scheduled by the orchestrator.
         :param version: The version to wait for.
         :param timeout: Value of timeout in seconds.
-        :param timeout: Value of retry interval in seconds.
+        :param retry_interval: Value of retry interval in seconds.
         """
         retry_limited(functools.partial(self.is_scheduled, version), timeout=timeout, retry_interval=retry_interval)
 
@@ -1097,9 +1097,9 @@ class RemoteOrchestrator:
                 ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
 
         else:
-            self.wait_for_released(version, timeout)
+            self.wait_for_released(version=version, timeout=timeout)
 
-            self.wait_for_scheduled(version, timeout)
+            self.wait_for_scheduled(version=version, timeout=timeout)
 
             self.wait_for_deployed(timeout)
 
