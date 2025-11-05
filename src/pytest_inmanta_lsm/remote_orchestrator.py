@@ -986,6 +986,7 @@ class RemoteOrchestrator:
         Wait for a given version to be scheduled by the orchestrator.
         :param version: The version to wait for.
         :param timeout: Value of timeout in seconds.
+        :param timeout: Value of retry interval in seconds.
         """
         retry_limited(functools.partial(self.is_scheduled, version), timeout=timeout, retry_interval=retry_interval)
 
