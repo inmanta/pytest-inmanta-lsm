@@ -1016,7 +1016,7 @@ class RemoteOrchestrator:
         Wait for the latest version to be deployed by the orchestrator.
         :param timeout: Value of timeout in seconds.
         """
-        retry_limited(self.is_deployment_finished, timeout)
+        retry_limited(self.is_deployment_finished, timeout=timeout)
 
     def is_deployment_finished(self) -> bool:
         """
@@ -1081,7 +1081,7 @@ class RemoteOrchestrator:
                 )
                 return response.result["model"]["total"] - response.result["model"]["done"] <= 0
 
-            retry_limited(is_deployment_finished, timeout)
+            retry_limited(is_deployment_finished, timeout=timeout)
 
             if desired_state is None:
                 # We are done waiting, and there is nothing more to verify
