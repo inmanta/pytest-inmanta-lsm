@@ -1,7 +1,7 @@
 # v 4.0.0 (?)
 Changes in this release:
 - Fix bug in `wait_until_deployment_finishes` method. It will now correctly wait for the version to be scheduled.
-- Fetch postgres version from the compatibility.json file in the containers
+- Fetch postgres version from the compatibility.json file in the containers. This only works for orchestrator versions released in or after November 2025. For older versions, use `--lsm-ctr-db-version` or the associated environment variable.
 
 # v 3.14.0 (2025-08-26)
 Changes in this release:
