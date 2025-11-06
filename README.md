@@ -94,7 +94,7 @@ To setup the orchestrator and run your test with it, pytest-inmanta-lsm needs to
 
 This plugin is built around the remote_orchestrator fixture and the `RemoteServiceInstance` class.
 
-You can easily write a test case that sends your project to a remote orchestrator, exports its service catalog, then deploy a service.  
+You can easily write a test case that sends your project to a remote orchestrator, exports its service catalog, then deploy a service.
 ```python
 def test_deploy_service(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
     # get connection to remote_orchestrator
@@ -413,7 +413,7 @@ pytest-inmanta-lsm:
                         The version of postgresql to use for the db of the
                         orchestrator, set to 'auto' for automatic resolving
                         based on orchestrator image version (overrides
-                        INMANTA_LSM_CONTAINER_DB_VERSION, defaults to 13)
+                        INMANTA_LSM_CONTAINER_DB_VERSION, defaults to auto)
   --lsm-ctr-pub-key-file=LSM_CTR_PUB_KEY_FILE
                         A path to a public key that should be set in the
                         container (overrides INMANTA_LSM_CONTAINER_PUB_KEY_FILE,
