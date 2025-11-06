@@ -959,13 +959,14 @@ class RemoteOrchestrator:
             env={ENV_NO_INSTANCES: "true"},
         )
 
-    def wait_for_released(self, version: int | None = None, timeout: int = 3) -> None:
+    def wait_for_released(self, version: int | None = None, *, timeout: int = 3, retry_interval: float = 1.0) -> None:
         """
         Wait for a given version to be released by the orchestrator.
         :param version: The version to wait for, or None to wait for the latest.
         :param timeout: Value of timeout in seconds.
+        :param retry_interval: Value of retry interval in seconds.
         """
-        retry_limited(functools.partial(self.is_released, version), timeout=timeout)
+        retry_limited(functools.partial(self.is_released, version), timeout=timeout, retry_interval=retry_interval)
 
     def is_released(self, version: int | None = None) -> bool:
         """
@@ -980,13 +981,14 @@ class RemoteOrchestrator:
         lookup = {v["version"]: v["released"] for v in versions.result["versions"]}
         return lookup[version]
 
-    def wait_for_scheduled(self, version: int, timeout: int = 3) -> None:
+    def wait_for_scheduled(self, *, version: int, timeout: int = 3, retry_interval: float = 1.0) -> None:
         """
         Wait for a given version to be scheduled by the orchestrator.
         :param version: The version to wait for.
         :param timeout: Value of timeout in seconds.
+        :param retry_interval: Value of retry interval in seconds.
         """
-        retry_limited(functools.partial(self.is_scheduled, version), timeout=timeout)
+        retry_limited(functools.partial(self.is_scheduled, version), timeout=timeout, retry_interval=retry_interval)
 
     def is_scheduled(self, version: int) -> bool:
         """
@@ -1009,12 +1011,12 @@ class RemoteOrchestrator:
             and desired_state_version["status"] == inmanta.const.DesiredStateVersionStatus.active
         )
 
-    def wait_for_deployed(self, timeout: int = 3):
+    def wait_for_deployed(self, *, timeout: int = 3):
         """
         Wait for the latest version to be deployed by the orchestrator.
         :param timeout: Value of timeout in seconds.
         """
-        retry_limited(self.is_deployment_finished, timeout)
+        retry_limited(self.is_deployment_finished, timeout=timeout)
 
     def is_deployment_finished(self) -> bool:
         """
@@ -1079,7 +1081,7 @@ class RemoteOrchestrator:
                 )
                 return response.result["model"]["total"] - response.result["model"]["done"] <= 0
 
-            retry_limited(is_deployment_finished, timeout)
+            retry_limited(is_deployment_finished, timeout=timeout)
 
             if desired_state is None:
                 # We are done waiting, and there is nothing more to verify
@@ -1095,11 +1097,11 @@ class RemoteOrchestrator:
                 ), f"Resource status do not match the desired state, got {resource['status']} (expected {desired_state})"
 
         else:
-            self.wait_for_released(version, timeout)
+            self.wait_for_released(version=version, timeout=timeout)
 
-            self.wait_for_scheduled(version, timeout)
+            self.wait_for_scheduled(version=version, timeout=timeout)
 
-            self.wait_for_deployed(timeout)
+            self.wait_for_deployed(timeout=timeout)
 
             if desired_state is None:
                 # We are done waiting, and there is nothing more to verify
