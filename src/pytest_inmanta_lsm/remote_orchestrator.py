@@ -959,7 +959,7 @@ class RemoteOrchestrator:
             env={ENV_NO_INSTANCES: "true"},
         )
 
-    def wait_for_released(self, *, version: int | None = None, timeout: int = 3, retry_interval: float = 1.0) -> None:
+    def wait_for_released(self, version: int | None = None, *, timeout: int = 3, retry_interval: float = 1.0) -> None:
         """
         Wait for a given version to be released by the orchestrator.
         :param version: The version to wait for, or None to wait for the latest.
@@ -1011,7 +1011,7 @@ class RemoteOrchestrator:
             and desired_state_version["status"] == inmanta.const.DesiredStateVersionStatus.active
         )
 
-    def wait_for_deployed(self, timeout: int = 3):
+    def wait_for_deployed(self, *, timeout: int = 3):
         """
         Wait for the latest version to be deployed by the orchestrator.
         :param timeout: Value of timeout in seconds.
@@ -1101,7 +1101,7 @@ class RemoteOrchestrator:
 
             self.wait_for_scheduled(version=version, timeout=timeout)
 
-            self.wait_for_deployed(timeout)
+            self.wait_for_deployed(timeout=timeout)
 
             if desired_state is None:
                 # We are done waiting, and there is nothing more to verify

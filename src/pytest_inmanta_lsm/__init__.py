@@ -13,7 +13,7 @@ from typing import Callable
 LOGGER = logging.getLogger(__name__)
 
 
-def retry_limited(fun: Callable[[], bool], *, timeout: int, retry_interval: float = 1.0) -> None:
+def retry_limited(fun: Callable[[], bool], timeout: int, *, retry_interval: float = 1.0) -> None:
     """
     Tries to run function until
     a truthy result will be returned by function or
