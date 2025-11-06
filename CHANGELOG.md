@@ -1,4 +1,4 @@
-# v 3.15.0 (?)
+# v 4.0.0 (?)
 Changes in this release:
 - Fix bug in `wait_until_deployment_finishes` method. It will now correctly wait for the version to be scheduled.
 - Fetch postgres version from the compatibility.json file in the containers
