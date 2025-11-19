@@ -21,7 +21,7 @@ def read(fname):
 
 setup(
     name="pytest-inmanta-lsm",
-    version="3.14.0",
+    version="4.0.0",
     python_requires=">=3.11",  # also update classifiers
     author="Inmanta",
     author_email="code@inmanta.com",
@@ -44,7 +44,7 @@ setup(
         ]
     },
     include_package_data=True,
-    install_requires=["pytest-inmanta>=2.5,<4.0", "inmanta-lsm", "devtools"],
+    install_requires=["pytest-inmanta>=2.5,<5.0", "inmanta-lsm", "devtools"],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Framework :: Pytest",

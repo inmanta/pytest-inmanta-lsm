@@ -190,7 +190,7 @@ inm_lsm_ctr_db_version = StringTestParameter(
         "The version of postgresql to use for the db of the orchestrator, "
         "set to 'auto' for automatic resolving based on orchestrator image version"
     ),
-    default="13",
+    default="auto",
     group=param_group,
 )
 
