@@ -64,3 +64,8 @@ mypy-save:
 	$(RUN_MYPY) > $(MYPY_BASELINE_FILE) || true
 
 
+stub:
+	stubgen --include-docstrings src/pytest_inmanta_lsm/remote_service_instance_async.py
+	sed -i -e 's/async def/def/g' out/pytest_inmanta_lsm/remote_service_instance_async.pyi
+	mv out/pytest_inmanta_lsm/remote_service_instance_async.pyi src/pytest_inmanta_lsm/remote_service_instance.pyi
+	$(MAKE) format
