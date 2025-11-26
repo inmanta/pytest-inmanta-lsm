@@ -12,6 +12,13 @@ import typing
 import uuid
 
 from pytest_inmanta_lsm import remote_orchestrator, remote_service_instance_async
+from pytest_inmanta_lsm.remote_service_instance_async import (  # noqa: F401
+    BadStateError,
+    RemoteServiceInstanceError,
+    StateTimeoutError,
+    VersionExceededError,
+    get_service_instance_from_log,
+)
 
 LOGGER = logging.getLogger(__name__)
 

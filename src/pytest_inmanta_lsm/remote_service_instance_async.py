@@ -368,6 +368,7 @@ class RemoteServiceInstance:
         wait_for_version: typing.Optional[int] = None,
         bad_states: typing.Optional[typing.Collection[str]] = None,
         timeout: typing.Optional[float] = None,
+        initial_state: typing.Optional[str] = None,
     ) -> model.ServiceInstance:
         """
         Create the service instance and wait for it to go into `wait_for_state`.
@@ -380,6 +381,9 @@ class RemoteServiceInstance:
         :param bad_states: stop waiting and fail if any of these states are reached.   If set to None, default to
             self.CREATE_FLOW_BAD_STATES.
         :param timeout: how long can we wait for service to achieve given state (in seconds)
+        :param initial_state: If specified, the service instance will be created in this initial state instead of
+            using the default initial state of the lifecycle. The provided state must be a valid initial state (i.e. either
+            the default initial state of the lifecycle, or one of the alternative initial states).
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state
         :raises VersionExceededError: If version is provided and the current state goes past it
@@ -390,14 +394,16 @@ class RemoteServiceInstance:
         LOGGER.info(
             "Creating new %s service instance with attributes: %s", self.service_entity_name, devtools.debug.format(attributes)
         )
-        service_instance = await self.remote_orchestrator.request(
-            "lsm_services_create",
-            model.ServiceInstance,
+        parameters = dict(
             tid=self.remote_orchestrator.environment,
             service_entity=self.service_entity_name,
             attributes=attributes,
             service_instance_id=self._instance_id,
         )
+        if initial_state is not None:
+            parameters["initial_state"] = initial_state
+
+        service_instance = await self.remote_orchestrator.request("lsm_services_create", model.ServiceInstance, **parameters)
         assert (
             service_instance.version == 1
         ), f"Error while creating instance: wrong version, got {service_instance.version} (expected 1)"

@@ -803,6 +803,7 @@ class LsmProject:
         service_entity_version: int | None = None,
         auto_transfer: bool = True,
         service_id: typing.Optional[uuid.UUID] = None,
+        initial_state: str | None = None,
     ) -> inmanta_lsm.model.ServiceInstance:
         """
         Helper method to create an instance of the given service entity and set the
@@ -821,6 +822,7 @@ class LsmProject:
             one compile for each state we pass by.
         :param service_id: The id to give to the newly created service, if None is provided, a random
             id is assigned.
+        :param initial_state: An alternative initial state that this service should be created in.
         """
         # Resolve the initial state for our service and resolve attributes defaults
         service_entity = self.get_service_entity(service_entity_name, service_entity_version)
@@ -834,7 +836,7 @@ class LsmProject:
             "version": 1,
             "desired_state_version": 1,
             "config": {},
-            "state": service_entity.lifecycle.initial_state,
+            "state": initial_state or service_entity.lifecycle.initial_state,
             "candidate_attributes": service_entity.add_defaults(attributes),  # type: ignore
             "active_attributes": None,
             "rollback_attributes": None,

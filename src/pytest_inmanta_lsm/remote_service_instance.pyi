@@ -7,6 +7,70 @@ from inmanta_lsm.diagnose.model import FullDiagnosis
 
 from pytest_inmanta_lsm import remote_orchestrator as remote_orchestrator
 
+LOGGER: Incomplete
+T = typing.TypeVar("T")
+
+def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.ServiceInstance:
+    """
+    This helper method allow to convert of a ServiceInstanceLog into the corresponding ServiceInstance.
+    The method `to_service_instance()` was only recently added to inmanta_lsm, this offers compatibility
+    with older versions of the orchestrator.
+
+    :param log: The ServiceInstanceLog to convert to a ServiceInstance object.
+    """
+
+class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
+    """
+    Base exception for error raised by a managed service instance.
+    """
+
+    instance: Incomplete
+    def __init__(self, instance: T, *args: object) -> None: ...
+
+class VersionExceededError(RemoteServiceInstanceError[T]):
+    """
+    This error is raised when a managed instance reaches a version that is greater than
+    the one we were waiting for.
+    """
+
+    target_version: Incomplete
+    log: Incomplete
+    def __init__(self, instance: T, target_version: int, log: model.ServiceInstanceLog, *args: object) -> None: ...
+
+class BadStateError(RemoteServiceInstanceError[T]):
+    """
+    This error is raised when a managed instance goes into a state that is considered to
+    be a bad one.
+    """
+
+    bad_states: Incomplete
+    log: Incomplete
+    def __init__(
+        self, instance: T, bad_states: typing.Collection[str], log: model.ServiceInstanceLog, *args: object
+    ) -> None: ...
+
+class StateTimeoutError(RemoteServiceInstanceError[T], TimeoutError):
+    """
+    This error is raised when we hit a timeout, while waiting for a service instance to
+    reach a target state.
+    """
+
+    target_state: Incomplete
+    target_version: Incomplete
+    timeout: Incomplete
+    last_state: Incomplete
+    last_version: Incomplete
+    def __init__(
+        self,
+        instance: T,
+        target_state: str,
+        target_version: int | None,
+        timeout: float,
+        last_state: str | None,
+        last_version: int,
+        *args: object,
+    ) -> None: ...
+
 class RemoteServiceInstance:
     DEFAULT_TIMEOUT: float
     RETRY_INTERVAL: float
@@ -20,7 +84,7 @@ class RemoteServiceInstance:
         self,
         remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
         service_entity_name: str,
-        service_id: typing.Optional[uuid.UUID] = None,
+        service_id: uuid.UUID | None = None,
         lookback_depth: int = 1,
     ) -> None:
         """
@@ -58,10 +122,10 @@ class RemoteServiceInstance:
     def wait_for_state(
         self,
         target_state: str,
-        target_version: typing.Optional[int] = None,
+        target_version: int | None = None,
         *,
-        bad_states: typing.Optional[typing.Collection[str]] = None,
-        timeout: typing.Optional[float] = None,
+        bad_states: typing.Collection[str] | None = None,
+        timeout: float | None = None,
         start_version: int,
     ) -> model.ServiceInstance:
         """
@@ -88,10 +152,11 @@ class RemoteServiceInstance:
         self,
         attributes: dict[str, object],
         *,
-        wait_for_state: typing.Optional[str] = None,
-        wait_for_version: typing.Optional[int] = None,
-        bad_states: typing.Optional[typing.Collection[str]] = None,
-        timeout: typing.Optional[float] = None,
+        wait_for_state: str | None = None,
+        wait_for_version: int | None = None,
+        bad_states: typing.Collection[str] | None = None,
+        timeout: float | None = None,
+        initial_state: str | None = None,
     ) -> model.ServiceInstance:
         """
         Create the service instance and wait for it to go into `wait_for_state`.
@@ -104,6 +169,9 @@ class RemoteServiceInstance:
         :param bad_states: stop waiting and fail if any of these states are reached.   If set to None, default to
             self.CREATE_FLOW_BAD_STATES.
         :param timeout: how long can we wait for service to achieve given state (in seconds)
+        :param initial_state: If specified, the service instance will be created in this initial state instead of
+            using the default initial state of the lifecycle. The provided state must be a valid initial state (i.e. either
+            the default initial state of the lifecycle, or one of the alternative initial states).
         :raises BadStateError: If the instance went into a bad state
         :raises TimeoutError: If the timeout is reached while waiting for the desired state
         :raises VersionExceededError: If version is provided and the current state goes past it
@@ -113,11 +181,11 @@ class RemoteServiceInstance:
         self,
         edit: list[model.PatchCallEdit],
         *,
-        current_version: typing.Optional[int] = None,
-        wait_for_state: typing.Optional[str] = None,
-        wait_for_version: typing.Optional[int] = None,
-        bad_states: typing.Optional[typing.Collection[str]] = None,
-        timeout: typing.Optional[float] = None,
+        current_version: int | None = None,
+        wait_for_state: str | None = None,
+        wait_for_version: int | None = None,
+        bad_states: typing.Collection[str] | None = None,
+        timeout: float | None = None,
     ) -> model.ServiceInstance:
         """
         Update the service instance with the given `attribute_updates` and wait for it to go into `wait_for_state`.
@@ -139,11 +207,11 @@ class RemoteServiceInstance:
     def delete(
         self,
         *,
-        current_version: typing.Optional[int] = None,
-        wait_for_state: typing.Optional[str] = None,
-        wait_for_version: typing.Optional[int] = None,
-        bad_states: typing.Optional[typing.Collection[str]] = None,
-        timeout: typing.Optional[float] = None,
+        current_version: int | None = None,
+        wait_for_state: str | None = None,
+        wait_for_version: int | None = None,
+        bad_states: typing.Collection[str] | None = None,
+        timeout: float | None = None,
     ) -> model.ServiceInstance:
         """
         Delete the service instance and wait for it to go into `wait_for_state`.
@@ -165,11 +233,11 @@ class RemoteServiceInstance:
         self,
         state: str,
         *,
-        current_version: typing.Optional[int] = None,
-        wait_for_state: typing.Optional[str] = None,
-        wait_for_version: typing.Optional[int] = None,
-        bad_states: typing.Optional[typing.Collection[str]] = None,
-        timeout: typing.Optional[float] = None,
+        current_version: int | None = None,
+        wait_for_state: str | None = None,
+        wait_for_version: int | None = None,
+        bad_states: typing.Collection[str] | None = None,
+        timeout: float | None = None,
     ) -> model.ServiceInstance:
         """
         Set the service instance to a given state, and wait for it to go into `wait_for_state`.
