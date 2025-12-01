@@ -32,4 +32,3 @@ directories_to_lint:
     - src
     - tests
 python_binary: python3.12
-use_jenkins_auth_jwt: true
