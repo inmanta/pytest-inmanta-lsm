@@ -7,7 +7,7 @@ pipeline_template: ci/inmanta-tools/Jenkinsfile-integration-tests
 repo_name: pytest-inmanta-lsm
 lock:
     # This machine is used by the subset of tests that do not run against a docker container.
-    label: pytest-inmanta-lsm-iso7-dev
+    label: pytest-inmanta-lsm-iso7-dev-auth
     variable: INMANTA_LSM_HOST
     quantity: 1
 additional_constraints:
