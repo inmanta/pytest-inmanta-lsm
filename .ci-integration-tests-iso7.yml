@@ -7,7 +7,7 @@ pipeline_template: ci/inmanta-tools/Jenkinsfile-integration-tests
 repo_name: pytest-inmanta-lsm
 lock:
     # This machine is used by the subset of tests that do not run against a docker container.
-    label: pytest-inmanta-lsm-iso7-dev
+    label: pytest-inmanta-lsm-iso7-dev-auth
     variable: INMANTA_LSM_HOST
     quantity: 1
 additional_constraints:
@@ -26,6 +26,9 @@ env_vars:
     # only add package repo, git repo requires token and is added in the Jenkinsfile
     INMANTA_MODULE_REPO: "package:https://artifacts.internal.inmanta.com/inmanta/dev"
     PIP_CONSTRAINT: https://docs.inmanta.com/inmanta-service-orchestrator-dev/7/reference/requirements.txt
+    # The generic Jenkins ci file `Jenkinsfile-integration-tests` retrieves the authentication token
+    # from the credentials storage and sets the INMANTA_LSM_TOKEN env var
+    # INMANTA_LSM_TOKEN: <jenkins bearer token>
 directories_to_lint:
     - examples
     - src
