@@ -15,7 +15,6 @@ import subprocess
 import sys
 import typing
 
-import pkg_resources
 import pytest
 import pytest_inmanta.plugin
 from inmanta import env, loader, plugins
@@ -45,7 +44,6 @@ def deactive_venv():
     old_path_hooks = sys.path_hooks.copy()
     old_pythonpath = os.environ.get("PYTHONPATH", None)
     old_os_venv: typing.Optional[str] = os.environ.get("VIRTUAL_ENV", None)
-    old_working_set = pkg_resources.working_set
 
     yield
 
@@ -59,7 +57,6 @@ def deactive_venv():
     sys.path_hooks.extend(old_path_hooks)
     # Clear cache for sys.path_hooks
     sys.path_importer_cache.clear()
-    pkg_resources.working_set = old_working_set
     # Restore PYTHONPATH
     if old_pythonpath is not None:
         os.environ["PYTHONPATH"] = old_pythonpath

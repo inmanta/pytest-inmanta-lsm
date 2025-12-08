@@ -6,6 +6,7 @@ Pytest Inmanta LSM
 :license: Inmanta EULA
 """
 
+import importlib.metadata
 import logging
 import os
 import pathlib
@@ -19,7 +20,6 @@ import uuid
 from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 from uuid import UUID
 
-import pkg_resources
 import pytest
 import pytest_inmanta.plugin
 import pytest_inmanta.test_parameter
@@ -110,7 +110,7 @@ def lsm_project_fixture(
     monkeypatch: pytest.MonkeyPatch,
     remote_orchestrator_partial: bool,
 ) -> "lsm_project.LsmProject":
-    core_version = version.Version(pkg_resources.get_distribution("inmanta-core").version)
+    core_version = version.Version(importlib.metadata.version("inmanta-core"))
     if core_version < version.Version("6"):
         # Before inmanta-core==6.0.0, the compile resets the inmanta plugins between each compile, which makes
         # the monkeypatching of plugins impossible.  This makes this fixture irrelevant in such case.
