@@ -304,10 +304,16 @@ class RemoteOrchestrator:
         """
         Setup the config required to make it possible for the client to reach the orchestrator.
         """
+        # Create a raw config object, with only the part of the configuration that will be
+        # common for the local and remote project compiles (environment and authentication)
+        raw_config = configparser.ConfigParser()
+        raw_config.add_section("config")
+        raw_config.set("config", "environment", str(self.environment))
         inmanta_config.Config.set("config", "environment", str(self.environment))
 
-        for section in ["compiler_rest_transport", "client_rest_transport"]:
-            inmanta_config.Config.set(section, "host", self.host)
+        for section in ["compiler_rest_transport", "client_rest_transport", "api_rest_transport"]:
+            raw_config.add_section(section)
+            inmanta_config.Config.set(section, "host", int(self.host))
             inmanta_config.Config.set(section, "port", str(self.port))
 
             # Config for SSL and authentication:
@@ -316,18 +322,8 @@ class RemoteOrchestrator:
                 if self.ca_cert:
                     inmanta_config.Config.set(section, "ssl_ca_cert_file", self.ca_cert)
             if self.token:
+                raw_config.set(section, "token", self.token)
                 inmanta_config.Config.set(section, "token", self.token)
-
-        # Create a raw config object, with only the part of the configuration that will be
-        # common for the local and remote project compiles (environment and authentication)
-        raw_config = configparser.ConfigParser()
-        raw_config.add_section("config")
-        raw_config.add_section("compiler_rest_transport")
-        raw_config.add_section("client_rest_transport")
-        raw_config.set("config", "environment", str(self.environment))
-        if self.token:
-            raw_config.set("compiler_rest_transport", "token", self.token)
-            raw_config.set("client_rest_transport", "token", self.token)
 
         # Persist environment and token info in the inmanta config file of the project
         # to make sure it is sent to the remote orchestrator
