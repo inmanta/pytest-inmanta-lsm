@@ -311,9 +311,11 @@ class RemoteOrchestrator:
         raw_config.set("config", "environment", str(self.environment))
         inmanta_config.Config.set("config", "environment", str(self.environment))
 
-        for section in ["compiler_rest_transport", "client_rest_transport", "api_rest_transport"]:
+        for client_type in inmanta.const.ClientType:
+            section = f"{client_type.value}_rest_transport"
             raw_config.add_section(section)
-            inmanta_config.Config.set(section, "host", int(self.host))
+            inmanta_config.TransportConfig(client_type.value)
+            inmanta_config.Config.set(section, "host", self.host)
             inmanta_config.Config.set(section, "port", str(self.port))
 
             # Config for SSL and authentication:
@@ -340,9 +342,9 @@ class RemoteOrchestrator:
         urllib.parse.urlunsplit can accept as input.
         https://docs.python.org/3/library/urllib.parse.html
         """
-        port: int = int(inmanta_config.Config.get("client_rest_transport", "port") or 8888)
-        host: str = inmanta_config.Config.get("client_rest_transport", "host") or "localhost"
-        ssl: bool = inmanta_config.Config.getboolean("client_rest_transport", "ssl", False)
+        port: int = int(inmanta_config.Config.get("api_rest_transport", "port") or 8888)
+        host: str = inmanta_config.Config.get("api_rest_transport", "host") or "localhost"
+        ssl: bool = inmanta_config.Config.getboolean("api_rest_transport", "ssl", False)
         protocol = "https" if ssl else "http"
         return urllib.parse.urlsplit(f"{protocol}://{host}:{port}")
 
@@ -377,8 +379,8 @@ class RemoteOrchestrator:
 
         # Read the config to know where the orchestrator is, and how we should
         # communicate with it
-        token: typing.Optional[str] = inmanta_config.Config.get("client_rest_transport", "token", None)
-        ca_certs: typing.Optional[str] = inmanta_config.Config.get("client_rest_transport", "ssl_ca_cert_file", None)
+        token: typing.Optional[str] = inmanta_config.Config.get("api_rest_transport", "token", None)
+        ca_certs: typing.Optional[str] = inmanta_config.Config.get("api_rest_transport", "ssl_ca_cert_file", None)
 
         # Setup authentication (if required)
         if token is not None:
