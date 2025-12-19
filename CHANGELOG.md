@@ -2,6 +2,7 @@
 Changes in this release:
 - Extend LsmProject and RemoteServiceInstance to support service creation in alternative initial state. (inmanta-lsm>=5.2.0)
 - Dropped the pkg_resources package
+- Fix bug related to requests CA
 
 # v 4.0.0 (2025-11-19)
 Changes in this release:

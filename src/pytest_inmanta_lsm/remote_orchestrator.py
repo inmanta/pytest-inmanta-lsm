@@ -390,7 +390,7 @@ class RemoteOrchestrator:
 
         # Setup ca_certs (if required)
         if ca_certs is not None:
-            self._session.cert = ca_certs
+            self._session.verify = ca_certs
 
         # Setup base url for all requests made
         def request_with_base_url(
