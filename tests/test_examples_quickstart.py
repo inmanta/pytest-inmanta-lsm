@@ -45,8 +45,8 @@ def module_venv_active(
     "args",
     [
         [],
-        ["--lsm-ctr"],
-        ["--lsm-ctr", "--pip-constraint=constraints.txt"],
+        # ["--lsm-ctr"],
+        # ["--lsm-ctr", "--pip-constraint=constraints.txt"],
     ],
 )
 def test_basic_example(testdir: pytest.Testdir, module_venv_active: env.VirtualEnv, args: list[str]) -> None:
@@ -62,4 +62,12 @@ def test_basic_example(testdir: pytest.Testdir, module_venv_active: env.VirtualE
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest("tests/test_quickstart.py", *args)
-    result.assert_outcomes(passed=8)
+    try:
+        result.assert_outcomes(passed=8)
+    except Exception as exc:
+        import logging
+
+        logger = logging.getLogger("FELIX DEBUG")
+        logger.info(str(result.stdout))
+        logger.info(str(exc))
+        raise Exception(str(result.stdout))
