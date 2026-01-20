@@ -265,7 +265,6 @@ class OrchestratorContainer:
         self._cwd: Optional[Path] = None
         self._config: Optional[LenientConfigParser] = None
         self._containers: Optional[List[str]] = None
-        self._orchestrator_container_id: Optional[str] = None
 
     @property
     def cwd(self) -> Path:
@@ -353,8 +352,6 @@ class OrchestratorContainer:
         return self._container("inmanta-server")
 
     def get_orchestrator_stats(self) -> ContainerStats:
-        if self._orchestrator_container_id is None:
-            raise RuntimeError("The lab has not been started properly")
         cmd = [*self.docker_compose, "stats", "--format", "json", "--no-stream", "inmanta-server"]
         stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
         if not stdout.strip():
@@ -400,11 +397,6 @@ class OrchestratorContainer:
         cmd = [*self.docker_compose, "--verbose", "ps", "-q"]
         stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
         self._containers = stdout.strip("\n").split("\n")
-
-        # Get container id orchestrator
-        cmd = [*self.docker_compose, "--verbose", "ps", "inmanta-server", "-q"]
-        stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
-        self._orchestrator_container_id = stdout.strip("\n")
 
     def _down(self) -> None:
         # Stopping the lab

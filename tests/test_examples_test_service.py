@@ -63,6 +63,10 @@ def test_deployment_failure(testdir: pytest.Testdir, module_venv_active: env.Vir
 
 
 def test_docker_stats(testdir: pytest.Testdir, module_venv_active: env.VirtualEnv) -> None:
+    """
+    Verify the behavior of the get_orchestrator_stats() method on the
+    remote_orchestrator_container fixture.
+    """
     result = testdir.runpytest_inprocess("-s", "tests/test_docker_stats.py", "--lsm-ctr")
     result.assert_outcomes(passed=1, failed=0)
     result.stdout.re_match_lines(
