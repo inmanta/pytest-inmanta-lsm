@@ -128,7 +128,7 @@ class DoNotCleanOrchestratorContainer(RuntimeError):
 @dataclass
 class ContainerStats:
     """
-    A class representation of a subset of the output returned by the `docker container stats` command.
+    A class representation of a subset of the output returned by the `docker compose stats` command.
     """
     memory_usage_bytes: float
     cpu_usage_percentage: float
@@ -136,7 +136,7 @@ class ContainerStats:
     @classmethod
     def parse_json_output(cls, docker_stats_output: str) -> "ContainerStats":
         """
-        Parse the output produced by the `docker container stats --format json --no-stream <container-id>` command.
+        Parse the output produced by the `docker compose stats --format json --no-stream <service-name>` command.
 
         Example output:
 
