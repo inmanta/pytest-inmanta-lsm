@@ -6,9 +6,6 @@ Pytest Inmanta LSM
 :license: Inmanta EULA
 """
 
-import pytest
-import logging
-
 from pytest_inmanta_lsm import orchestrator_container as oc
 
 

@@ -6,20 +6,20 @@ Pytest Inmanta LSM
 :license: Inmanta EULA
 """
 
-import re
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 from configparser import Interpolation
+from dataclasses import dataclass
 from ipaddress import IPv4Address
 from pathlib import Path
 from tempfile import mkdtemp
 from textwrap import dedent
 from types import TracebackType
 from typing import List, Optional, Tuple, Type
-from dataclasses import dataclass
 
 from inmanta.config import LenientConfigParser
 from packaging import version
@@ -130,6 +130,7 @@ class ContainerStats:
     """
     A class representation of a subset of the output returned by the `docker compose stats` command.
     """
+
     memory_usage_bytes: float
     cpu_usage_percentage: float
 
@@ -436,4 +437,3 @@ class OrchestratorContainer:
             self._cwd = None
 
         return None
-
