@@ -6,6 +6,7 @@ Pytest Inmanta LSM
 :license: Inmanta EULA
 """
 
+import re
 import json
 import logging
 import os
@@ -18,6 +19,7 @@ from tempfile import mkdtemp
 from textwrap import dedent
 from types import TracebackType
 from typing import List, Optional, Tuple, Type
+from dataclasses import dataclass
 
 from inmanta.config import LenientConfigParser
 from packaging import version
@@ -123,6 +125,65 @@ class DoNotCleanOrchestratorContainer(RuntimeError):
     """
 
 
+@dataclass
+class ContainerStats:
+    """
+    A class representation of a subset of the output returned by the `docker container stats` command.
+    """
+    memory_usage_bytes: float
+    cpu_usage_percentage: float
+
+    @classmethod
+    def parse_json_output(cls, docker_stats_output: str) -> "ContainerStats":
+        """
+        Parse the output produced by the `docker container stats --format json --no-stream <container-id>` command.
+
+        Example output:
+
+        {
+          "BlockIO": "0B / 0B",
+          "CPUPerc": "0.00%",
+          "Container": "5cdb6daf536e",
+          "ID": "5cdb6daf536e",
+          "MemPerc": "0.01%",
+          "MemUsage": "824KiB / 11.15GiB",
+          "Name": "epic_mclaren",
+          "NetIO": "876B / 126B",
+          "PIDs": "1"
+        }
+        """
+        stats_dct = json.loads(docker_stats_output)
+        cpu_percentage = float(stats_dct["CPUPerc"][:-1])
+        memory_usage = cls._parse_memory_usage(stats_dct["MemUsage"])
+        return ContainerStats(memory_usage_bytes=memory_usage, cpu_usage_percentage=cpu_percentage)
+
+    @classmethod
+    def _parse_memory_usage(cls, memory_usage: str) -> float:
+        """
+        Parse the memory usage and return it converted to Bytes.
+        """
+        unit_conversion_factors = {
+            "YiB": pow(10, 24),
+            "ZiB": pow(10, 21),
+            "EiB": pow(10, 18),
+            "PiB": pow(10, 15),
+            "TiB": pow(10, 12),
+            "GiB": pow(10, 9),
+            "MiB": pow(10, 6),
+            "KiB": pow(10, 3),
+            "B": 1,
+        }
+        actual_memory_usage = memory_usage.split("/")[0].strip().replace(" ", "")
+        match = re.fullmatch("([^a-zA-Z]+)([a-zA-Z]+)", actual_memory_usage)
+        if not match:
+            raise Exception(f"Failed to parse: {actual_memory_usage}")
+        amount = float(match.group(1))
+        unit = match.group(2)
+        if unit not in unit_conversion_factors:
+            raise Exception(f"Unknown unit: {unit}")
+        return amount * unit_conversion_factors[unit]
+
+
 class OrchestratorContainer:
     """
     This class allows to easily setup an inmanta orchestrator in a container using the official
@@ -204,6 +265,7 @@ class OrchestratorContainer:
         self._cwd: Optional[Path] = None
         self._config: Optional[LenientConfigParser] = None
         self._containers: Optional[List[str]] = None
+        self._orchestrator_container_id: Optional[str] = None
 
     @property
     def cwd(self) -> Path:
@@ -290,6 +352,16 @@ class OrchestratorContainer:
     def orchestrator(self) -> dict:
         return self._container("inmanta-server")
 
+    def get_orchestrator_stats(self) -> ContainerStats:
+        if self._orchestrator_container_id is None:
+            raise RuntimeError("The lab has not been started properly")
+        cmd = [*self.docker_compose, "stats", "--format", "json", "--no-stream", "inmanta-server"]
+        stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
+        if not stdout.strip():
+            # The container is not running
+            raise Exception("Orchestrator container is not running")
+        return ContainerStats.parse_json_output(stdout)
+
     @property
     def orchestrator_ips(self) -> List[IPv4Address]:
         return [IPv4Address(network["IPAddress"]) for network in self.orchestrator["NetworkSettings"]["Networks"].values()]
@@ -329,6 +401,11 @@ class OrchestratorContainer:
         stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
         self._containers = stdout.strip("\n").split("\n")
 
+        # Get container id orchestrator
+        cmd = [*self.docker_compose, "--verbose", "ps", "inmanta-server", "-q"]
+        stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
+        self._orchestrator_container_id = stdout.strip("\n")
+
     def _down(self) -> None:
         # Stopping the lab
         cmd = [*self.docker_compose, "--verbose", "down", "-v"]
@@ -367,3 +444,4 @@ class OrchestratorContainer:
             self._cwd = None
 
         return None
+
