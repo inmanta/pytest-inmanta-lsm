@@ -60,3 +60,18 @@ def test_deployment_failure(testdir: pytest.Testdir, module_venv_active: env.Vir
     matched_lines = [match for line in result.stdout.lines if (match := search_line.fullmatch(line)) is not None]
     assert len(matched_lines) >= 1, f"Failed to find dump log in test output: {result.stdout.str()}"
     assert pathlib.Path(matched_lines[0].group("path")).exists()
+
+
+def test_docker_stats(testdir: pytest.Testdir, module_venv_active: env.VirtualEnv) -> None:
+    """
+    Verify the behavior of the get_orchestrator_stats() method on the
+    remote_orchestrator_container fixture.
+    """
+    result = testdir.runpytest_inprocess("-s", "tests/test_docker_stats.py", "--lsm-ctr")
+    result.assert_outcomes(passed=1, failed=0)
+    result.stdout.re_match_lines(
+        [
+            r".*CPU: [0-9]+(\.[0-9]+)?",
+            r".*MEMORY: [0-9]+(\.[0-9]+)?",
+        ]
+    )

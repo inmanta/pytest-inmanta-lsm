@@ -9,9 +9,11 @@ Pytest Inmanta LSM
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 from configparser import Interpolation
+from dataclasses import dataclass
 from ipaddress import IPv4Address
 from pathlib import Path
 from tempfile import mkdtemp
@@ -121,6 +123,66 @@ class DoNotCleanOrchestratorContainer(RuntimeError):
     If this error is raised from the OrchestratorContainer context manager block
     the deployed lab won't be deleted, the user will have to do it manually.
     """
+
+
+@dataclass
+class ContainerStats:
+    """
+    A class representation of a subset of the output returned by the `docker compose stats` command.
+    """
+
+    memory_usage_bytes: float
+    cpu_usage_percentage: float
+
+    @classmethod
+    def parse_json_output(cls, docker_stats_output: str) -> "ContainerStats":
+        """
+        Parse the output produced by the `docker compose stats --format json --no-stream <service-name>` command.
+
+        Example output:
+
+        {
+          "BlockIO": "0B / 0B",
+          "CPUPerc": "0.00%",
+          "Container": "5cdb6daf536e",
+          "ID": "5cdb6daf536e",
+          "MemPerc": "0.01%",
+          "MemUsage": "824KiB / 11.15GiB",
+          "Name": "epic_mclaren",
+          "NetIO": "876B / 126B",
+          "PIDs": "1"
+        }
+        """
+        stats_dct = json.loads(docker_stats_output)
+        cpu_percentage = float(stats_dct["CPUPerc"][:-1])
+        memory_usage = cls._parse_memory_usage(stats_dct["MemUsage"])
+        return ContainerStats(memory_usage_bytes=memory_usage, cpu_usage_percentage=cpu_percentage)
+
+    @classmethod
+    def _parse_memory_usage(cls, memory_usage: str) -> float:
+        """
+        Parse the memory usage and return it converted to Bytes.
+        """
+        unit_conversion_factors = {
+            "YiB": pow(10, 24),
+            "ZiB": pow(10, 21),
+            "EiB": pow(10, 18),
+            "PiB": pow(10, 15),
+            "TiB": pow(10, 12),
+            "GiB": pow(10, 9),
+            "MiB": pow(10, 6),
+            "KiB": pow(10, 3),
+            "B": 1,
+        }
+        actual_memory_usage = memory_usage.split("/")[0].strip().replace(" ", "")
+        match = re.fullmatch("([^a-zA-Z]+)([a-zA-Z]+)", actual_memory_usage)
+        if not match:
+            raise Exception(f"Failed to parse: {actual_memory_usage}")
+        amount = float(match.group(1))
+        unit = match.group(2)
+        if unit not in unit_conversion_factors:
+            raise Exception(f"Unknown unit: {unit}")
+        return amount * unit_conversion_factors[unit]
 
 
 class OrchestratorContainer:
@@ -289,6 +351,14 @@ class OrchestratorContainer:
     @property
     def orchestrator(self) -> dict:
         return self._container("inmanta-server")
+
+    def get_orchestrator_stats(self) -> ContainerStats:
+        cmd = [*self.docker_compose, "stats", "--format", "json", "--no-stream", "inmanta-server"]
+        stdout, _ = run_cmd(cmd=cmd, cwd=self.cwd)
+        if not stdout.strip():
+            # The container is not running
+            raise Exception("Orchestrator container is not running")
+        return ContainerStats.parse_json_output(stdout)
 
     @property
     def orchestrator_ips(self) -> List[IPv4Address]:
