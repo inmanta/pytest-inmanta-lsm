@@ -4,6 +4,7 @@ Changes in this release:
 - Dropped the pkg_resources package
 - Fix bug related to requests CA
 - Added support to retrieve statistics for the orchestrator container spinned up by pytest-inmanta-lsm
+- Extend LsmProject.lsm_services_list supported parameter: handle include_deleted
 
 # v 4.0.0 (2025-11-19)
 Changes in this release:
