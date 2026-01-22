@@ -380,7 +380,7 @@ class LsmProject:
             raising=False,
         )
 
-    def lsm_services_list(self, tid: uuid.UUID, service_entity: str) -> inmanta.protocol.common.Result:
+    def lsm_services_list(self, tid: uuid.UUID, service_entity: str, include_deleted: bool = False) -> inmanta.protocol.common.Result:
         """
         This is a mock for the lsm api, this method is called during allocation to get
         all the instances of a service.
@@ -402,6 +402,7 @@ class LsmProject:
                     json.loads(json.dumps(srv, default=inmanta.util.api_boundary_json_encoder))
                     for srv in self.services.values()
                     if srv.service_entity == service_entity
+                    and (include_deleted or srv.deleted is False)
                 ],
             },
         )
