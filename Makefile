@@ -25,6 +25,8 @@ RUN_MYPY=MYPYPATH=src python -m mypy --html-report mypy -p pytest_inmanta_lsm
 
 mypy:
 	$(RUN_MYPY)
+ci-mypy:
+	$(RUN_MYPY)
 
 # baseline file mypy-diff will compare to
 MYPY_BASELINE_FILE=.mypy-baseline
