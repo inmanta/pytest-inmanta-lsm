@@ -30,3 +30,6 @@ env_vars:
     # from the credentials storage and sets the INMANTA_LSM_TOKEN env var
     # INMANTA_LSM_TOKEN: <jenkins bearer token>
 python_binary: python3.13
+mypy-mode: fail
+pyupgrade_mode: fail
+pyupgrade_python_version: py313
