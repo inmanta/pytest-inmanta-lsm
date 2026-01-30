@@ -52,7 +52,7 @@ def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.Servic
             deployment_progress=None,
             service_identity_attribute_value=log.service_identity_attribute_value,
             referenced_by=None,
-        )
+        ) # type: ignore[call-arg]
 
 
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
