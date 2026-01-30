@@ -21,7 +21,7 @@ pep8:
 	$(flake8)
 
 .PHONY: mypy mypy-diff mypy-save
-RUN_MYPY=MYPYPATH=src python -m mypy --html-report mypy -p pytest_inmanta_lsm
+RUN_MYPY=python -m mypy --html-report mypy -p pytest_inmanta_lsm
 mypy_baseline = python -m mypy_baseline
 
 .PHONY: mypy ci-mypy

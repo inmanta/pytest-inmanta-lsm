@@ -34,4 +34,4 @@ credentials:
     credentialsId: 96f313c8-b5db-4978-ac85-d314ac372b8f
 mypy_mode: fail
 pyupgrade_mode: fail
-pyupgrade_python_version: py313
+pyupgrade_python_version: py311
