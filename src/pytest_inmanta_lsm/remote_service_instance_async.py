@@ -53,6 +53,9 @@ def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.Servic
             service_identity_attribute_value=log.service_identity_attribute_value,
             referenced_by=None,
         )  # type: ignore[call-arg]
+        # The model.ServiceInstance used in older versions of inmanta-lsm (iso7) had fewer fields than more recent versions,
+        # which means that we would have different mypy results for different supported inmanta-lsm versions.
+        # We add this ignore in order to have a consistent mypy-baseline between supported iso versions
 
 
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
