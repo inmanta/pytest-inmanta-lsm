@@ -1,0 +1,38 @@
+# We want to verify that the pytest-inmanta-lsm pytest plugin works correctly when the tests run against a remote
+# orchestrator installed from RPM and when the remote orchestrator is an inmanta docker container. As such, the
+# configuration mentioned below runs all the tests except the `tests/test_containerized_orchestrator.py` tests against
+# an orchestrator installed from RPM. More information regarding the structure of the test suite can be found in the
+# README.md.
+pipeline_template: ci/inmanta-tools/Jenkinsfile-integration-tests-2
+lock:
+    # This machine is used by the subset of tests that do not run against a docker container.
+    label: pytest-inmanta-lsm-iso10-dev-auth
+    variable: INMANTA_LSM_HOST
+    quantity: 1
+additional_constraints:
+    - "-c https://docs.inmanta.com/inmanta-service-orchestrator-dev/10/reference/requirements.txt"
+env_vars:
+    # This option is ignored when the tests run against a docker container.
+    INMANTA_LSM_SSH_USER: inmanta
+    INMANTA_LSM_SSH_PORT: 2222
+    INMANTA_LSM_CONTAINER_ENV: true
+    # The INMANTA_LSM_CONTAINER environment variable is not set here. The test suite sets the
+    # --lsm-ctr option for the subset of tests that need to run against a docker container.
+    # More information regarding the structure of the test suite can be found in the README.md
+    INMANTA_LSM_CONTAINER_DB_VERSION: auto
+    INMANTA_LSM_CONTAINER_IMAGE: code.inmanta.com:4567/solutions/containers/service-orchestrator:10-dev
+    INMANTA_LSM_CONTAINER_LICENSE_FILE: http://file.ii.inmanta.com/license/dev.inmanta.com.license
+    INMANTA_LSM_CONTAINER_JWE_FILE: http://file.ii.inmanta.com/license/dev.inmanta.com.jwe
+    # only add package repo, git repo requires token and is added in the Jenkinsfile
+    INMANTA_MODULE_REPO: "package:https://artifacts.internal.inmanta.com/inmanta/dev"
+    PIP_CONSTRAINT: https://docs.inmanta.com/inmanta-service-orchestrator-dev/10/reference/requirements.txt
+    # The generic Jenkins ci file `Jenkinsfile-integration-tests` retrieves the authentication token
+    # from the credentials storage and sets the INMANTA_LSM_TOKEN env var
+    # INMANTA_LSM_TOKEN: <jenkins bearer token>
+python_binary: python3.13
+credentials:
+  - type: sshagent
+    credentialsId: 96f313c8-b5db-4978-ac85-d314ac372b8f
+mypy_mode: fail
+pyupgrade_mode: fail
+pyupgrade_python_version: py311
