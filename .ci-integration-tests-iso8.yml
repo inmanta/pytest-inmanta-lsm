@@ -3,8 +3,7 @@
 # configuration mentioned below runs all the tests except the `tests/test_containerized_orchestrator.py` tests against
 # an orchestrator installed from RPM. More information regarding the structure of the test suite can be found in the
 # README.md.
-pipeline_template: ci/inmanta-tools/Jenkinsfile-integration-tests
-repo_name: pytest-inmanta-lsm
+pipeline_template: ci/inmanta-tools/Jenkinsfile-integration-tests-2
 lock:
     # This machine is used by the subset of tests that do not run against a docker container.
     label: pytest-inmanta-lsm-iso8-dev-auth
@@ -30,8 +29,10 @@ env_vars:
     # The generic Jenkins ci file `Jenkinsfile-integration-tests` retrieves the authentication token
     # from the credentials storage and sets the INMANTA_LSM_TOKEN env var
     # INMANTA_LSM_TOKEN: <jenkins bearer token>
-directories_to_lint:
-    - examples
-    - src
-    - tests
 python_binary: python3.12
+credentials:
+  - type: sshagent
+    credentialsId: 96f313c8-b5db-4978-ac85-d314ac372b8f
+mypy_mode: fail
+pyupgrade_mode: fail
+pyupgrade_python_version: py311
