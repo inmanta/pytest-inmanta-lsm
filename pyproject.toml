@@ -1,3 +1,84 @@
+
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytest-inmanta-lsm"
+version = "4.1.0"
+description = "Common fixtures used in inmanta LSM related modules"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = ["pytest", "inmanta", "lsm"]
+authors = [{ name = "Inmanta", email = "code@inmanta.com" }]
+
+# For a list of valid classifiers, see https://pypi.org/classifiers/
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    "pytest-inmanta>=2.5,<5.0",
+    "inmanta-lsm",
+    "devtools"
+]
+
+[project.urls]
+"Homepage" = "https://inmanta.com"
+"Bug Reports" = "https://github.com/inmanta/pytest-inmanta-lsm/issues"
+"Source" = "https://github.com/inmanta/pytest-inmanta-lsm"
+
+[project.entry-points.pytest11]
+pytest-inmanta-lsm = "pytest_inmanta_lsm.plugin"
+
+[tool.setuptools]
+packages = { find = { where = ["src"] } }
+
+
+[tool.bumpversion]
+current_version = "4.1.0.dev0"
+tag = false
+commit = false
+parse = """
+    ^(?P<major>0|[1-9]\\d*)\\.
+    (?P<minor>0|[1-9]\\d*)\\.
+    (?P<patch>0|[1-9]\\d*)
+    (?:
+        .(?P<tag>dev0)
+    )?$
+"""
+serialize = [
+    "{major}.{minor}.{patch}.{tag}",
+    "{major}.{minor}.{patch}",
+]
+
+[tool.bumpversion.parts.tag]
+values = ["dev0", ""]
+optional_value = ""
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = "^version = \"{current_version}\""
+regex = true
+replace = "version = \"{new_version}\""
+serialize = ["{major}.{minor}.{patch}"]
+
+[[tool.bumpversion.files]]
+filename = "setup.cfg"
+serialize = ["{tag}"]
+search = "tag_build = {current_version}"
+replace = "tag_build = {new_version}"
+
 [tool.black]
 line-length = 128
 target-version = ['py311']
