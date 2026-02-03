@@ -45,7 +45,7 @@ pytest-inmanta-lsm = "pytest_inmanta_lsm.plugin"
 packages = { find = { include = ["pytest_inmanta_lsm*"], where = ["src"] } }
 
 [tool.setuptools.package-data]
-pytest_inmanta_lsm = ["py.typed", "*.yml", "my-env-file", "*.cfg"]
+pytest_inmanta_lsm = ["py.typed"]
 
 
 [tool.bumpversion]
