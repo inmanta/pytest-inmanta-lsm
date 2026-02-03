@@ -42,7 +42,7 @@ dependencies = [
 pytest-inmanta-lsm = "pytest_inmanta_lsm.plugin"
 
 [tool.setuptools]
-packages = { find = { include = ["pytest_inmanta_lsm*"], where = ["src"] } }
+packages = { find = { where = ["src"] } }
 
 [tool.setuptools.package-data]
 pytest_inmanta_lsm = ["py.typed"]
