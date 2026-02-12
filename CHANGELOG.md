@@ -1,4 +1,9 @@
 # v 4.1.0 (?)
+
+## v4.1.1 - ?
+
+
+
 Changes in this release:
 - Extend LsmProject and RemoteServiceInstance to support service creation in alternative initial state. (inmanta-lsm>=5.2.0)
 - Dropped the pkg_resources package
