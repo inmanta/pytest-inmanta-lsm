@@ -1,7 +1,8 @@
 # Changelog
 
-## v4.1.1 - ?
+## v5.0.0 - ?
 
+- Bump minimal required python version to 3.12
 
 
 
