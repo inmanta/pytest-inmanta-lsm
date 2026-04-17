@@ -100,16 +100,14 @@ def venv_unset_python_path(venv: env.VirtualEnv) -> None:
     else:
         sitecustomize_inherit = ""
     with open(os.path.join(venv.site_packages_dir, "sitecustomize.py"), "a") as fd:
-        fd.write(
-            f"""
+        fd.write(f"""
 {sitecustomize_inherit}
 
 import os
 
 if "PYTHONPATH" in os.environ:
     del os.environ["PYTHONPATH"]
-            """.strip()
-        )
+            """.strip())
 
 
 def unload_modules_for_path(path: str) -> None:

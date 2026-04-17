@@ -587,8 +587,7 @@ def unittest_lsm(project: Project) -> Iterator[None]:
     name: str = "unittest_lsm"
     project.create_module(
         name,
-        initcf=textwrap.dedent(
-            """
+        initcf=textwrap.dedent("""
             entity Resource extends std::PurgeableResource:
                 string name
                 string agent = "internal"
@@ -598,12 +597,8 @@ def unittest_lsm(project: Project) -> Iterator[None]:
             index Resource(name)
 
             implement Resource using std::none
-            """.strip(
-                "\n"
-            )
-        ),
-        initpy=textwrap.dedent(
-            """
+            """.strip("\n")),
+        initpy=textwrap.dedent("""
             from inmanta import resources
             from inmanta.agent import handler
 
@@ -637,10 +632,7 @@ def unittest_lsm(project: Project) -> Iterator[None]:
                     resource: resources.PurgeableResource,
                 ) -> None:
                     ctx.set_updated()
-            """.strip(
-                "\n"
-            )
-        ),
+            """.strip("\n")),
     )
     yield
     shutil.rmtree(os.path.join(project._test_project_dir, "libs", name))
