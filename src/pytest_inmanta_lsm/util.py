@@ -60,6 +60,18 @@ async def execute_scenarios(
         # each scenario, one at a time
         scenarios = (execute_sequentially(*scenarios),)
 
+    if max_concurrency is not None and not sequential:
+        # Cap the number of scenarios running in parallel. The timer for
+        # the per-scenario timeout (if any) only starts once a slot is
+        # acquired, since the wait_for is wrapped inside the semaphore.
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def with_semaphore(scenario: collections.abc.Awaitable) -> object:
+            async with semaphore:
+                return await scenario
+
+        scenarios = tuple(with_semaphore(s) for s in scenarios)
+
     if timeout:
         # If we received a timeout parameter, we make sure each scenario
         # will stop if the timeout is reached
