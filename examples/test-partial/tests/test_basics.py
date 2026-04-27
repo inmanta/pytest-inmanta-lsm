@@ -30,9 +30,7 @@ def test_service_instances(
     remote_orchestrator_partial: bool,
 ) -> None:
     # set up project
-    project.compile(
-        textwrap.dedent(
-            """
+    project.compile(textwrap.dedent("""
             import test_partial
             import test_partial::service
             import unittest_lsm
@@ -43,11 +41,7 @@ def test_service_instances(
             end
 
             implement test_partial::UnittestResourceStub using resource
-            """.strip(
-                "\n"
-            )
-        )
-    )
+            """.strip("\n")))
     service: str = "network"
 
     # sync project and export service entities

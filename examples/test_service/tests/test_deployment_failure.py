@@ -16,11 +16,9 @@ def test_full_cycle(project, remote_orchestrator, fail: bool):
     # get connection to remote_orchestrator
     client = remote_orchestrator.client
 
-    project.compile(
-        """
+    project.compile("""
         import test_service
-        """
-    )
+        """)
 
     # sync project and export service entities
     remote_orchestrator.export_service_entities()
