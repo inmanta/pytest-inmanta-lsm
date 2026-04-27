@@ -31,6 +31,7 @@ async def execute_scenarios(
     *scenarios: collections.abc.Awaitable,
     sequential: bool = False,
     timeout: typing.Optional[float] = None,
+    max_concurrency: int | None = None,
 ) -> None:
     """
     Execute all the given scenarios.  If a scenario fails, raises its exception (after
@@ -41,6 +42,8 @@ async def execute_scenarios(
     :param sequential: Execute all the scenarios sequentially instead of concurrently.
         Defaults to False, can be enabled for debugging purposes, to get cleaner logs.
     :param timeout: A global timeout to set for the execution of all scenarios.
+    :param max_concurrency: The maximum amount of test scenarios that can run in parallel.
+        When more scenarios are provided, they are queued until another scenario is done.
     """
 
     async def execute_sequentially(*scenarios: collections.abc.Awaitable) -> None:
@@ -86,6 +89,7 @@ def sync_execute_scenarios(
     *scenarios: collections.abc.Awaitable,
     sequential: bool = False,
     timeout: typing.Optional[float] = None,
+    max_concurrency: int | None = None,
 ) -> None:
     """
     Execute all the given scenarios.  If a scenario fails, raises its exception (after
@@ -95,6 +99,8 @@ def sync_execute_scenarios(
     :param sequential: Execute all the scenarios sequentially instead of concurrently.
         Defaults to False, can be enabled for debugging purposes, to get cleaner logs.
     :param timeout: A global timeout to set for the execution of all scenarios.
+    :param max_concurrency: The maximum amount of test scenarios that can run in parallel.
+        When more scenarios are provided, they are queued until another scenario is done.
     """
 
-    asyncio.run(execute_scenarios(*scenarios, sequential=sequential, timeout=timeout))
+    asyncio.run(execute_scenarios(*scenarios, sequential=sequential, timeout=timeout, max_concurrency=max_concurrency))
