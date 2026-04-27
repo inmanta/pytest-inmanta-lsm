@@ -1,14 +1,13 @@
 # Shortcuts for various dev tasks. Based on makefile from pydantic
 .DEFAULT_GOAL := all
-isort = isort src tests examples *.py
-black = black src tests examples *.py
-flake8 = flake8 src tests examples *.py
+isort = isort src tests examples
+black = black src tests examples
+flake8 = flake8 src tests examples
 
 
 .PHONY: install
 install:
-	pip install -U setuptools pip
-	pip install -U --upgrade-strategy=eager -r requirements.dev.txt -c requirements.txt -e .
+	UV_CONSTRAINT=${PIP_CONSTRAINT} UV_DEFAULT_INDEX=${PIP_INDEX_URL} uv pip install -U -e . -c requirements.txt -r requirements.dev.txt --pre
 
 .PHONY: format
 format:

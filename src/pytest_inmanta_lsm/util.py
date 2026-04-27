@@ -31,6 +31,7 @@ async def execute_scenarios(
     *scenarios: collections.abc.Awaitable,
     sequential: bool = False,
     timeout: typing.Optional[float] = None,
+    max_concurrency: int | None = None,
 ) -> None:
     """
     Execute all the given scenarios.  If a scenario fails, raises its exception (after
@@ -41,6 +42,8 @@ async def execute_scenarios(
     :param sequential: Execute all the scenarios sequentially instead of concurrently.
         Defaults to False, can be enabled for debugging purposes, to get cleaner logs.
     :param timeout: A global timeout to set for the execution of all scenarios.
+    :param max_concurrency: The maximum amount of test scenarios that can run in parallel.
+        When more scenarios are provided, they are queued until another scenario is done.
     """
 
     async def execute_sequentially(*scenarios: collections.abc.Awaitable) -> None:
@@ -56,6 +59,18 @@ async def execute_scenarios(
         # list to contain only one scenario which is the executing
         # each scenario, one at a time
         scenarios = (execute_sequentially(*scenarios),)
+
+    if max_concurrency is not None and not sequential:
+        # Cap the number of scenarios running in parallel. The timer for
+        # the per-scenario timeout (if any) starts even before the slot is
+        # acquired, as we want this timeout to be global, not per scenario.
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def with_semaphore(scenario: collections.abc.Awaitable) -> object:
+            async with semaphore:
+                return await scenario
+
+        scenarios = tuple(with_semaphore(s) for s in scenarios)
 
     if timeout:
         # If we received a timeout parameter, we make sure each scenario
@@ -86,6 +101,7 @@ def sync_execute_scenarios(
     *scenarios: collections.abc.Awaitable,
     sequential: bool = False,
     timeout: typing.Optional[float] = None,
+    max_concurrency: int | None = None,
 ) -> None:
     """
     Execute all the given scenarios.  If a scenario fails, raises its exception (after
@@ -95,6 +111,8 @@ def sync_execute_scenarios(
     :param sequential: Execute all the scenarios sequentially instead of concurrently.
         Defaults to False, can be enabled for debugging purposes, to get cleaner logs.
     :param timeout: A global timeout to set for the execution of all scenarios.
+    :param max_concurrency: The maximum amount of test scenarios that can run in parallel.
+        When more scenarios are provided, they are queued until another scenario is done.
     """
 
-    asyncio.run(execute_scenarios(*scenarios, sequential=sequential, timeout=timeout))
+    asyncio.run(execute_scenarios(*scenarios, sequential=sequential, timeout=timeout, max_concurrency=max_concurrency))
