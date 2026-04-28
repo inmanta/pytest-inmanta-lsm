@@ -4,6 +4,7 @@
 
 - Bump minimal required python version to 3.12
 - Add `max_concurrency` parameter to `execute_scenarios` and `sync_execute_scenarios` to cap the number of scenarios running in parallel.
+- Make sure `RemoteOrchestrator.run_command` doesn't fallback to the access user `HOME` when the `cwd` folder doesn't exist.
 
 ## v4.1.0 - 2026-02-12
 
