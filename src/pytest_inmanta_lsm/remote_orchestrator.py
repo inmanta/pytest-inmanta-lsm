@@ -576,7 +576,7 @@ class RemoteOrchestrator:
         if cwd is not None:
             # Pretend that the command is a shell, and add a cd ... prefix to it
             shell = True
-            cmd = shlex.join(["cd", cwd]) + "; " + cmd
+            cmd = shlex.join(["cd", cwd]) + " && " + cmd
 
         if shell:
             # The command we received should be run in a shell
