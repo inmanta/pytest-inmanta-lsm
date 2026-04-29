@@ -1,5 +1,8 @@
 # Changelog
 
+## v4.2.1 - ?
+
+
 ## v4.2.0 - 2026-04-29
 
 - Bump minimal required python version to 3.12
