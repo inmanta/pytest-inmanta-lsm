@@ -1,6 +1,6 @@
 # Changelog
 
-## v4.2.0 - ?
+## v4.2.0 - 2026-04-29
 
 - Bump minimal required python version to 3.12
 - Add `max_concurrency` parameter to `execute_scenarios` and `sync_execute_scenarios` to cap the number of scenarios running in parallel.
