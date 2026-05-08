@@ -1,4 +1,4 @@
-inmanta-dev-dependencies==2.198.0
+inmanta-dev-dependencies==2.199.0
 inmanta-module-lsm
 types-PyYAML
 types-requests
