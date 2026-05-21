@@ -3,13 +3,15 @@
 :contact: code@inmanta.com
 :license: Inmanta EULA
 """
-import os
+
 import copy
+import os
 import pathlib
 import typing
 from collections import defaultdict
 from dataclasses import dataclass
 
+import inmanta
 import inmanta_lsm.model
 from inmanta_lsm.model import AttributeOperation
 from inmanta_plugins.lsm import (  # type: ignore
@@ -17,13 +19,12 @@ from inmanta_plugins.lsm import (  # type: ignore
     LifecycleState,
     LifecycleTransfer,
 )
+
 from pytest_inmanta_lsm import lsm_project
 from pytest_inmanta_lsm.lsm_project import (
     perform_attribute_operation,
     resource_attributes_hash,
 )
-
-import inmanta
 
 
 class LifecycleHelper:
@@ -38,9 +39,7 @@ class LifecycleHelper:
         self.render = render
         self.service = service
 
-        self.lifecycle: Lifecycle = lsm_project.get_service_entity(
-            service.service_entity
-        ).lifecycle
+        self.lifecycle: Lifecycle = lsm_project.get_service_entity(service.service_entity).lifecycle
 
         self.same_desired_state_transfers: list[tuple[str, str]] = []
         self.same_desired_state_transfers_candidates: list[tuple[str, str]] = []
@@ -81,24 +80,18 @@ class LifecycleHelper:
             all_transfers_to_prune_below, n_pruned_below = [], 0  # type: ignore
             next_already_visited = next_state.name in visited
             if not next_already_visited:
-                all_transfers_to_prune_below, n_pruned_below = self.prunable_transfers(
-                    next_state.name, visited
-                )
+                all_transfers_to_prune_below, n_pruned_below = self.prunable_transfers(next_state.name, visited)
 
             transfer = self.transfers[(state, next_state.name)]
 
             is_next_state_error = next_state.name == transfer.error
             should_have_same_desired_state = (
-                transfer.error_same_desired_state
-                if is_next_state_error
-                else transfer.target_same_desired_state
+                transfer.error_same_desired_state if is_next_state_error else transfer.target_same_desired_state
             )
 
             prune_below = len(self.outgoing_nodes[next_state.name]) == n_pruned_below
 
-            if not should_have_same_desired_state and (
-                prune_below or next_already_visited
-            ):
+            if not should_have_same_desired_state and (prune_below or next_already_visited):
                 # Prune this transfer if the transfer itself is not considered as state preserving
                 # and if it doesn't lead to any state preserving transfer we haven't visited via another branch.
                 all_transfers_to_prune.append((state, next_state.name))
@@ -114,23 +107,17 @@ class LifecycleHelper:
         The only condition for a transfer to be pruned is that the transfer itself
         is not state preserving and it does not lead to a state preserving transfer using depth first search.
         """
-        transfers_to_prune, _ = self.prunable_transfers(
-            self.lifecycle.get_state(self.lifecycle.initial_state).name, set()
-        )
+        transfers_to_prune, _ = self.prunable_transfers(self.lifecycle.get_state(self.lifecycle.initial_state).name, set())
         return transfers_to_prune
 
-    def set_transfers_to_visit(
-        self, states: list[str] | None = None, exploration: bool = False
-    ) -> None:
+    def set_transfers_to_visit(self, states: list[str] | None = None, exploration: bool = False) -> None:
         """
         Initialize all transfers to visit with the given list of states.
         If no states are provided, then the default is to take into account all states of the lifecycle.
         If exploration boolean is set, no transfers will be pruned.
         """
 
-        def set_loop_same_state(
-            transfer: LifecycleTransfer, error: bool = False
-        ) -> bool:
+        def set_loop_same_state(transfer: LifecycleTransfer, error: bool = False) -> bool:
             """
             Prune self loop transfer and already insert them in candidates if transfer boolean not already set.
             Return true if the transfer is a loop.
@@ -138,12 +125,8 @@ class LifecycleHelper:
             target = transfer.error if error else transfer.target
             if transfer.source == target:
                 self.same_desired_state_transfers.append((transfer.source, target))
-                if (not error and not transfer.target_same_desired_state) or (
-                    error and not transfer.error_same_desired_state
-                ):
-                    self.same_desired_state_transfers_candidates.append(
-                        (transfer.source, target)
-                    )
+                if (not error and not transfer.target_same_desired_state) or (error and not transfer.error_same_desired_state):
+                    self.same_desired_state_transfers_candidates.append((transfer.source, target))
                 return True
             return False
 
@@ -152,16 +135,8 @@ class LifecycleHelper:
         # Dictionary of transfers with key being tuple (source, target).
         self.transfers: dict[tuple[str, str], LifecycleTransfer] = dict()
         for transfer in self.lifecycle.transfers:
-            visit_target = (
-                True
-                if not states
-                else transfer.source in states and transfer.target in states
-            )
-            visit_error = (
-                transfer.error is not None
-                if not states
-                else transfer.source in states and transfer.error in states
-            )
+            visit_target = True if not states else transfer.source in states and transfer.target in states
+            visit_error = transfer.error is not None if not states else transfer.source in states and transfer.error in states
 
             targets = []
             if visit_target:
@@ -181,9 +156,7 @@ class LifecycleHelper:
         transfers_to_prune = [] if exploration else self.get_prunable_transfers()
 
         for source, target in transfers_to_prune:
-            self.outgoing_nodes[source] = [
-                state for state in self.outgoing_nodes[source] if state.name != target
-            ]
+            self.outgoing_nodes[source] = [state for state in self.outgoing_nodes[source] if state.name != target]
             del self.transfers[(source, target)]
 
         self.states: set[str] = set()
@@ -202,13 +175,9 @@ class LifecycleHelper:
         added = resources_b.keys() - resources_a.keys()
 
         common_resources = set(resources_a.keys()).intersection(resources_b.keys())
-        modified = {
-            key for key in common_resources if resources_a[key] != resources_b[key]
-        }
+        modified = {key for key in common_resources if resources_a[key] != resources_b[key]}
 
-        return LifecycleHelper.ResourceDiff(  # type: ignore
-            lost=set(lost), added=set(added), modified=modified
-        )
+        return LifecycleHelper.ResourceDiff(lost=set(lost), added=set(added), modified=modified)  # type: ignore
 
     # Function to draw the graph and save it to a file
     def draw_graph_to_file(
@@ -286,45 +255,29 @@ class LifecycleHelper:
             transfer = self.transfers[(state, next_state.name)]
 
             if self.render:
-                self.draw_graph_to_file(
-                    visited, current_transfer=(state, next_state.name)
-                )
+                self.draw_graph_to_file(visited, current_transfer=(state, next_state.name))
 
             # update candidates attributes if there is an update for this transfer
-            update: LifecycleHelper.AttributeUpdate = updates.get(
-                (state, next_state.name), None  # type: ignore
-            )
+            update: LifecycleHelper.AttributeUpdate = updates.get((state, next_state.name), None)  # type: ignore
             if update:
-                self.service.candidate_attributes = copy.deepcopy(
-                    self.service.active_attributes
-                )
-                attribute = inmanta.util.dict_path.to_path(update.path).get_element(
-                    self.service.candidate_attributes
-                )
+                self.service.candidate_attributes = copy.deepcopy(self.service.active_attributes)
+                attribute = inmanta.util.dict_path.to_path(update.path).get_element(self.service.candidate_attributes)
 
                 match update.operation:
                     case "add":
                         if type(attribute) is not list:
-                            raise RuntimeError(
-                                f"AttributeUpdate operation `add` expects a list, given: {type(attribute)} !"
-                            )
+                            raise RuntimeError(f"AttributeUpdate operation `add` expects a list, given: {type(attribute)} !")
                         attribute.append(update.element)
                     case "remove":
                         if type(attribute) is not list:
-                            raise RuntimeError(
-                                f"AttributeUpdate operation `remove` expects a list, given: {type(attribute)} !"
-                            )
+                            raise RuntimeError(f"AttributeUpdate operation `remove` expects a list, given: {type(attribute)} !")
                         attribute = [
-                            element
-                            for element in attribute
-                            if not (update.element.items() < element.items())  # type: ignore
+                            element for element in attribute if not (update.element.items() < element.items())  # type: ignore
                         ]
                     case _:
                         attribute = update.element
 
-                inmanta.util.dict_path.to_path(update.path).set_element(
-                    self.service.candidate_attributes, attribute
-                )
+                inmanta.util.dict_path.to_path(update.path).set_element(self.service.candidate_attributes, attribute)
 
             # Make the validation compile if this transfer requires it
             is_next_state_error = next_state.name == transfer.error
@@ -335,21 +288,13 @@ class LifecycleHelper:
             self.service.state = next_state.name
 
             # Execute the target operation if any
-            target_operation = (
-                transfer.error_operation
-                if is_next_state_error
-                else transfer.target_operation
-            )
+            target_operation = transfer.error_operation if is_next_state_error else transfer.target_operation
             if target_operation:
-                perform_attribute_operation(
-                    self.service, AttributeOperation(target_operation)
-                )
+                perform_attribute_operation(self.service, AttributeOperation(target_operation))
 
             # Compile and make sure transfer is state preserving if it claims to be.
             should_have_same_desired_state = (
-                transfer.error_same_desired_state
-                if is_next_state_error
-                else transfer.target_same_desired_state
+                transfer.error_same_desired_state if is_next_state_error else transfer.target_same_desired_state
             )
 
             # exporting compile
@@ -367,13 +312,9 @@ class LifecycleHelper:
                 )
 
             if no_resource_diff:
-                self.same_desired_state_transfers.append(
-                    (transfer.source, transfer.target)
-                )
+                self.same_desired_state_transfers.append((transfer.source, transfer.target))
             if no_resource_diff and not should_have_same_desired_state:
-                self.same_desired_state_transfers_candidates.append(
-                    (transfer.source, transfer.target)
-                )
+                self.same_desired_state_transfers_candidates.append((transfer.source, transfer.target))
 
             visited.add((state, next_state.name))
             if next_state.name not in visited:
