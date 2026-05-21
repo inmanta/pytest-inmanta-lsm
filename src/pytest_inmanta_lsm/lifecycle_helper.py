@@ -26,7 +26,6 @@ from pytest_inmanta_lsm.lsm_project import (
 import inmanta
 
 
-# TODO: this is copied and must be replaced with the import on pytest-inmanta-lsm
 class LifecycleHelper:
     def __init__(
         self,
