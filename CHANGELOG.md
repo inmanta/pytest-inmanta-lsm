@@ -1,7 +1,8 @@
 # Changelog
 
-## v4.2.1 - ?
+## v4.3.0 - ?
 
+- Add lifecycle helper
 
 ## v4.2.0 - 2026-04-29
 
