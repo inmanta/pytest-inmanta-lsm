@@ -2,6 +2,7 @@
 
 ## v4.2.1 - ?
 
+- Add the `RemoteOrder` helper class, which allows to create, update and delete service instances through the order api.
 
 ## v4.2.0 - 2026-04-29
 

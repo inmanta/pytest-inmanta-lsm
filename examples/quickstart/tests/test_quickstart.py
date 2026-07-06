@@ -19,6 +19,7 @@ import pytest_inmanta_lsm.lsm_project
 from pytest_inmanta_lsm import (
     load_generator,
     remote_orchestrator,
+    remote_order_async,
     remote_service_instance,
     remote_service_instance_async,
     util,
@@ -75,6 +76,58 @@ async def service_full_cycle(
 
     # Delete the instance
     await instance.delete(wait_for_state="terminated", timeout=60)
+
+
+async def services_full_cycle_via_order(
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    *attributes: dict[str, object],
+) -> None:
+    # Create an order object, and add the creation of a service instance
+    # to it for each set of attributes
+    order = remote_order_async.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    instances = []
+    for service_attributes in attributes:
+        instance = remote_service_instance_async.RemoteServiceInstance(
+            remote_orchestrator=remote_orchestrator,
+            service_entity_name=SERVICE_NAME,
+        )
+        order.add_create(instance, service_attributes)
+        instances.append(instance)
+
+    # Send the order to the remote orchestrator, all the service instances
+    # are created together, in a single api call
+    await order.send(timeout=60)
+
+    # Wait for all the created instances to be deployed
+    created = await asyncio.gather(
+        *(
+            instance.wait_for_state(
+                target_state="up",
+                start_version=0,
+                bad_states=["rejected", "failed"],
+                timeout=60,
+            )
+            for instance in instances
+        )
+    )
+
+    # Delete all the instances, together in a single order as well
+    delete_order = remote_order_async.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    for instance in instances:
+        delete_order.add_delete(instance)
+    await delete_order.send(timeout=60)
+
+    # Wait for all the instances to be gone
+    await asyncio.gather(
+        *(
+            instance.wait_for_state(
+                target_state="terminated",
+                start_version=up.version,
+                timeout=60,
+            )
+            for instance, up in zip(instances, created)
+        )
+    )
 
 
 @pytest.mark.parametrize(("remote_orchestrator_dump_on_failure",), [(True,)])
@@ -174,8 +227,25 @@ def test_full_cycle(
         create_fail=True,
     )
 
+    # Create two valid services together, through the order api
+    ordered_services = services_full_cycle_via_order(
+        remote_orchestrator,
+        {
+            "router_ip": "10.1.9.20",
+            "interface_name": "eth3",
+            "address": "10.0.0.251/24",
+            "vlan_id": 17,
+        },
+        {
+            "router_ip": "10.1.9.21",
+            "interface_name": "eth4",
+            "address": "10.0.0.250/24",
+            "vlan_id": 18,
+        },
+    )
+
     # Run all the services
-    util.sync_execute_scenarios(first_service, duplicated_service, another_service)
+    util.sync_execute_scenarios(first_service, duplicated_service, another_service, ordered_services)
 
 
 def test_full_cycle_with_load_generator(

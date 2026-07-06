@@ -241,6 +241,33 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
 ```
 > source: [test_quickstart.py::test_full_cycle](./examples/quickstart/tests/test_quickstart.py)
 
+On orchestrators supporting it, service instances can also be managed through the order api (`POST /lsm/v2/order`) instead of the service inventory api, using the `RemoteOrder` class.  Multiple changes (creations, updates and deletions of service instances, expressed on the `RemoteServiceInstance` objects they apply to) can be added to an order, they are then all applied together, in a single api call.  The same `RemoteServiceInstance` objects can be used to follow each instance through its lifecycle once the order has been sent.  Like the `RemoteServiceInstance` class, the `RemoteOrder` class exists in a sync (`remote_order` module) and an async (`remote_order_async` module) flavor.
+```python
+    # Create an order object, and add the creation of a service instance to it
+    order = remote_order_async.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    instance = remote_service_instance_async.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+    order.add_create(
+        instance,
+        {
+            "router_ip": router_ip,
+            "interface_name": interface_name,
+            "address": address,
+            "vlan_id": vlan_id,
+        },
+    )
+
+    # Send the order to the remote orchestrator, this returns once all the
+    # changes of the order have been initiated, i.e. once all the created
+    # service instances exist in the service inventory
+    await order.send(timeout=60)
+
+    # Follow the created service instance through its lifecycle
+    await instance.wait_for_state(target_state="up", start_version=0, timeout=60)
+```
+> source: [test_quickstart.py::test_full_cycle](./examples/quickstart/tests/test_quickstart.py)
 
 ### Second case: mocking the lsm api
 
