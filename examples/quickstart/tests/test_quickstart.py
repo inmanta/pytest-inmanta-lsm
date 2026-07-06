@@ -12,6 +12,7 @@ import time
 import uuid
 
 import inmanta_lsm.model
+import inmanta_lsm.order.model
 import pytest
 from pytest_inmanta import plugin
 
@@ -19,6 +20,8 @@ import pytest_inmanta_lsm.lsm_project
 from pytest_inmanta_lsm import (
     load_generator,
     remote_orchestrator,
+    remote_order,
+    remote_order_async,
     remote_service_instance,
     remote_service_instance_async,
     util,
@@ -257,6 +260,148 @@ def test_transient_state(project: plugin.Project, remote_orchestrator: remote_or
 
     # Delete the instance
     instance.delete(wait_for_state="terminated", timeout=60)
+
+
+async def order_full_cycle(
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    router_ip: str,
+    interface_name: str,
+    address: str,
+    vlan_id: int,
+    vlan_id_update: int,
+) -> None:
+    # Pick an id for the instance we are going to manage through the order api
+    instance_id = uuid.uuid4()
+
+    # Create the instance using the order api, and wait for the order to complete
+    create_order = remote_order_async.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    await create_order.create(
+        [
+            inmanta_lsm.order.model.CreateWritableServiceOrderItem(
+                instance_id=instance_id,
+                service_entity=SERVICE_NAME,
+                action=inmanta_lsm.order.model.OrderItemAction.create,
+                attributes={
+                    "router_ip": router_ip,
+                    "interface_name": interface_name,
+                    "address": address,
+                    "vlan_id": vlan_id,
+                },
+            ),
+        ],
+        description="Create a vlan-assignment service",
+        wait_for_state=inmanta_lsm.order.model.OrderState.success,
+        timeout=60,
+    )
+
+    # Update the vlan id using the order api
+    update_order = remote_order_async.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    await update_order.create(
+        [
+            inmanta_lsm.order.model.UpdateWritableServiceOrderItem(
+                instance_id=instance_id,
+                service_entity=SERVICE_NAME,
+                action=inmanta_lsm.order.model.OrderItemAction.update,
+                edits=[
+                    inmanta_lsm.model.PatchCallEdit(
+                        edit_id=str(uuid.uuid4()),
+                        operation=inmanta_lsm.model.EditOperation.replace,
+                        target="vlan_id",
+                        value=vlan_id_update,
+                    ),
+                ],
+            ),
+        ],
+        wait_for_state=inmanta_lsm.order.model.OrderState.success,
+        timeout=60,
+    )
+
+    # Delete the instance using the order api
+    delete_order = remote_order_async.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    await delete_order.create(
+        [
+            inmanta_lsm.order.model.DeleteWritableServiceOrderItem(
+                instance_id=instance_id,
+                service_entity=SERVICE_NAME,
+                action=inmanta_lsm.order.model.OrderItemAction.delete,
+            ),
+        ],
+        wait_for_state=inmanta_lsm.order.model.OrderState.success,
+        timeout=60,
+    )
+
+
+def test_order_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    # setup project
+    project.compile("import quickstart")
+
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
+
+    # Deploy multiple services concurrently, each through its own set of orders
+    first_service = order_full_cycle(
+        remote_orchestrator=remote_orchestrator,
+        router_ip="10.1.9.17",
+        interface_name="eth1",
+        address="10.0.0.254/24",
+        vlan_id=14,
+        vlan_id_update=42,
+    )
+    another_service = order_full_cycle(
+        remote_orchestrator=remote_orchestrator,
+        router_ip="10.1.9.18",
+        interface_name="eth2",
+        address="10.0.0.253/24",
+        vlan_id=15,
+        vlan_id_update=52,
+    )
+    util.sync_execute_scenarios(first_service, another_service)
+
+
+def test_order_sync(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    # setup project
+    project.compile("import quickstart")
+
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
+
+    # Create an instance through the synchronous order api
+    instance_id = uuid.uuid4()
+    order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    service_order = order.create(
+        [
+            inmanta_lsm.order.model.CreateWritableServiceOrderItem(
+                instance_id=instance_id,
+                service_entity=SERVICE_NAME,
+                action=inmanta_lsm.order.model.OrderItemAction.create,
+                attributes={
+                    "router_ip": "10.1.9.19",
+                    "interface_name": "eth3",
+                    "address": "10.0.0.252/24",
+                    "vlan_id": 16,
+                },
+            ),
+        ],
+        wait_for_state=inmanta_lsm.order.model.OrderState.success,
+        timeout=60,
+    )
+
+    # Assert that the order reached the success state and manages our instance
+    assert service_order.status.state == inmanta_lsm.order.model.OrderState.success
+    assert {item.instance_id for item in service_order.service_order_items} == {instance_id}
+
+    # Clean up the instance through the order api
+    order.create(
+        [
+            inmanta_lsm.order.model.DeleteWritableServiceOrderItem(
+                instance_id=instance_id,
+                service_entity=SERVICE_NAME,
+                action=inmanta_lsm.order.model.OrderItemAction.delete,
+            ),
+        ],
+        wait_for_state=inmanta_lsm.order.model.OrderState.success,
+        timeout=60,
+    )
 
 
 def test_model_legacy(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:

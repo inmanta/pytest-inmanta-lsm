@@ -35,4 +35,7 @@ stub:
 	stubgen --include-docstrings src/pytest_inmanta_lsm/remote_service_instance_async.py
 	sed -i -e 's/async def/def/g' out/pytest_inmanta_lsm/remote_service_instance_async.pyi
 	mv out/pytest_inmanta_lsm/remote_service_instance_async.pyi src/pytest_inmanta_lsm/remote_service_instance.pyi
+	stubgen --include-docstrings src/pytest_inmanta_lsm/remote_order_async.py
+	sed -i -e 's/async def/def/g' out/pytest_inmanta_lsm/remote_order_async.pyi
+	mv out/pytest_inmanta_lsm/remote_order_async.pyi src/pytest_inmanta_lsm/remote_order.pyi
 	$(MAKE) format
