@@ -365,10 +365,11 @@ def test_order_sync(project: plugin.Project, remote_orchestrator: remote_orchest
     # sync project and export service entities
     remote_orchestrator.export_service_entities()
 
-    # Create an instance through the synchronous order api
+    # Create an instance through the synchronous order api.  Each order is a one-shot
+    # object, so we use a dedicated RemoteOrder for the create and for the delete.
     instance_id = uuid.uuid4()
-    order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
-    service_order = order.create(
+    create_order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    service_order = create_order.create(
         [
             inmanta_lsm.order.model.CreateWritableServiceOrderItem(
                 instance_id=instance_id,
@@ -391,7 +392,8 @@ def test_order_sync(project: plugin.Project, remote_orchestrator: remote_orchest
     assert {item.instance_id for item in service_order.service_order_items} == {instance_id}
 
     # Clean up the instance through the order api
-    order.create(
+    delete_order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    delete_order.create(
         [
             inmanta_lsm.order.model.DeleteWritableServiceOrderItem(
                 instance_id=instance_id,
