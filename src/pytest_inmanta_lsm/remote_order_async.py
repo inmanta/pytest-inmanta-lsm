@@ -162,8 +162,9 @@ class RemoteOrder:
         if bad_states is None:
             bad_states = [state for state in self.ALL_BAD_STATES if state != target_state]
 
-        # Save the start time to know when we should trigger a timeout error
-        start = time.time()
+        # Save the start time to know when we should trigger a timeout error.  Use a
+        # monotonic clock so we are not affected by changes to the system clock.
+        start = time.monotonic()
 
         # Save the last state, for logging purpose, to tell the user every time we meet a new state
         last_state: typing.Optional[order_model.OrderState] = None
@@ -190,7 +191,7 @@ class RemoteOrder:
                 )
                 raise BadOrderStateError(self, bad_states, order)
 
-            if time.time() - start > timeout:
+            if time.monotonic() - start > timeout:
                 # We reached the timeout, we should stop waiting and raise an exception
                 LOGGER.info(
                     "Order %s exceeded timeout while waiting for %s, current state is %s.",
