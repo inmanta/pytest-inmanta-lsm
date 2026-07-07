@@ -24,9 +24,9 @@ def retry_limited(fun: Callable[[], bool], timeout: int, *, retry_interval: floa
     :param retry_interval: How long to wait for between each run of the function, in seconds.
     :raise AssertionError: in case when timeout has been reached
     """
-    start = time.time()
+    start = time.monotonic()
     result = fun()
-    while time.time() - start < timeout and not result:
+    while time.monotonic() - start < timeout and not result:
         time.sleep(retry_interval)
         result = fun()
 

@@ -301,8 +301,9 @@ class RemoteServiceInstance:
             # Check if both the version and the state match
             return log.version == target_version and log.state == target_state
 
-        # Save the start time to know when we should trigger a timeout error
-        start = time.time()
+        # Save the start time to know when we should trigger a timeout error.  Use a
+        # monotonic clock so we are not affected by changes to the system clock.
+        start = time.monotonic()
 
         # Save the last state, for logging purpose, to tell the user every time we meet a new state
         last_state: typing.Optional[str] = None
@@ -348,7 +349,7 @@ class RemoteServiceInstance:
                 # Save the current version
                 last_version = log.version
 
-            if time.time() - start > timeout:
+            if time.monotonic() - start > timeout:
                 # We reached the timeout, we should stop waiting and raise an exception
                 diagnosis = await self.diagnose(version=log.version)
                 LOGGER.info(

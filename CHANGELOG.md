@@ -1,6 +1,8 @@
 # Changelog
 
-## v4.2.1 - ?
+## v4.3.0 - ?
+
+- Add `RemoteOrder` (and its async variant `remote_order_async.RemoteOrder`) to create, update and delete service instances through the orchestrator order API.
 
 
 ## v4.2.0 - 2026-04-29

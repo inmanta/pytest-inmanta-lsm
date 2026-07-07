@@ -241,6 +241,81 @@ def test_full_cycle(project: plugin.Project, remote_orchestrator: remote_orchest
 ```
 > source: [test_quickstart.py::test_full_cycle](./examples/quickstart/tests/test_quickstart.py)
 
+#### Driving services through the order API
+
+Instead of managing a single service instance at a time with `RemoteServiceInstance`, you can use the orchestrator's order API to create, update and delete one or more service instances in a single atomic order.  The `RemoteOrder` class (and its async counterpart `remote_order_async.RemoteOrder`) wraps this API and lets you wait for the resulting order to reach a terminal state.  Just like `RemoteServiceInstance`, it relies on the typed objects exposed by `inmanta_lsm` (`inmanta_lsm.order.model`).
+
+```python
+def test_order(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    # setup project
+    project.compile("import quickstart")
+
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
+
+    # Pick an id for the instance we are going to manage through the order api
+    instance_id = uuid.uuid4()
+
+    # Create an instance through the synchronous order api, and wait for the order to complete
+    order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    service_order = order.create(
+        [
+            inmanta_lsm.order.model.CreateWritableServiceOrderItem(
+                instance_id=instance_id,
+                service_entity=SERVICE_NAME,
+                action=inmanta_lsm.order.model.OrderItemAction.create,
+                attributes={
+                    "router_ip": "10.1.9.17",
+                    "interface_name": "eth1",
+                    "address": "10.0.0.254/24",
+                    "vlan_id": 14,
+                },
+            ),
+        ],
+        wait_for_state=inmanta_lsm.order.model.OrderState.success,
+        timeout=60,
+    )
+    assert service_order.status.state == inmanta_lsm.order.model.OrderState.success
+
+    # Clean up the instance through the order api
+    order.create(
+        [
+            inmanta_lsm.order.model.DeleteWritableServiceOrderItem(
+                instance_id=instance_id,
+                service_entity=SERVICE_NAME,
+                action=inmanta_lsm.order.model.OrderItemAction.delete,
+            ),
+        ],
+        wait_for_state=inmanta_lsm.order.model.OrderState.success,
+        timeout=60,
+    )
+```
+> source: [test_quickstart.py::test_order_sync](./examples/quickstart/tests/test_quickstart.py)
+
+As with `RemoteServiceInstance`, an `async` variant (`remote_order_async.RemoteOrder`) is available, which can be combined with `util.sync_execute_scenarios` to drive multiple orders concurrently.
+> source: [test_quickstart.py::test_order_full_cycle](./examples/quickstart/tests/test_quickstart.py)
+
+Instead of building the order items yourself, you can also let the order build them from `RemoteServiceInstance` objects, with the `add_create_instance`, `add_update_instance` and `add_delete_instance` helpers.  The same `RemoteServiceInstance` objects can then be used to follow each service instance through its lifecycle.
+
+```python
+    order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    instance = remote_service_instance.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+    order.add_create_instance(
+        instance,
+        {
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
+    )
+    order.create(wait_for_state=inmanta_lsm.order.model.OrderState.success, timeout=60)
+```
+> source: [test_quickstart.py::test_order_full_cycle](./examples/quickstart/tests/test_quickstart.py)
+
 
 ### Second case: mocking the lsm api
 

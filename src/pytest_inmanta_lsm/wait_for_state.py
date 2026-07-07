@@ -124,7 +124,7 @@ class WaitForState(object):
         """
 
         LOGGER.info(f"Waiting for {self.name} to go to one of {desired_states}")
-        start_time = time.time()
+        start_time = time.monotonic()
 
         previous_state: State = State(
             name="default",
@@ -180,7 +180,7 @@ class WaitForState(object):
                         )
                         raise BadStateError(instance, bad_states, state)
 
-            if time.time() - start_time > timeout:
+            if time.monotonic() - start_time > timeout:
                 LOGGER.info(
                     self.__compose_error_msg_with_bad_state_error(
                         (
