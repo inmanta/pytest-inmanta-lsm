@@ -295,6 +295,27 @@ def test_order(project: plugin.Project, remote_orchestrator: remote_orchestrator
 As with `RemoteServiceInstance`, an `async` variant (`remote_order_async.RemoteOrder`) is available, which can be combined with `util.sync_execute_scenarios` to drive multiple orders concurrently.
 > source: [test_quickstart.py::test_order_full_cycle](./examples/quickstart/tests/test_quickstart.py)
 
+Instead of building the order items yourself, you can also let the order build them from `RemoteServiceInstance` objects, with the `add_create_instance`, `add_update_instance` and `add_delete_instance` helpers.  The same `RemoteServiceInstance` objects can then be used to follow each service instance through its lifecycle.
+
+```python
+    order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    instance = remote_service_instance.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+    order.add_create_instance(
+        instance,
+        {
+            "router_ip": "10.1.9.17",
+            "interface_name": "eth1",
+            "address": "10.0.0.254/24",
+            "vlan_id": 14,
+        },
+    )
+    order.create(wait_for_state=inmanta_lsm.order.model.OrderState.success, timeout=60)
+```
+> source: [test_quickstart.py::test_order_full_cycle](./examples/quickstart/tests/test_quickstart.py)
+
 
 ### Second case: mocking the lsm api
 
