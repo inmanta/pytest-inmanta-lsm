@@ -16,6 +16,7 @@ from pytest_inmanta_lsm.remote_order_async import (  # noqa: F401
     BadOrderStateError,
     OrderStateTimeoutError,
     RemoteOrderError,
+    ServiceInstanceTypes,
     format_failures,
 )
 
