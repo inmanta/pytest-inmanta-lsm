@@ -27,6 +27,8 @@ import pydantic.types
 import pytest
 import pytest_inmanta.plugin
 
+from pytest_inmanta_lsm import fork_compile
+
 # Error message to display when the lsm module is not reachable
 INMANTA_LSM_MODULE_NOT_LOADED = (
     "The inmanta lsm module is not loaded.\n"
@@ -255,6 +257,7 @@ class LsmProject:
         project: pytest_inmanta.plugin.Project,
         monkeypatch: pytest.MonkeyPatch,
         partial_compile: bool,
+        fork_compiler: bool = False,
     ) -> None:
         inmanta.config.Config.set("config", "environment", str(environment))
         self.services: dict[str, inmanta_lsm.model.ServiceInstance] = {}
@@ -280,6 +283,15 @@ class LsmProject:
         # The monkeypatching we do later in the `compile` method is only there to specify to
         # lsm which service has "triggered" the compilation.
         self.monkeypatch_client()
+
+        # Optionally speed up the many compiles a single test performs by parsing the
+        # model only once in the parent process and running each compile in a forked
+        # child on the copy-on-write inherited AST.  Opt-in, see fork_compile for the
+        # caveats.
+        self.fork_compile_server: typing.Optional[fork_compile.ForkCompileServer] = None
+        if fork_compiler:
+            self.fork_compile_server = fork_compile.ForkCompileServer(self)
+            self.fork_compile_server.install(self.monkeypatch)
 
     @property
     def environment(self) -> str:

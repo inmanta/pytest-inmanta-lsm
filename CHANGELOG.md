@@ -3,6 +3,7 @@
 ## v4.3.0 - ?
 
 - Add `RemoteOrder` (and its async variant `remote_order_async.RemoteOrder`) to create, update and delete service instances through the orchestrator order API.
+- Add opt-in fork-based compile server for the `lsm_project` fixture (`--lsm-fork-compiler` / `INMANTA_LSM_FORK_COMPILER` / `lsm_fork_compiler` fixture): parse the model once in the parent process and run every subsequent compile of that same model in a forked child on the copy-on-write inherited AST, significantly speeding up model tests that perform many compiles while keeping the parent's AST pristine.
 
 
 ## v4.2.0 - 2026-04-29

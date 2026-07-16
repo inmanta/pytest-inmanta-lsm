@@ -122,6 +122,19 @@ inm_lsm_partial_compile = BooleanTestParameter(
     group=param_group,
 )
 
+inm_lsm_fork_compiler = BooleanTestParameter(
+    argument="--lsm-fork-compiler",
+    environment_variable="INMANTA_LSM_FORK_COMPILER",
+    usage=(
+        "Speed up tests using the lsm_project fixture by parsing the model only once in the parent "
+        "process and running every compile of that same model in a forked child process on the "
+        "copy-on-write inherited AST.  Opt-in: it relies on os.fork and inmanta-core internals and is "
+        "guarded by a capability check."
+    ),
+    default=False,
+    group=param_group,
+)
+
 inm_lsm_container_env = BooleanTestParameter(
     argument="--lsm-container-env",
     environment_variable="INMANTA_LSM_CONTAINER_ENV",

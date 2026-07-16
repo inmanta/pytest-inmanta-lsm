@@ -54,6 +54,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_dump,
     inm_lsm_env,
     inm_lsm_env_name,
+    inm_lsm_fork_compiler,
     inm_lsm_host,
     inm_lsm_no_clean,
     inm_lsm_no_halt,
@@ -104,11 +105,23 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
     item.stash.setdefault(phase_report_key, default)[rep.when] = rep
 
 
+@pytest.fixture(scope="session")
+def lsm_fork_compiler(request: pytest.FixtureRequest) -> bool:
+    """
+    Whether the ``lsm_project`` fixture should run each compile in a forked child
+    process on a parse-once, copy-on-write inherited AST.  Override this fixture to
+    force it on or off for a test suite, or set it globally with the
+    ``--lsm-fork-compiler`` option / ``INMANTA_LSM_FORK_COMPILER`` environment variable.
+    """
+    return inm_lsm_fork_compiler.resolve(request.config)
+
+
 @pytest.fixture(name="lsm_project")
 def lsm_project_fixture(
     project: pytest_inmanta.plugin.Project,
     monkeypatch: pytest.MonkeyPatch,
     remote_orchestrator_partial: bool,
+    lsm_fork_compiler: bool,
 ) -> "lsm_project.LsmProject":
     core_version = version.Version(importlib.metadata.version("inmanta-core"))
     if core_version < version.Version("6"):
@@ -122,6 +135,7 @@ def lsm_project_fixture(
         project,
         monkeypatch=monkeypatch,
         partial_compile=remote_orchestrator_partial,
+        fork_compiler=lsm_fork_compiler,
     )
 
 
