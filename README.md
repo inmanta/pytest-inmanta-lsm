@@ -371,6 +371,22 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
 
 ```
 
+#### Experimental: reusing the compiler across compiles
+
+> **⚠️ Experimental — potentially unstable.**
+> A single `lsm_project` based test compiles the *same* model many times, only
+> varying the LSM service data.  The `--lsm-reuse-compiler` option (env var
+> `INMANTA_LSM_REUSE_COMPILER`, or the `lsm_reuse_compiler` fixture) parses and
+> type-checks the model only once and reuses the typed program for every
+> subsequent compile, which can significantly speed up such tests.
+>
+> This is **opt-in** and **disabled by default**.  It reaches into
+> `inmanta-core` and `pytest-inmanta` internals and, while guarded by a
+> capability check that fails loudly when those internals change shape, it
+> should be considered experimental and potentially unstable.  Only enable it
+> for test suites where compile time is a real problem, and double-check your
+> results if you do.
+
 ### Third case: development on an active environment.
 
 In some cases, (i.e. PoC) you might want to update the code of your module that is currently deployed in an environment.
@@ -457,6 +473,13 @@ pytest-inmanta-lsm:
                         Enable partial compiles on the remote orchestrator
                         (overrides INMANTA_LSM_PARTIAL_COMPILE, defaults to
                         False)
+  --lsm-reuse-compiler  EXPERIMENTAL, potentially unstable. Speed up tests
+                        using the lsm_project fixture by parsing and type-
+                        checking the model only once and reusing the typed
+                        program for every subsequent compile of that same
+                        model. Opt-in: it relies on inmanta-core internals and
+                        is guarded by a capability check. (overrides
+                        INMANTA_LSM_REUSE_COMPILER, defaults to False)
   --lsm-container-env   If set to true, expect the orchestrator to be running in
                         a container without systemd.  It then assumes that all
                         environment variables required to install the modules

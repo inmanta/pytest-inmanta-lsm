@@ -289,6 +289,13 @@ class LsmProject:
         # for the subsequent compiles.  Opt-in, see compile_cache for the caveats.
         self.compile_cache: typing.Optional[compile_cache.CompileCache] = None
         if reuse_compiler:
+            warnings.warn(
+                "Compiler reuse (reuse_compiler / --lsm-reuse-compiler) is an EXPERIMENTAL, "
+                "potentially unstable optimisation that reaches into inmanta-core and pytest-inmanta "
+                "internals.  Enable it only for test suites where compile time is a problem, and "
+                "double-check your results.",
+                stacklevel=2,
+            )
             self.compile_cache = compile_cache.CompileCache()
             self.compile_cache.install(self.monkeypatch)
 

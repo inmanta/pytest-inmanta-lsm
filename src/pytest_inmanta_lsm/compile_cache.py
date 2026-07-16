@@ -33,7 +33,7 @@ resources, which is already non-deterministic between two stock compiles.
 
 .. warning::
 
-    This is an **opt-in** optimisation that reaches into inmanta-core and
+    This is an **experimental**, potentially unstable, **opt-in** optimisation that reaches into inmanta-core and
     pytest-inmanta internals (the compiler entry points, the scheduler and a
     handful of AST node fields).  It is guarded by a capability check that
     disables the feature loudly when those internals are not shaped as expected,
@@ -260,6 +260,11 @@ class CompileCache:
         compiler.plugins = state.plugins
 
         sched = scheduler_mod.Scheduler(compiler_config.track_dataflow(), project.get_relation_precedence_policy())
+        # The typing is kept warm: we hand the scheduler the previously computed
+        # types and register it as a warm scheduler so the patched define_types
+        # returns early instead of rebuilding them.  sched.run below therefore only
+        # runs the execution phase, which is why _reset_execution_state only has to
+        # clear the *execution* state accumulated on those (reused) type objects.
         sched.types = state.types
         self._warm_schedulers.add(id(sched))
         raised = False

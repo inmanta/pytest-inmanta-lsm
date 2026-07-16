@@ -126,9 +126,10 @@ inm_lsm_reuse_compiler = BooleanTestParameter(
     argument="--lsm-reuse-compiler",
     environment_variable="INMANTA_LSM_REUSE_COMPILER",
     usage=(
-        "Speed up tests using the lsm_project fixture by parsing and type-checking the model "
-        "only once and reusing the typed program for every subsequent compile of that same model. "
-        "Opt-in: it relies on inmanta-core internals and is guarded by a capability check."
+        "EXPERIMENTAL, potentially unstable. Speed up tests using the lsm_project fixture by parsing "
+        "and type-checking the model only once and reusing the typed program for every subsequent "
+        "compile of that same model. Opt-in: it relies on inmanta-core internals and is guarded by a "
+        "capability check."
     ),
     default=False,
     group=param_group,

@@ -112,6 +112,12 @@ def lsm_reuse_compiler(request: pytest.FixtureRequest) -> bool:
     across the compiles of a single test.  Override this fixture to force it on
     or off for a test suite, or set it globally with the ``--lsm-reuse-compiler``
     option / ``INMANTA_LSM_REUSE_COMPILER`` environment variable.
+
+    .. warning::
+
+        EXPERIMENTAL, potentially unstable.  This relies on inmanta-core and
+        pytest-inmanta internals; enable it only for test suites where compile
+        time is a problem.
     """
     return inm_lsm_reuse_compiler.resolve(request.config)
 
