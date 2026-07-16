@@ -42,3 +42,12 @@ def test_basic_example(testdir, module_venv_active):
 
     result = testdir.runpytest("tests/test_basics.py")
     result.assert_outcomes(passed=1)
+
+
+def test_basic_example_reuse_compiler(testdir, module_venv_active):
+    """The lsm_project fixture still works when compiler reuse is enabled."""
+
+    utils.add_version_constraint_to_project(testdir.tmpdir)
+
+    result = testdir.runpytest("tests/test_basics.py", "--lsm-reuse-compiler")
+    result.assert_outcomes(passed=1)

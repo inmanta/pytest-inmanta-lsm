@@ -62,6 +62,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_project_name,
     inm_lsm_remote_host,
     inm_lsm_remote_shell,
+    inm_lsm_reuse_compiler,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
     inm_lsm_ssh_user,
@@ -104,11 +105,29 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
     item.stash.setdefault(phase_report_key, default)[rep.when] = rep
 
 
+@pytest.fixture(scope="session")
+def lsm_reuse_compiler(request: pytest.FixtureRequest) -> bool:
+    """
+    Whether the ``lsm_project`` fixture should reuse the parsed/typed program
+    across the compiles of a single test.  Override this fixture to force it on
+    or off for a test suite, or set it globally with the ``--lsm-reuse-compiler``
+    option / ``INMANTA_LSM_REUSE_COMPILER`` environment variable.
+
+    .. warning::
+
+        EXPERIMENTAL, potentially unstable.  This relies on inmanta-core and
+        pytest-inmanta internals; enable it only for test suites where compile
+        time is a problem.
+    """
+    return inm_lsm_reuse_compiler.resolve(request.config)
+
+
 @pytest.fixture(name="lsm_project")
 def lsm_project_fixture(
     project: pytest_inmanta.plugin.Project,
     monkeypatch: pytest.MonkeyPatch,
     remote_orchestrator_partial: bool,
+    lsm_reuse_compiler: bool,
 ) -> "lsm_project.LsmProject":
     core_version = version.Version(importlib.metadata.version("inmanta-core"))
     if core_version < version.Version("6"):
@@ -122,6 +141,7 @@ def lsm_project_fixture(
         project,
         monkeypatch=monkeypatch,
         partial_compile=remote_orchestrator_partial,
+        reuse_compiler=lsm_reuse_compiler,
     )
 
 

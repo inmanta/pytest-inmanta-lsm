@@ -27,6 +27,8 @@ import pydantic.types
 import pytest
 import pytest_inmanta.plugin
 
+from pytest_inmanta_lsm import compile_cache
+
 # Error message to display when the lsm module is not reachable
 INMANTA_LSM_MODULE_NOT_LOADED = (
     "The inmanta lsm module is not loaded.\n"
@@ -255,6 +257,7 @@ class LsmProject:
         project: pytest_inmanta.plugin.Project,
         monkeypatch: pytest.MonkeyPatch,
         partial_compile: bool,
+        reuse_compiler: bool = False,
     ) -> None:
         inmanta.config.Config.set("config", "environment", str(environment))
         self.services: dict[str, inmanta_lsm.model.ServiceInstance] = {}
@@ -280,6 +283,21 @@ class LsmProject:
         # The monkeypatching we do later in the `compile` method is only there to specify to
         # lsm which service has "triggered" the compilation.
         self.monkeypatch_client()
+
+        # Optionally speed up the many compiles a single test performs by parsing and
+        # type-checking the (identical) model only once and reusing the typed program
+        # for the subsequent compiles.  Opt-in, see compile_cache for the caveats.
+        self.compile_cache: typing.Optional[compile_cache.CompileCache] = None
+        if reuse_compiler:
+            warnings.warn(
+                "Compiler reuse (reuse_compiler / --lsm-reuse-compiler) is an EXPERIMENTAL, "
+                "potentially unstable optimisation that reaches into inmanta-core and pytest-inmanta "
+                "internals.  Enable it only for test suites where compile time is a problem, and "
+                "double-check your results.",
+                stacklevel=2,
+            )
+            self.compile_cache = compile_cache.CompileCache()
+            self.compile_cache.install(self.monkeypatch)
 
     @property
     def environment(self) -> str:
