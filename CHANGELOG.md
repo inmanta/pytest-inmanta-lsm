@@ -3,7 +3,7 @@
 ## v4.3.0 - ?
 
 - Add `RemoteOrder` (and its async variant `remote_order_async.RemoteOrder`) to create, update and delete service instances through the orchestrator order API.
-- Add opt-in compiler reuse for the `lsm_project` fixture (`--lsm-reuse-compiler` / `INMANTA_LSM_REUSE_COMPILER` / `lsm_reuse_compiler` fixture): parse and type-check the model only once and reuse the typed program for every subsequent compile of that same model, significantly speeding up model tests that perform many compiles.
+- Add opt-in compiler reuse for the `lsm_project` fixture (`--lsm-reuse-compiler` / `INMANTA_LSM_REUSE_COMPILER` / `lsm_reuse_compiler` fixture): parse and type-check the model only once and reuse the typed program for every subsequent compile of that same model, significantly speeding up model tests that perform many compiles. While active, it also disables the redundant on-disk parser cache, removing the cost of writing every module's `.cfc` during the cold compile.
 
 
 ## v4.2.0 - 2026-04-29

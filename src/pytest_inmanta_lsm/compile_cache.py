@@ -19,8 +19,11 @@ time of the test.
 
 This module makes that work happen once.  The first compile of a given model
 text is a normal compile; afterwards the loaded project, its typed AST and the
-resulting types are kept in memory and reused.  Each subsequent ("warm") compile
-skips parse and ``define_types`` and only:
+resulting types are kept in memory and reused.  Because the parsed AST never
+leaves memory, the on-disk parser cache is redundant while the feature is
+active, so it is turned off for the test: that removes the (otherwise dominant)
+cost of writing every module's ``.cfc`` during the single cold compile.  Each
+subsequent ("warm") compile skips parse and ``define_types`` and only:
 
     * resets the per-compile *execution* state that the previous compile left on
       the shared typed graph, and
@@ -146,6 +149,8 @@ class CompileCache:
             (compiler_mod, "ProjectLoader"),
             (compiler_mod.ProjectLoader, "_reset_module_state"),
             (compiler_config, "track_dataflow"),
+            (compiler_config, "feature_compiler_cache"),
+            (compiler_config.feature_compiler_cache, "get"),
             (scheduler_mod.Scheduler, "define_types"),
             (scheduler_mod.Scheduler, "run"),
             (PytestInmantaProject, "_create_project_and_load"),
@@ -165,8 +170,17 @@ class CompileCache:
         self._check_capabilities()
 
         import inmanta.compiler as compiler_mod
+        from inmanta.compiler import config as compiler_config
         from inmanta.execute import scheduler as scheduler_mod
         from pytest_inmanta.plugin import Project as PytestInmantaProject
+
+        # The on-disk parser cache is redundant here: the in-memory typed program
+        # is reused across every compile of the test, so warm compiles never parse
+        # and thus never read the cache.  Leaving it enabled only pays the cost of
+        # writing every module's .cfc during the single cold compile (dominant for
+        # a large import closure) for a benefit that is never collected.  Disable
+        # it for the duration of the test; monkeypatch reverts it afterwards.
+        monkeypatch.setattr(compiler_config.feature_compiler_cache, "get", lambda: False)
 
         orig_create = PytestInmantaProject._create_project_and_load
         orig_define_types = scheduler_mod.Scheduler.define_types
