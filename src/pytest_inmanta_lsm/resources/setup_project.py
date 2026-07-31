@@ -10,11 +10,13 @@ import contextlib
 import logging
 import os
 import pathlib
+import subprocess
 import sys
 from collections import abc
+from itertools import chain
 from typing import List, Optional
 
-from inmanta import env, module
+from inmanta import module
 
 # The project_path has to be provided in env var
 project_path = pathlib.Path(os.environ["PROJECT_PATH"])
@@ -30,9 +32,10 @@ LOGGER = logging.getLogger(project_path.name)
 
 
 @contextlib.contextmanager
-def env_vars(var: abc.Mapping[str, str]) -> abc.Iterator[None]:
+def env_vars(var: abc.Mapping[str, Optional[str]]) -> abc.Iterator[None]:
     """
     Context manager to extend the current environment with one or more environment variables.
+    A value of None means that the variable should be unset.
     """
 
     def set_env(set_var: abc.Mapping[str, Optional[str]]) -> None:
@@ -50,10 +53,6 @@ def env_vars(var: abc.Mapping[str, str]) -> abc.Iterator[None]:
 
 # Create the project object, this is the folder we sent to the orchestrator
 project = module.Project(str(project_path), venv_path=str(project_path / ".env"))
-
-# Make sure the virtual environment is ready
-if not project.is_using_virtual_env():
-    project.use_virtual_env()
 
 v2_modules: List[module.ModuleV2] = []
 # Discover all modules in the libs folder and install the v2 ones
@@ -80,29 +79,46 @@ for dir in (project_path / "libs").iterdir():
     v2_modules.append(mod)
     LOGGER.info(f"Module {mod.name} is v2, we will attempt to install it")
 
+
+# TODO: do we need all this? It's based on inmanta.env, but we are in a simpler context here
+def pip_env_vars() -> abc.Mapping[str, Optional[str]]:
+    """
+    Compute the environment variables that make pip install from the package sources
+    configured on the project.  We call pip ourselves, so core doesn't apply the project's
+    sources for us and we have to configure the pip index ourselves.
+    """
+    # The pip section of the project config is the authoritative package source
+    pip_config = project.metadata.pip
+    return {
+        # Only take the config of this host into account when the project allows it
+        "PIP_CONFIG_FILE": None if pip_config.use_system_config else os.devnull,
+        "PIP_INDEX_URL": pip_config.index_url,
+        "PIP_EXTRA_INDEX_URL": " ".join(pip_config.extra_index_url) or None,
+        "PIP_PRE": None if pip_config.pre is None else str(pip_config.pre),
+        # No index to install from, the dependencies are expected to be installed already
+        "PIP_NO_INDEX": "1" if not pip_config.index_url and not pip_config.use_system_config else None,
+    }
+
+
 # Install all v2 modules in editable mode using the project's configured package sources
 if v2_modules:
     LOGGER.info(f"Installing modules from source: {[mod.name for mod in v2_modules]}")
-    paths = [env.LocalPackagePath(mod.path, editable=True) for mod in v2_modules]
-
-    if hasattr(project.virtualenv, "install_for_config"):
-        # For ISO7
-        project.virtualenv.install_for_config([], project.metadata.pip, paths=paths)
-    else:
-        # Pre ISO7
-        # plain Python install so core does not apply project's sources -> we need to configure pip index ourselves
-        urls: abc.Sequence[str] = project.module_source.urls
-        if not urls:
-            raise Exception("No package repos configured for project")
-        with env_vars(
-            {
-                "PIP_INDEX_URL": urls[0],
-                "PIP_PRE": "0" if project.install_mode == module.InstallMode.release else "1",
-                "PIP_EXTRA_INDEX_URL": " ".join(urls[1:]),
-            }
-        ):
-            project.virtualenv.install_from_source(paths)
+    with env_vars(pip_env_vars()):
+        subprocess.check_call(
+            [
+                # TODO: with current implementation this might reinstall (different versions of) inmanta packages
+                project.virtualenv.python_path,
+                "-m",
+                "pip",
+                "install",
+                # Trailing separator to explicitly tell pip we point to a local directory
+                *chain.from_iterable(["-e", os.path.join(mod.path, "")] for mod in v2_modules),
+            ],
+        )
 
 # Install all other dependencies
 LOGGER.info("Installing other project dependencies")
-project.install_modules()
+subprocess.check_call(
+    [project.virtualenv.python_path, "-m", "inmanta.app", "-vvv", "project", "install"],
+    cwd=str(project_path),
+)
