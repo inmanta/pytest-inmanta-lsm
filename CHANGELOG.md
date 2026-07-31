@@ -2,6 +2,7 @@
 
 ## v4.3.0 - ?
 
+- Install the project synced to the remote orchestrator using `pip` and `inmanta project install` in subprocesses, running the project venv's python interpreter, instead of driving the installation with the inmanta core python api.  This drops support for orchestrators older than iso6.
 - Add `RemoteOrder` (and its async variant `remote_order_async.RemoteOrder`) to create, update and delete service instances through the orchestrator order API.
 - Add opt-in compiler reuse for the `lsm_project` fixture (`--lsm-reuse-compiler` / `INMANTA_LSM_REUSE_COMPILER` / `lsm_reuse_compiler` fixture): parse and type-check the model only once and reuse the typed program for every subsequent compile of that same model, significantly speeding up model tests that perform many compiles. While active, it also disables the redundant on-disk parser cache, removing the cost of writing every module's `.cfc` during the cold compile.
 
