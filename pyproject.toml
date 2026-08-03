@@ -46,6 +46,13 @@ packages = { find = { include = ["pytest_inmanta_lsm*"], where = ["src"] } }
 [tool.setuptools.package-data]
 pytest_inmanta_lsm = ["py.typed", "resources/*"]
 
+[tool.uv]
+# The venv used in ci is installed with an explicit set of constraints, pinning amongst
+# others the version of inmanta-core.  `uv run` would re-resolve the dependencies of this
+# project, ignoring those constraints, and re-sync the venv with the resolved set.  Marking
+# the project as unmanaged makes `uv run` use the venv as-is.
+managed = false
+
 
 [tool.bumpversion]
 current_version = "4.3.0.dev0"
