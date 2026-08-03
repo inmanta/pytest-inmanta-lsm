@@ -96,9 +96,19 @@ implement Parent using parents
 implement Child using parents
 
 
+entity Tag extends std::Dataclass:
+    """ A dataclass entity, paired with its python counterpart in the plugins package. """
+    string name
+end
+
+implement Tag using std::none
+
+
 implementation tracer for lsm::ServiceEntity:
     tester = std::testing::NullResource(
-        name=self.name,
+        # Go through a plugin returning dataclass instances, so that the pairing between
+        # the Tag entity and its python counterpart is exercised on every compile.
+        name=first_tag_name(tags(self.name)),
     )
     self.resources += tester
     self.owned_resources += tester

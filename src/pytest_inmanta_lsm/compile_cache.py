@@ -26,7 +26,9 @@ cost of writing every module's ``.cfc`` during the single cold compile.  Each
 subsequent ("warm") compile skips parse and ``define_types`` and only:
 
     * resets the per-compile *execution* state that the previous compile left on
-      the shared typed graph, and
+      the shared typed graph,
+    * restores the process-global state that the typing phase would have written
+      (the pairing between dataclass entities and their python counterpart), and
     * re-runs the execution phase (which re-reads the LSM data and re-emits the
       resources).
 
@@ -127,10 +129,10 @@ class CompileCache:
         shape.  Raise :class:`CompilerReuseUnavailableError` otherwise.
         """
         try:
-            import inmanta.ast.entity  # noqa: F401
             import inmanta.ast.statements.define  # noqa: F401
             import inmanta.compiler as compiler_mod
             import inmanta.execute.runtime  # noqa: F401
+            from inmanta.ast.entity import Entity
             from inmanta.compiler import config as compiler_config
             from inmanta.execute import scheduler as scheduler_mod
             from pytest_inmanta.plugin import Project as PytestInmantaProject
@@ -153,6 +155,8 @@ class CompileCache:
             (compiler_config.feature_compiler_cache, "get"),
             (scheduler_mod.Scheduler, "define_types"),
             (scheduler_mod.Scheduler, "run"),
+            (Entity, "get_paired_dataclass"),
+            (Entity, "pair_dataclass_stage1"),
             (PytestInmantaProject, "_create_project_and_load"),
         ]
         for owner, name in required:
@@ -186,15 +190,16 @@ class CompileCache:
         orig_define_types = scheduler_mod.Scheduler.define_types
 
         def create_project_and_load(pi_project: PytestInmantaProject, model: str) -> Project:
-            state = self._states.get(model)
+            key = self._cache_key(model)
+            state = self._states.get(key)
             if state is not None and state.compiled:
                 # Warm: reuse the already parsed and typed project, so its AST is
                 # not rebuilt and the parser cache is not read again.
                 compiler_mod.module.Project.set(state.project, clean=False)
                 return state.project
             project = orig_create(pi_project, model)
-            self._states[model] = _TypedProgram(project)
-            setattr(project, self._MODEL_TAG, model)
+            self._states[key] = _TypedProgram(project)
+            setattr(project, self._MODEL_TAG, key)
             return project
 
         def define_types(
@@ -265,6 +270,7 @@ class CompileCache:
         # does this); do the same so e.g. lsm's partial-compile selector cache
         # starts fresh for this compile.
         compiler_mod.ProjectLoader._reset_module_state()
+        self._restore_dataclass_pairing(state)
         self._reset_execution_state(state)
 
         assert state.root_ns is not None  # guaranteed once state.compiled is True
@@ -291,6 +297,40 @@ class CompileCache:
             self._warm_schedulers.discard(id(sched))
             compiler_mod.Finalizers.call_finalizers(raised)
         return state.types, state.root_ns
+
+    @staticmethod
+    def _cache_key(model: str) -> str:
+        """
+        Canonical form of a model text, used to identify a cached typed program.
+
+        ``Project.compile`` normalises the model it is given with ``dedent(model.strip("\\n"))``
+        before writing it to ``main.cf``.  That normalisation is not idempotent: a model whose
+        literal ends with a whitespace-only line (the usual style when the closing triple quote
+        is indented) gets a trailing newline that a second round through ``Project.compile``
+        strips again.  Reading ``main.cf`` back and compiling its content, as
+        ``LsmProject.post_partial_compile_validation`` does, would then start a second program
+        for what is the same model.  Stripping the surrounding newlines is enough to make both
+        texts map to the same entry, and never merges two models that differ in anything else.
+        """
+        return model.strip("\n")
+
+    @staticmethod
+    def _restore_dataclass_pairing(state: _TypedProgram) -> None:
+        """
+        Re-point every dataclass of the reused program's entities at that program.
+
+        The pairing between a dsl dataclass entity and its python counterpart is stored
+        on the *python class* (a process-global), and it is only written during the
+        typing phase, which a warm compile skips.  Any compile of a different model text
+        types a second program and rebinds that global to the entities of that program,
+        so a plugin returning dataclass instances would build them from the other
+        program's entity while its declared return type still resolves to this one.
+        """
+        from inmanta.ast.entity import Entity
+
+        for entity in state.types.values():
+            if isinstance(entity, Entity) and entity.get_paired_dataclass() is not None:
+                entity.pair_dataclass_stage1()
 
     @staticmethod
     def _all_namespaces(root_ns: Namespace) -> typing.Iterator[Namespace]:
