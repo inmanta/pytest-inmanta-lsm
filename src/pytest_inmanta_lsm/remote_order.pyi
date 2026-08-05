@@ -145,22 +145,18 @@ class RemoteOrder:
         Get the current order in its current state, and return it as a ServiceOrder object.
         """
 
-    def diagnose_failures(
-        self, order: order_model.ServiceOrder | None = None, *, lookback_depth: int = 1
-    ) -> dict[uuid.UUID, FullDiagnosis]:
+    def diagnose_failures(self, *, lookback_depth: int = 1) -> dict[uuid.UUID, FullDiagnosis]:
         """
         Get a diagnosis for every failing item of this order, keyed by the id of the service
         instance the item is about.  The diagnosis is fetched for the current version of each
         instance.  Instances for which no diagnosis can be obtained are simply left out of
         the result.
 
-        :param order: The order to diagnose the failing items of.  If left out, the current
-            state of the order is fetched from the orchestrator.
         :param lookback_depth: The amount of states to search for failures in the history of
             each failing service instance.
         """
 
-    def log_failures(self, order: order_model.ServiceOrder | None = None, *, lookback_depth: int = 1) -> str:
+    def log_failures(self, *, lookback_depth: int = 1) -> str:
         """
         Log, at INFO level, a summary of all the failing items of this order, including a
         diagnosis of each failing service instance.  Returns the summary that has been
@@ -170,8 +166,6 @@ class RemoteOrder:
         waiting for it because of a timeout.  It can also be called manually, for orders
         whose failures are handled by the caller (e.g. `bad_states=[]`).
 
-        :param order: The order to report the failures of.  If left out, the current state
-            of the order is fetched from the orchestrator.
         :param lookback_depth: The amount of states to search for failures in the history of
             each failing service instance.
         """

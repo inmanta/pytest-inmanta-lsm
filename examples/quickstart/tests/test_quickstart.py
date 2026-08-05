@@ -8,6 +8,7 @@ Pytest Inmanta LSM
 
 import asyncio
 import copy
+import logging
 import time
 import uuid
 
@@ -477,6 +478,56 @@ def test_order_sync(project: plugin.Project, remote_orchestrator: remote_orchest
         wait_for_state=inmanta_lsm.order.model.OrderState.success,
         timeout=60,
     )
+
+
+def test_order_failure(
+    project: plugin.Project,
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # setup project
+    project.compile("import quickstart")
+
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
+
+    order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    instance = remote_service_instance.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+
+    # The resource of a service deployed on a fake interface fails, which makes the
+    # order fail as well
+    order.add_create_instance(
+        instance,
+        {
+            "router_ip": "10.1.9.22",
+            "interface_name": "fake_interface",
+            "address": "10.0.0.249/24",
+            "vlan_id": 19,
+        },
+    )
+
+    with caplog.at_level(logging.INFO, logger="pytest_inmanta_lsm.remote_order_async"):
+        with pytest.raises(remote_order.BadOrderStateError) as exc_info:
+            order.create(timeout=120)
+
+    # The failing items of the order are logged, together with the diagnosis of the
+    # service instances they are about
+    assert [item.instance_id for item in remote_order.failing_items(exc_info.value.order)] == [instance.instance_id]
+    assert f"Failing items of order {order.order_id}" in caplog.text
+    assert str(instance.instance_id) in caplog.text
+
+    # The same reporting can be triggered on demand, for a test suite which handles the
+    # failures of the order itself (e.g. with bad_states=[])
+    diagnoses = order.diagnose_failures()
+    assert set(diagnoses) == {instance.instance_id}
+    assert diagnoses[instance.instance_id].failures, "The failing deployment should be part of the diagnosis"
+    assert str(instance.instance_id) in order.log_failures()
+
+    # The instance is left in the inventory: its resource keeps failing, so it can not
+    # reach a state in which it could be cleaned up
 
 
 def test_model_legacy(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
