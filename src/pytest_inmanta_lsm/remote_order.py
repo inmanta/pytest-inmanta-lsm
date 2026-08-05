@@ -11,9 +11,6 @@ import logging
 import typing
 import uuid
 
-from inmanta_lsm.diagnose.model import FullDiagnosis  # type: ignore
-from inmanta_lsm.order import model as order_model  # type: ignore
-
 from pytest_inmanta_lsm import remote_orchestrator, remote_order_async
 from pytest_inmanta_lsm.remote_order_async import (  # noqa: F401
     BadOrderStateError,
@@ -25,31 +22,6 @@ from pytest_inmanta_lsm.remote_order_async import (  # noqa: F401
 )
 
 LOGGER = logging.getLogger(__name__)
-
-
-def diagnose_failures(
-    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
-    order: order_model.ServiceOrder,
-    *,
-    lookback_depth: int = 1,
-) -> dict[uuid.UUID, FullDiagnosis]:
-    """
-    Synchronous flavor of `remote_order_async.diagnose_failures`.  Get a diagnosis for
-    every failing item of the given order, keyed by the id of the service instance the
-    item is about.
-
-    :param remote_orchestrator: The orchestrator the order has been created on.
-    :param order: The order for which we want to diagnose the failing items.
-    :param lookback_depth: The amount of states to search for failures in the history of
-        each failing service instance.
-    """
-    return asyncio.run(
-        remote_order_async.diagnose_failures(
-            remote_orchestrator,
-            order,
-            lookback_depth=lookback_depth,
-        )
-    )
 
 
 class RemoteOrder:

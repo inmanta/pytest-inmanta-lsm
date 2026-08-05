@@ -98,12 +98,8 @@ def test_diagnose_failures() -> None:
     )
 
     orchestrator = FakeRemoteOrchestrator({failing: make_diagnosis("some compile error"), completed: make_diagnosis("unused")})
-    diagnoses = asyncio.run(
-        remote_order_async.diagnose_failures(
-            typing.cast(typing.Any, orchestrator),
-            order,
-        )
-    )
+    remote_order = remote_order_async.RemoteOrder(typing.cast(typing.Any, orchestrator))
+    diagnoses = asyncio.run(remote_order.diagnose_failures(order))
 
     assert list(diagnoses) == [failing]
     assert orchestrator.diagnosed == [failing]

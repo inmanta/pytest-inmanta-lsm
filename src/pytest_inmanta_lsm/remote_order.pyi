@@ -59,21 +59,6 @@ def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOr
     :param order: The order for which we want to collect the failing items.
     """
 
-def diagnose_failures(
-    remote_orchestrator: remote_orchestrator.RemoteOrchestrator, order: order_model.ServiceOrder, *, lookback_depth: int = 1
-) -> dict[uuid.UUID, FullDiagnosis]:
-    """
-    Get a diagnosis for every failing item of the given order, keyed by the id of the
-    service instance the item is about.  The diagnosis is fetched for the current version
-    of each instance.  Instances for which no diagnosis can be obtained are simply left
-    out of the result.
-
-    :param remote_orchestrator: The orchestrator the order has been created on.
-    :param order: The order for which we want to diagnose the failing items.
-    :param lookback_depth: The amount of states to search for failures in the history of
-        each failing service instance.
-    """
-
 def format_failures(order: order_model.ServiceOrder, diagnoses: typing.Mapping[uuid.UUID, FullDiagnosis] | None = None) -> str:
     """
     Build a human readable summary of all the failing order items of the given order.
@@ -158,6 +143,21 @@ class RemoteOrder:
     def get(self) -> order_model.ServiceOrder:
         """
         Get the current order in its current state, and return it as a ServiceOrder object.
+        """
+
+    def diagnose_failures(
+        self, order: order_model.ServiceOrder | None = None, *, lookback_depth: int = 1
+    ) -> dict[uuid.UUID, FullDiagnosis]:
+        """
+        Get a diagnosis for every failing item of this order, keyed by the id of the service
+        instance the item is about.  The diagnosis is fetched for the current version of each
+        instance.  Instances for which no diagnosis can be obtained are simply left out of
+        the result.
+
+        :param order: The order to diagnose the failing items of.  If left out, the current
+            state of the order is fetched from the orchestrator.
+        :param lookback_depth: The amount of states to search for failures in the history of
+            each failing service instance.
         """
 
     def log_failures(self, order: order_model.ServiceOrder | None = None, *, lookback_depth: int = 1) -> str:

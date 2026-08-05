@@ -105,45 +105,6 @@ def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOr
     return [item for item in order.service_order_items if item.status.state == order_model.OrderItemState.failed]
 
 
-async def diagnose_failures(
-    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
-    order: order_model.ServiceOrder,
-    *,
-    lookback_depth: int = 1,
-) -> dict[uuid.UUID, FullDiagnosis]:
-    """
-    Get a diagnosis for every failing item of the given order, keyed by the id of the
-    service instance the item is about.  The diagnosis is fetched for the current version
-    of each instance.  Instances for which no diagnosis can be obtained are simply left
-    out of the result.
-
-    :param remote_orchestrator: The orchestrator the order has been created on.
-    :param order: The order for which we want to diagnose the failing items.
-    :param lookback_depth: The amount of states to search for failures in the history of
-        each failing service instance.
-    """
-
-    async def diagnose(item: order_model.ServiceOrderItem) -> typing.Optional[tuple[uuid.UUID, FullDiagnosis]]:
-        instance = remote_service_instance_async.RemoteServiceInstance(
-            remote_orchestrator=remote_orchestrator,
-            service_entity_name=item.service_entity,
-            service_id=item.instance_id,
-            lookback_depth=lookback_depth,
-        )
-        try:
-            current_version = (await instance.get()).version
-            return item.instance_id, await instance.diagnose(version=current_version)
-        except Exception:
-            # The diagnosis is a best-effort helper for the user, it should never shadow
-            # the failure we are reporting about.  The instance might for example not
-            # exist at all, if the order failed before creating it.
-            LOGGER.warning("Failed to get a diagnosis for service instance %s", item.instance_id, exc_info=True)
-            return None
-
-    diagnoses = await asyncio.gather(*(diagnose(item) for item in failing_items(order)))
-    return dict(diagnosis for diagnosis in diagnoses if diagnosis is not None)
-
-
 def format_failures(
     order: order_model.ServiceOrder,
     diagnoses: typing.Optional[typing.Mapping[uuid.UUID, FullDiagnosis]] = None,
@@ -329,6 +290,46 @@ class RemoteOrder:
             order_id=self.order_id,
         )
 
+    async def diagnose_failures(
+        self,
+        order: typing.Optional[order_model.ServiceOrder] = None,
+        *,
+        lookback_depth: int = 1,
+    ) -> dict[uuid.UUID, FullDiagnosis]:
+        """
+        Get a diagnosis for every failing item of this order, keyed by the id of the service
+        instance the item is about.  The diagnosis is fetched for the current version of each
+        instance.  Instances for which no diagnosis can be obtained are simply left out of
+        the result.
+
+        :param order: The order to diagnose the failing items of.  If left out, the current
+            state of the order is fetched from the orchestrator.
+        :param lookback_depth: The amount of states to search for failures in the history of
+            each failing service instance.
+        """
+        if order is None:
+            order = await self.get()
+
+        async def diagnose(item: order_model.ServiceOrderItem) -> typing.Optional[tuple[uuid.UUID, FullDiagnosis]]:
+            instance = remote_service_instance_async.RemoteServiceInstance(
+                remote_orchestrator=self.remote_orchestrator,
+                service_entity_name=item.service_entity,
+                service_id=item.instance_id,
+                lookback_depth=lookback_depth,
+            )
+            try:
+                current_version = (await instance.get()).version
+                return item.instance_id, await instance.diagnose(version=current_version)
+            except Exception:
+                # The diagnosis is a best-effort helper for the user, it should never shadow
+                # the failure we are reporting about.  The instance might for example not
+                # exist at all, if the order failed before creating it.
+                LOGGER.warning("Failed to get a diagnosis for service instance %s", item.instance_id, exc_info=True)
+                return None
+
+        diagnoses = await asyncio.gather(*(diagnose(item) for item in failing_items(order)))
+        return dict(diagnosis for diagnosis in diagnoses if diagnosis is not None)
+
     async def log_failures(
         self,
         order: typing.Optional[order_model.ServiceOrder] = None,
@@ -352,7 +353,7 @@ class RemoteOrder:
         if order is None:
             order = await self.get()
 
-        diagnoses = await diagnose_failures(self.remote_orchestrator, order, lookback_depth=lookback_depth)
+        diagnoses = await self.diagnose_failures(order, lookback_depth=lookback_depth)
         summary = format_failures(order, diagnoses)
         LOGGER.info(
             "Failing items of order %s (state: %s): \n%s",

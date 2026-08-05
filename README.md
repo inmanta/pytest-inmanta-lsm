@@ -321,7 +321,7 @@ When an order goes into a bad state, or when we stop waiting for it because of a
 ```python
     order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
     order.add_create_instance(instance, {"vlan_id": 14, ...})
-    service_order = order.create(bad_states=[], wait_for_state=None)
+    service_order = order.create(bad_states=[])
 
     ...
 
@@ -330,7 +330,7 @@ When an order goes into a bad state, or when we stop waiting for it because of a
     order.log_failures()
 
     # Or get the diagnosis of each failing service instance, keyed by instance id
-    diagnoses = remote_order.diagnose_failures(remote_orchestrator, order.get())
+    diagnoses = order.diagnose_failures()
 ```
 
 
