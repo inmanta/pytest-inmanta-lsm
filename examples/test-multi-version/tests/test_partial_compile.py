@@ -143,6 +143,20 @@ def test_partial_compile_owned_service(lsm_project: pytest_inmanta_lsm.lsm_proje
     lsm_project.exporting_compile([parent.id])
     lsm_project.post_partial_compile_validation(parent.id, SHARED_RESOURCES, OWNED_RESOURCES)
 
+    # Update the owned service itself, the resource set of its owner is emitted again
+    child = lsm_project.get_service(CHILD_ID)
+    lsm_project.update_service(
+        service_id=child.id,
+        attributes=copy.deepcopy(child.active_attributes),  # no update
+        auto_transfer=True,
+    )
+    lsm_project.post_partial_compile_validation(child.id, SHARED_RESOURCES, OWNED_RESOURCES)
+
+    child.state = "up"
+    child.version += 1
+    lsm_project.exporting_compile([child.id])
+    lsm_project.post_partial_compile_validation(child.id, SHARED_RESOURCES, OWNED_RESOURCES)
+
 
 def test_partial_compile_delete_owned_service(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     """
