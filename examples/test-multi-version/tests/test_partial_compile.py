@@ -179,8 +179,8 @@ def test_partial_compile_delete_owned_service(lsm_project: pytest_inmanta_lsm.ls
 def test_partial_compile_additional_services(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     """
     A partial compile which pulls in a service outside of the ownership tree of the service it
-    is triggered for emits the resource set of that service as well.  This is only accepted if
-    that service is declared through the additional_services argument.
+    is triggered for emits the resource set of that service as well.  It is tolerated by default,
+    and only accepted if it is declared when additional_services is provided.
     """
     create_tree(lsm_project)
     create_second_tree(lsm_project)
@@ -190,9 +190,19 @@ def test_partial_compile_additional_services(lsm_project: pytest_inmanta_lsm.lsm
     lsm_project.exporting_compile([PARENT_ID, SECOND_ID])
     assert get_resource_sets(lsm_project.project).keys() == {str(PARENT_ID), str(SECOND_ID)}
 
-    # The resource set of the other tree is not expected as long as it is not declared
+    # By default, the resource set of the other tree is tolerated
+    lsm_project.post_partial_compile_validation(PARENT_ID, SHARED_RESOURCES, OWNED_RESOURCES)
+
+    # Providing additional_services makes the check exact, an empty sequence doesn't leave any
+    # room for the resource set of the other tree
+    lsm_project.exporting_compile([PARENT_ID, SECOND_ID])
     with pytest.raises(AssertionError):
-        lsm_project.post_partial_compile_validation(PARENT_ID, SHARED_RESOURCES, OWNED_RESOURCES)
+        lsm_project.post_partial_compile_validation(
+            PARENT_ID,
+            SHARED_RESOURCES,
+            OWNED_RESOURCES,
+            additional_services=[],
+        )
 
     lsm_project.exporting_compile([PARENT_ID, SECOND_ID])
     lsm_project.post_partial_compile_validation(
@@ -200,6 +210,15 @@ def test_partial_compile_additional_services(lsm_project: pytest_inmanta_lsm.lsm
         SHARED_RESOURCES,
         OWNED_RESOURCES,
         additional_services=[SECOND_ID],
+    )
+
+    # A partial compile of a single tree passes the exact check with no additional service
+    lsm_project.exporting_compile([PARENT_ID])
+    lsm_project.post_partial_compile_validation(
+        PARENT_ID,
+        SHARED_RESOURCES,
+        OWNED_RESOURCES,
+        additional_services=[],
     )
 
     # An owned service can be used as additional service as well, what is validated is the

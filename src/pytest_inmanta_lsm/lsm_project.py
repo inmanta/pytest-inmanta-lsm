@@ -1183,12 +1183,11 @@ class LsmProject:
         shared_resource_patterns: typing.Sequence[str],
         owned_resource_patterns: typing.Sequence[str],
         *,
-        additional_services: typing.Sequence[typing.Union[uuid.UUID, str]] = (),
+        additional_services: typing.Optional[typing.Sequence[typing.Union[uuid.UUID, str]]] = None,
     ) -> None:
         """
         Perform a check on the export result of a partial compile.  It makes sure that:
-        1. The only resource sets that are present are the ones of the services the partial
-           compile is expected to cover
+        1. The resource set of the validated service is present, and no unexpected resource set is
         2. The resource in the resource sets are the expected ones
         3. The resource in the shared resource set are the expected ones
         4. Resources sent to the shared resource set are never modified
@@ -1203,9 +1202,16 @@ class LsmProject:
 
         A partial compile may also pull in services outside of the ownership tree of the service
         it is triggered for, when the module extends the selection logic to do so.  Those services
-        keep their own resource set, which this method only tolerates if they are declared through
-        the `additional_services` argument.  Their resources are matched against the owned resource
-        patterns as well: the shared resource patterns are only about the resources which are not
+        keep their own resource set, and the `additional_services` argument decides how strict this
+        method is about them:
+        - When it is left to None, any additional resource set is tolerated, only the presence of
+          the resource set of the validated service is checked.
+        - When a sequence of service ids is provided, even an empty one, the emitted resource sets
+          must be exactly the ones of the ownership trees of the validated service and of these
+          additional services.  This catches partial compiles whose scope is broader than intended.
+
+        In both cases the resources of the additional resource sets are matched against the owned
+        resource patterns: the shared resource patterns are only about the resources which are not
         part of any resource set.
 
         :param lsm_project: The LsmProject object that was used to perform the partial compile
@@ -1215,18 +1221,25 @@ class LsmProject:
         :param owned_resource_patterns: A list of patterns that can be used to identified the
             resources which are expected to be part of one of the emitted resource sets.
         :param additional_services: The ids of the services, outside of the ownership tree of the
-            validated service, which the partial compile is expected to pull in.
+            validated service, whose resource set the partial compile is expected to emit as well.
+            If None, no check is done on the resource sets of the other services.
         """
-        # Get the ids of the resource sets which the partial compile is expected to emit: the
-        # ones of the ownership trees of the validated service and of the additional services.
-        # A resource set is only emitted if at least one service of its ownership tree is in an
-        # exporting state.
-        expected_resource_sets = {
-            str(self.get_owner_root(id)) for id in (service_id, *additional_services)
-        } & self.exporting_resource_sets
+        # Get the id of the resource set the validated service contributes to.  A resource set is
+        # only emitted if at least one service of its ownership tree is in an exporting state.
+        root_id = str(self.get_owner_root(service_id))
+        exporting_resource_sets = self.exporting_resource_sets
 
         resource_sets = get_resource_sets(self.project)
-        assert resource_sets.keys() == expected_resource_sets
+        if additional_services is None:
+            # Only check the resource set of the validated service, any other resource set the
+            # partial compile emitted is tolerated
+            assert (root_id in resource_sets) == (root_id in exporting_resource_sets)
+        else:
+            # Check that the emitted resource sets are exactly the expected ones
+            expected_resource_sets = {
+                str(self.get_owner_root(id)) for id in (service_id, *additional_services)
+            } & exporting_resource_sets
+            assert resource_sets.keys() == expected_resource_sets
 
         # Any resource which is part of one of the emitted resource sets is owned by one of the
         # services of this partial compile
