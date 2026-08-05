@@ -27,6 +27,21 @@ OWNED_RESOURCES = [
 ]
 
 
+def resource_set_content(
+    lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject,
+    resource_set: uuid.UUID,
+) -> set[tuple[str, str]]:
+    """
+    Get the content of the given resource set, as a set of resource type and identifying
+    attribute value.  The agent of the resources is left out, as it is not stable across
+    orchestrator versions.
+    """
+    return {
+        (resource.entity_type, resource.attribute_value)
+        for resource in get_resource_sets(lsm_project.project)[str(resource_set)]
+    }
+
+
 def create_tree(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     """
     Create a parent service and a child service owned by it, and bring both of them to
@@ -97,13 +112,12 @@ def test_partial_compile_owned_service(lsm_project: pytest_inmanta_lsm.lsm_proje
 
     # The child doesn't emit a resource set of its own, its resources are part of the
     # resource set of its owner
-    resource_sets = get_resource_sets(lsm_project.project)
-    assert resource_sets.keys() == {str(PARENT_ID)}
-    assert {str(resource) for resource in resource_sets[str(PARENT_ID)]} == {
-        f"lsm::LifecycleTransfer[lsm,instance_id={PARENT_ID}]",
-        f"lsm::LifecycleTransfer[lsm,instance_id={CHILD_ID}]",
-        "std::testing::NullResource[internal,name=parent]",
-        "std::testing::NullResource[internal,name=child]",
+    assert get_resource_sets(lsm_project.project).keys() == {str(PARENT_ID)}
+    assert resource_set_content(lsm_project, PARENT_ID) == {
+        ("lsm::LifecycleTransfer", str(PARENT_ID)),
+        ("lsm::LifecycleTransfer", str(CHILD_ID)),
+        ("std::testing::NullResource", "parent"),
+        ("std::testing::NullResource", "child"),
     }
 
     # Both the owned service and its owner can be validated, they are validated against
@@ -152,11 +166,10 @@ def test_partial_compile_delete_owned_service(lsm_project: pytest_inmanta_lsm.ls
     lsm_project.post_partial_compile_validation(child.id, SHARED_RESOURCES, OWNED_RESOURCES)
 
     # The child's resources are gone, but the owner's resource set is still there
-    resource_sets = get_resource_sets(lsm_project.project)
-    assert resource_sets.keys() == {str(PARENT_ID)}
-    assert {str(resource) for resource in resource_sets[str(PARENT_ID)]} == {
-        f"lsm::LifecycleTransfer[lsm,instance_id={PARENT_ID}]",
-        "std::testing::NullResource[internal,name=parent]",
+    assert get_resource_sets(lsm_project.project).keys() == {str(PARENT_ID)}
+    assert resource_set_content(lsm_project, PARENT_ID) == {
+        ("lsm::LifecycleTransfer", str(PARENT_ID)),
+        ("std::testing::NullResource", "parent"),
     }
 
     # Delete the parent, the tree is empty, no resource set is emitted anymore
