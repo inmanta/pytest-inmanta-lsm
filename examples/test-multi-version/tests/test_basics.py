@@ -69,6 +69,17 @@ def test_compile(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None
     service.state = "up"
     lsm_project.compile(service_id=service.id)
 
+    # Update the child service, its own service entity version (0) should be used, not the
+    # default one (1), which has an additional required attribute
+    lsm_project.update_service(
+        service_id=service.id,
+        attributes=copy.deepcopy(service.active_attributes),
+        auto_transfer=True,
+    )
+
+    # Assert that the service has been updated and is now in update_inprogress state
+    assert service.state == "update_inprogress"
+
     # Create a child service without providing a service_entity_version
     service = lsm_project.create_service(
         service_entity_name="child",

@@ -914,7 +914,7 @@ class LsmProject:
         """
         # Get the service and its corresponding service entity
         service = self.get_service(service_id)
-        service_entity = self.get_service_entity(service.service_entity, attributes.get("service_entity_version", None))
+        service_entity = self.get_service_entity(service.service_entity, service.service_entity_version)
 
         # Go into the update state
         try:

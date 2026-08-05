@@ -2,6 +2,7 @@
 
 ## v4.3.0 - ?
 
+- Fix `LsmProject.update_service` using the default version of the service entity instead of the version of the instance being updated, which made it impossible to update an instance whose `service_entity_version` is not the default one.
 - Add `RemoteOrder` (and its async variant `remote_order_async.RemoteOrder`) to create, update and delete service instances through the orchestrator order API.
 - Fix compiler reuse (`--lsm-reuse-compiler`) breaking dataclass entities in tests that compile more than one model text: the pairing between a dsl dataclass entity and its python counterpart is restored before every reused compile, and two model texts that only differ in their surrounding newlines (as produced by `LsmProject.post_partial_compile_validation`) now share a single cached program.
 - Add opt-in compiler reuse for the `lsm_project` fixture (`--lsm-reuse-compiler` / `INMANTA_LSM_REUSE_COMPILER` / `lsm_reuse_compiler` fixture): parse and type-check the model only once and reuse the typed program for every subsequent compile of that same model, significantly speeding up model tests that perform many compiles. While active, it also disables the redundant on-disk parser cache, removing the cost of writing every module's `.cfc` during the cold compile.
