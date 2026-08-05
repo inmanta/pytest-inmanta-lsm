@@ -733,6 +733,61 @@ class LsmProject:
 
         return self.service_entity_versions[(service_entity_name, version)]
 
+    def get_owner(self, service_id: typing.Union[uuid.UUID, str]) -> typing.Optional[uuid.UUID]:
+        """
+        Get the id of the service which owns the service with the given id, as defined by the
+        `owner` and `relation_to_owner` attributes of its service entity binding.  Return None
+        if the service is not owned by any other service.
+
+        :param service_id: The id of the service whose owner we are looking for.
+        """
+        service = self.get_service(service_id)
+        service_entity = self.get_service_entity(service.service_entity, service.service_entity_version)
+        if service_entity.relation_to_owner is None:
+            # This service is not owned by any other service, it is the root of its
+            # own ownership tree
+            return None
+
+        # The relation towards the owner is an inter-service relation, its value is the id
+        # of the owning service instance
+        attributes = service.candidate_attributes or service.active_attributes or service.rollback_attributes or {}
+        owner_id = attributes.get(service_entity.relation_to_owner)
+        if owner_id is None:
+            raise LookupError(
+                f"Service {service.id} is owned by a {service_entity.owner} service, but its "
+                f"{service_entity.relation_to_owner} relation doesn't hold any owner id."
+            )
+
+        return uuid.UUID(str(owner_id))
+
+    def get_owner_root(self, service_id: typing.Union[uuid.UUID, str]) -> uuid.UUID:
+        """
+        Get the id of the service at the root of the ownership tree the service with the given id
+        is part of.  This is the service whose resource set contains the resources owned by any
+        service of the tree.  For a service which is not owned by any other service, this is the
+        service itself.
+
+        :param service_id: The id of the service whose ownership tree root we are looking for.
+        """
+        root = uuid.UUID(str(service_id))
+        visited = {root}
+        while (owner := self.get_owner(root)) is not None:
+            if owner in visited:
+                raise ValueError(f"The ownership relations of service {service_id} contain a cycle: {visited}")
+            visited.add(owner)
+            root = owner
+
+        return root
+
+    @property
+    def exporting_resource_sets(self) -> set[str]:
+        """
+        Get the ids of all the resource sets which are expected to be emitted by a full compile.
+        Each service in an exporting state contributes its resources to the resource set of the
+        service at the root of its ownership tree.
+        """
+        return {str(self.get_owner_root(id)) for id in self.exporting_services}
+
     def auto_transfer(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
         """
         Mock the logic of an auto transfer.  This can be used to automatically perform validation
@@ -1127,40 +1182,68 @@ class LsmProject:
         service_id: uuid.UUID,
         shared_resource_patterns: typing.Sequence[str],
         owned_resource_patterns: typing.Sequence[str],
+        *,
+        additional_services: typing.Optional[typing.Sequence[typing.Union[uuid.UUID, str]]] = None,
     ) -> None:
         """
         Perform a check on the export result of a partial compile.  It makes sure that:
-        1. The only resource set that is present is the service resource set
-        2. The resource in the resource set are the expected ones
+        1. The resource set of the validated service is present, and no unexpected resource set is
+        2. The resource in the resource sets are the expected ones
         3. The resource in the shared resource set are the expected ones
         4. Resources sent to the shared resource set are never modified
         5. A full compile for the previously compiled mode still works
 
-        This method only works with basic services, which don't need any other service to be
-        present in the partial compile with them and don't share their owned resources set with
-        any other service.
-        For more advanced use cases, the user is expected to implement its own similar validation
-        logic.
+        Services which are owned by another service (as defined by the `owner` and
+        `relation_to_owner` attributes of their service entity binding) don't have a resource set
+        of their own: they contribute their resources to the resource set of the service at the
+        root of their ownership tree.  Validating such a service therefore validates the resource
+        set of that root, which contains the resources of every service in the tree.  The owned
+        resource patterns are then expected to match the resources of the full tree.
+
+        A partial compile may also pull in services outside of the ownership tree of the service
+        it is triggered for, when the module extends the selection logic to do so.  Those services
+        keep their own resource set, and the `additional_services` argument decides how strict this
+        method is about them:
+        - When it is left to None, any additional resource set is tolerated, only the presence of
+          the resource set of the validated service is checked.
+        - When a sequence of service ids is provided, even an empty one, the emitted resource sets
+          must be exactly the ones of the ownership trees of the validated service and of these
+          additional services.  This catches partial compiles whose scope is broader than intended.
+
+        In both cases the resources of the additional resource sets are matched against the owned
+        resource patterns: the shared resource patterns are only about the resources which are not
+        part of any resource set.
 
         :param lsm_project: The LsmProject object that was used to perform the partial compile
         :param service_id: The id of the service which performed the partial compile
         :param shared_resource_patterns: A list of patterns that can be used to identified the
             resources which are expected to be part of the shared resource set.
         :param owned_resource_patterns: A list of patterns that can be used to identified the
-            resources which are expected to be part of the service's resource set.
+            resources which are expected to be part of one of the emitted resource sets.
+        :param additional_services: The ids of the services, outside of the ownership tree of the
+            validated service, whose resource set the partial compile is expected to emit as well.
+            If None, no check is done on the resource sets of the other services.
         """
-        # Get the service
-        service = self.get_service(service_id)
+        # Get the id of the resource set the validated service contributes to.  A resource set is
+        # only emitted if at least one service of its ownership tree is in an exporting state.
+        root_id = str(self.get_owner_root(service_id))
+        exporting_resource_sets = self.exporting_resource_sets
 
         resource_sets = get_resource_sets(self.project)
-        if not service.deleted:
-            # Check that the only resource set emitted is the one of this service
-            assert resource_sets.keys() == {str(service_id)}
-            _, owned_resources = resource_sets.popitem()
+        if additional_services is None:
+            # Only check the resource set of the validated service, any other resource set the
+            # partial compile emitted is tolerated
+            assert (root_id in resource_sets) == (root_id in exporting_resource_sets)
         else:
-            # Check that no resource set is emitted
-            assert resource_sets.keys() == set()
-            owned_resources = []
+            # Check that the emitted resource sets are exactly the expected ones
+            expected_resource_sets = {
+                str(self.get_owner_root(id)) for id in (service_id, *additional_services)
+            } & exporting_resource_sets
+            assert resource_sets.keys() == expected_resource_sets
+
+        # Any resource which is part of one of the emitted resource sets is owned by one of the
+        # services of this partial compile
+        owned_resources = {resource for resources in resource_sets.values() for resource in resources}
 
         # Check that each resource that is emitted belongs to the expected resource set
         for resource_id in self.project.resources.keys():
@@ -1193,8 +1276,9 @@ class LsmProject:
         model = pathlib.Path(self.project._test_project_dir, "main.cf").read_text()
         self.exporting_compile(model=model)
 
-        # Check that we have as many resource sets as there are services
-        assert get_resource_sets(self.project).keys() == self.exporting_services.keys()
+        # Check that we have as many resource sets as there are ownership trees with
+        # exporting services
+        assert get_resource_sets(self.project).keys() == self.exporting_resource_sets
 
         # Check that the shared resource set doesn't contain any illegal modification
         # For classic full compiles (no config update), the shared set shouldn't be
