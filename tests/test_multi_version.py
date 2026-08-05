@@ -59,7 +59,7 @@ def test_partial_compile_example(testdir, module_venv_active):
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest("tests/test_partial_compile.py")
-    result.assert_outcomes(passed=3)
+    result.assert_outcomes(passed=4)
 
 
 @pytest.mark.parametrize("reuse_compiler", [False, True])

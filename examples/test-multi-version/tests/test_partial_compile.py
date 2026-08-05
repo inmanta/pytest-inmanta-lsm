@@ -9,17 +9,21 @@ Pytest Inmanta LSM
 import copy
 import uuid
 
+import pytest
+
 import pytest_inmanta_lsm.lsm_project
 from pytest_inmanta_lsm.lsm_project import get_resource_sets
 
 PARENT_ID = uuid.UUID(int=1)
 CHILD_ID = uuid.UUID(int=2)
+SECOND_ID = uuid.UUID(int=3)
 
 SHARED_RESOURCES: list[str] = []
 OWNED_RESOURCES = [
     r"lsm::LifecycleTransfer\[.*\]",
     r"std::testing::NullResource\[.*,name=parent\]",
     r"std::testing::NullResource\[.*,name=child\]",
+    r"std::testing::NullResource\[.*,name=second\]",
 ]
 
 
@@ -51,6 +55,22 @@ def create_tree(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     child.state = "up"
     child.version += 1
     lsm_project.exporting_compile([child.id])
+
+
+def create_second_tree(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+    """
+    Create a service which is part of another, disjoint ownership tree, and bring it to the
+    up state.
+    """
+    second = lsm_project.create_service(
+        service_entity_name="second_parent",
+        attributes={"name": "second", "description": "my-description"},
+        auto_transfer=True,
+        service_id=SECOND_ID,
+    )
+    second.state = "up"
+    second.version += 1
+    lsm_project.exporting_compile([second.id])
 
 
 def test_ownership_resolution(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
@@ -154,3 +174,40 @@ def test_partial_compile_delete_owned_service(lsm_project: pytest_inmanta_lsm.ls
 
     assert get_resource_sets(lsm_project.project).keys() == set()
     assert lsm_project.exporting_resource_sets == set()
+
+
+def test_partial_compile_additional_services(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
+    """
+    A partial compile which pulls in a service outside of the ownership tree of the service it
+    is triggered for emits the resource set of that service as well.  This is only accepted if
+    that service is declared through the additional_services argument.
+    """
+    create_tree(lsm_project)
+    create_second_tree(lsm_project)
+
+    # Compile the owner together with the service of the other ownership tree, both resource
+    # sets are emitted
+    lsm_project.exporting_compile([PARENT_ID, SECOND_ID])
+    assert get_resource_sets(lsm_project.project).keys() == {str(PARENT_ID), str(SECOND_ID)}
+
+    # The resource set of the other tree is not expected as long as it is not declared
+    with pytest.raises(AssertionError):
+        lsm_project.post_partial_compile_validation(PARENT_ID, SHARED_RESOURCES, OWNED_RESOURCES)
+
+    lsm_project.exporting_compile([PARENT_ID, SECOND_ID])
+    lsm_project.post_partial_compile_validation(
+        PARENT_ID,
+        SHARED_RESOURCES,
+        OWNED_RESOURCES,
+        additional_services=[SECOND_ID],
+    )
+
+    # An owned service can be used as additional service as well, what is validated is the
+    # resource set of the root of its ownership tree
+    lsm_project.exporting_compile([SECOND_ID, CHILD_ID])
+    lsm_project.post_partial_compile_validation(
+        SECOND_ID,
+        SHARED_RESOURCES,
+        OWNED_RESOURCES,
+        additional_services=[CHILD_ID],
+    )
