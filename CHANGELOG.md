@@ -2,6 +2,7 @@
 
 ## v4.3.0 - ?
 
+- Extend `LsmProject.post_partial_compile_validation` to support services which are owned by another service: such services don't have a resource set of their own, they are now validated against the resource set of the root of their ownership tree.  `LsmProject.get_owner`, `LsmProject.get_owner_root` and `LsmProject.exporting_resource_sets` are exposed to allow custom validation logic to resolve the same ownership relations.
 - Add `RemoteOrder` (and its async variant `remote_order_async.RemoteOrder`) to create, update and delete service instances through the orchestrator order API.
 - Fix compiler reuse (`--lsm-reuse-compiler`) breaking dataclass entities in tests that compile more than one model text: the pairing between a dsl dataclass entity and its python counterpart is restored before every reused compile, and two model texts that only differ in their surrounding newlines (as produced by `LsmProject.post_partial_compile_validation`) now share a single cached program.
 - Add opt-in compiler reuse for the `lsm_project` fixture (`--lsm-reuse-compiler` / `INMANTA_LSM_REUSE_COMPILER` / `lsm_reuse_compiler` fixture): parse and type-check the model only once and reuse the typed program for every subsequent compile of that same model, significantly speeding up model tests that perform many compiles. While active, it also disables the redundant on-disk parser cache, removing the cost of writing every module's `.cfc` during the cold compile.
