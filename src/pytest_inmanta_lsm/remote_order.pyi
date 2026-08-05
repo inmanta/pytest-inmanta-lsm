@@ -3,6 +3,7 @@ import uuid
 
 from _typeshed import Incomplete
 from inmanta_lsm import model as model
+from inmanta_lsm.diagnose.model import FullDiagnosis
 from inmanta_lsm.order import model as order_model
 
 from pytest_inmanta_lsm import remote_orchestrator as remote_orchestrator
@@ -51,11 +52,36 @@ class OrderStateTimeoutError(RemoteOrderError[T], TimeoutError):
         *args: object,
     ) -> None: ...
 
-def format_failures(order: order_model.ServiceOrder) -> str:
+def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOrderItem]:
+    """
+    Get all the order items of the given order which are in a failed state.
+
+    :param order: The order for which we want to collect the failing items.
+    """
+
+def diagnose_failures(
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator, order: order_model.ServiceOrder, *, lookback_depth: int = 1
+) -> dict[uuid.UUID, FullDiagnosis]:
+    """
+    Get a diagnosis for every failing item of the given order, keyed by the id of the
+    service instance the item is about.  The diagnosis is fetched for the current version
+    of each instance.  Instances for which no diagnosis can be obtained are simply left
+    out of the result.
+
+    :param remote_orchestrator: The orchestrator the order has been created on.
+    :param order: The order for which we want to diagnose the failing items.
+    :param lookback_depth: The amount of states to search for failures in the history of
+        each failing service instance.
+    """
+
+def format_failures(order: order_model.ServiceOrder, diagnoses: typing.Mapping[uuid.UUID, FullDiagnosis] | None = None) -> str:
     """
     Build a human readable summary of all the failing order items of the given order.
 
     :param order: The order for which we want to display the failing items.
+    :param diagnoses: The diagnosis of each failing service instance, as returned by
+        `diagnose_failures`.  When provided, the diagnosis of an instance is displayed
+        next to the status of its order item.
     """
 
 class RemoteOrder:
@@ -132,6 +158,22 @@ class RemoteOrder:
     def get(self) -> order_model.ServiceOrder:
         """
         Get the current order in its current state, and return it as a ServiceOrder object.
+        """
+
+    def log_failures(self, order: order_model.ServiceOrder | None = None, *, lookback_depth: int = 1) -> str:
+        """
+        Log, at INFO level, a summary of all the failing items of this order, including a
+        diagnosis of each failing service instance.  Returns the summary that has been
+        logged.
+
+        This is called automatically when the order goes into a bad state, or when we stop
+        waiting for it because of a timeout.  It can also be called manually, for orders
+        whose failures are handled by the caller (e.g. `bad_states=[]`).
+
+        :param order: The order to report the failures of.  If left out, the current state
+            of the order is fetched from the orchestrator.
+        :param lookback_depth: The amount of states to search for failures in the history of
+            each failing service instance.
         """
 
     def wait_for_state(
