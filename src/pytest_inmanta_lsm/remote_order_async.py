@@ -14,6 +14,7 @@ import uuid
 
 import devtools
 from inmanta_lsm import model  # type: ignore
+from inmanta_lsm.diagnose.model import FullDiagnosis  # type: ignore
 from inmanta_lsm.order import model as order_model  # type: ignore
 
 from pytest_inmanta_lsm import (
@@ -95,17 +96,38 @@ class OrderStateTimeoutError(RemoteOrderError[T], TimeoutError):
         self.last_state = last_state
 
 
-def format_failures(order: order_model.ServiceOrder) -> str:
+def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOrderItem]:
+    """
+    Get all the order items of the given order which are in a failed state.
+
+    :param order: The order for which we want to collect the failing items.
+    """
+    return [item for item in order.service_order_items if item.status.state == order_model.OrderItemState.failed]
+
+
+def format_failures(
+    order: order_model.ServiceOrder,
+    diagnoses: typing.Optional[typing.Mapping[uuid.UUID, FullDiagnosis]] = None,
+) -> str:
     """
     Build a human readable summary of all the failing order items of the given order.
 
     :param order: The order for which we want to display the failing items.
+    :param diagnoses: The diagnosis of each failing service instance, as returned by
+        `diagnose_failures`.  When provided, the diagnosis of an instance is displayed
+        next to the status of its order item.
     """
-    failures = {
-        str(item.instance_id): item.status
-        for item in order.service_order_items
-        if item.status.state == order_model.OrderItemState.failed
-    }
+    failures: dict[str, dict[str, object]] = {}
+    for item in failing_items(order):
+        failure: dict[str, object] = {"status": item.status}
+        if diagnoses is not None and item.instance_id in diagnoses:
+            failure["diagnosis"] = diagnoses[item.instance_id]
+
+        failures[f"{item.service_entity}({item.instance_id})"] = failure
+
+    if not failures:
+        return "No failing order item."
+
     return str(devtools.debug.format(failures))
 
 
@@ -268,6 +290,76 @@ class RemoteOrder:
             order_id=self.order_id,
         )
 
+    async def _diagnose_failures(
+        self,
+        order: order_model.ServiceOrder,
+        *,
+        lookback_depth: int,
+    ) -> dict[uuid.UUID, FullDiagnosis]:
+        """
+        Get a diagnosis for every failing item of the given state of this order.
+
+        :param order: The state of this order to diagnose the failing items of.
+        :param lookback_depth: The amount of states to search for failures in the history of
+            each failing service instance.
+        """
+
+        async def diagnose(item: order_model.ServiceOrderItem) -> typing.Optional[tuple[uuid.UUID, FullDiagnosis]]:
+            instance = remote_service_instance_async.RemoteServiceInstance(
+                remote_orchestrator=self.remote_orchestrator,
+                service_entity_name=item.service_entity,
+                service_id=item.instance_id,
+                lookback_depth=lookback_depth,
+            )
+            try:
+                current_version = (await instance.get()).version
+                return item.instance_id, await instance.diagnose(version=current_version)
+            except Exception:
+                # The diagnosis is a best-effort helper for the user, it should never shadow
+                # the failure we are reporting about.  The instance might for example not
+                # exist at all, if the order failed before creating it.
+                LOGGER.warning("Failed to get a diagnosis for service instance %s", item.instance_id, exc_info=True)
+                return None
+
+        diagnoses = await asyncio.gather(*(diagnose(item) for item in failing_items(order)))
+        return dict(diagnosis for diagnosis in diagnoses if diagnosis is not None)
+
+    async def diagnose_failures(self, *, lookback_depth: int = 1) -> dict[uuid.UUID, FullDiagnosis]:
+        """
+        Get a diagnosis for every failing item of this order, keyed by the id of the service
+        instance the item is about.  The diagnosis is fetched for the current version of each
+        instance.  Instances for which no diagnosis can be obtained are simply left out of
+        the result.
+
+        :param lookback_depth: The amount of states to search for failures in the history of
+            each failing service instance.
+        """
+        return await self._diagnose_failures(await self.get(), lookback_depth=lookback_depth)
+
+    async def log_failures(self, *, lookback_depth: int = 1) -> str:
+        """
+        Log, at INFO level, a summary of all the failing items of this order, including a
+        diagnosis of each failing service instance.  Returns the summary that has been
+        logged.
+
+        This is called automatically when the order goes into a bad state, or when we stop
+        waiting for it because of a timeout.  It can also be called manually, for orders
+        whose failures are handled by the caller (e.g. `bad_states=[]`).
+
+        :param lookback_depth: The amount of states to search for failures in the history of
+            each failing service instance.
+        """
+        order = await self.get()
+        diagnoses = await self._diagnose_failures(order, lookback_depth=lookback_depth)
+        summary = format_failures(order, diagnoses)
+        LOGGER.info(
+            "Failing items of order %s (state: %s): \n%s",
+            order.id,
+            order.status.state,
+            summary,
+        )
+        return summary
+
     async def wait_for_state(
         self,
         target_state: order_model.OrderState = order_model.OrderState.success,
@@ -314,13 +406,10 @@ class RemoteOrder:
                 return order
 
             if state in bad_states:
-                # We encountered a bad state, print the failing items then quit
-                LOGGER.info(
-                    "Order %s reached bad state %s: \n%s",
-                    self.order_id,
-                    state,
-                    format_failures(order),
-                )
+                # We encountered a bad state, print the failing items and the diagnosis of
+                # the services they are about, then quit
+                LOGGER.info("Order %s reached bad state %s", self.order_id, state)
+                await self.log_failures()
                 raise BadOrderStateError(self, bad_states, order)
 
             if time.monotonic() - start > timeout:
@@ -331,6 +420,7 @@ class RemoteOrder:
                     repr(target_state),
                     repr(state),
                 )
+                await self.log_failures()
                 raise OrderStateTimeoutError(self, target_state, timeout, last_state)
 
             # Wait then try again

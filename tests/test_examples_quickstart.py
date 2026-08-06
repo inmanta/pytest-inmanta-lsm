@@ -62,4 +62,4 @@ def test_basic_example(testdir: pytest.Testdir, module_venv_active: env.VirtualE
     utils.add_version_constraint_to_project(testdir.tmpdir)
 
     result = testdir.runpytest("tests/test_quickstart.py", *args)
-    result.assert_outcomes(passed=10)
+    result.assert_outcomes(passed=11)

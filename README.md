@@ -316,6 +316,23 @@ Instead of building the order items yourself, you can also let the order build t
 ```
 > source: [test_quickstart.py::test_order_full_cycle](./examples/quickstart/tests/test_quickstart.py)
 
+When an order goes into a bad state, or when we stop waiting for it because of a timeout, the failing order items are logged together with the diagnosis (the same one the `lsm_services_diagnose` endpoint exposes) of each failing service instance.  If you handle the failures of the order yourself (e.g. by passing `bad_states=[]` and asserting on the order state in the test), you can trigger the same reporting on demand with `log_failures`, or get the diagnosis of every failing instance as an object with `diagnose_failures`.
+
+```python
+    order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    order.add_create_instance(instance, {"vlan_id": 14, ...})
+    service_order = order.create(bad_states=[])
+
+    ...
+
+    # Log a summary of all the failing items of the order, and the diagnosis of the
+    # service instances they are about
+    order.log_failures()
+
+    # Or get the diagnosis of each failing service instance, keyed by instance id
+    diagnoses = order.diagnose_failures()
+```
+
 
 ### Second case: mocking the lsm api
 
