@@ -1,5 +1,8 @@
 # Changelog
 
+## v4.3.1 - ?
+
+
 ## v4.3.0 - 2026-08-06
 
 - Extend `LsmProject.post_partial_compile_validation` to support services which are owned by another service: such services don't have a resource set of their own, they are now validated against the resource set of the root of their ownership tree.  `LsmProject.get_owner`, `LsmProject.get_owner_root` and `LsmProject.exporting_resource_sets` are exposed to allow custom validation logic to resolve the same ownership relations.
