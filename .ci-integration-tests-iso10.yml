@@ -36,3 +36,4 @@ credentials:
 mypy_mode: fail
 pyupgrade_mode: fail
 pyupgrade_python_version: py311
+tests_timeout: 40
