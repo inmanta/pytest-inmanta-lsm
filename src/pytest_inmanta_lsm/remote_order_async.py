@@ -27,6 +27,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 T = typing.TypeVar("T")
+R = typing.TypeVar("R")
 
 
 ServiceInstanceTypes = typing.Union[
@@ -108,6 +109,9 @@ def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOr
 def format_failures(
     order: order_model.ServiceOrder,
     diagnoses: typing.Optional[typing.Mapping[uuid.UUID, FullDiagnosis]] = None,
+    non_compliances: typing.Optional[
+        typing.Mapping[uuid.UUID, typing.Mapping[str, remote_service_instance_async.ResourceCompliance]]
+    ] = None,
 ) -> str:
     """
     Build a human readable summary of all the failing order items of the given order.
@@ -116,12 +120,17 @@ def format_failures(
     :param diagnoses: The diagnosis of each failing service instance, as returned by
         `diagnose_failures`.  When provided, the diagnosis of an instance is displayed
         next to the status of its order item.
+    :param non_compliances: The non-compliant resources of each failing service instance,
+        as returned by `diagnose_non_compliance`.  When provided, the deviation of those
+        resources is displayed next to the status of the order item of their instance.
     """
     failures: dict[str, dict[str, object]] = {}
     for item in failing_items(order):
         failure: dict[str, object] = {"status": item.status}
         if diagnoses is not None and item.instance_id in diagnoses:
             failure["diagnosis"] = diagnoses[item.instance_id]
+        if non_compliances is not None and item.instance_id in non_compliances:
+            failure["non_compliant_resources"] = non_compliances[item.instance_id]
 
         failures[f"{item.service_entity}({item.instance_id})"] = failure
 
@@ -290,6 +299,48 @@ class RemoteOrder:
             order_id=self.order_id,
         )
 
+    async def _diagnose_failing_items(
+        self,
+        order: order_model.ServiceOrder,
+        diagnose: typing.Callable[
+            [remote_service_instance_async.RemoteServiceInstance, int],
+            typing.Awaitable[R],
+        ],
+        *,
+        lookback_depth: int = 1,
+    ) -> dict[uuid.UUID, R]:
+        """
+        Run the given diagnosis on the service instance of every failing item of the given
+        state of this order, and return its result for each instance we could reach, keyed
+        by instance id.
+
+        :param order: The state of this order to diagnose the failing items of.
+        :param diagnose: The diagnosis to run, it is called with a failing service instance
+            and the current version of that instance.
+        :param lookback_depth: The amount of states to search for failures in the history of
+            each failing service instance.
+        """
+
+        async def diagnose_item(item: order_model.ServiceOrderItem) -> typing.Optional[tuple[uuid.UUID, R]]:
+            instance = remote_service_instance_async.RemoteServiceInstance(
+                remote_orchestrator=self.remote_orchestrator,
+                service_entity_name=item.service_entity,
+                service_id=item.instance_id,
+                lookback_depth=lookback_depth,
+            )
+            try:
+                current_version = (await instance.get()).version
+                return item.instance_id, await diagnose(instance, current_version)
+            except Exception:
+                # The diagnosis is a best-effort helper for the user, it should never shadow
+                # the failure we are reporting about.  The instance might for example not
+                # exist at all, if the order failed before creating it.
+                LOGGER.warning("Failed to get a diagnosis for service instance %s", item.instance_id, exc_info=True)
+                return None
+
+        diagnoses = await asyncio.gather(*(diagnose_item(item) for item in failing_items(order)))
+        return dict(diagnosis for diagnosis in diagnoses if diagnosis is not None)
+
     async def _diagnose_failures(
         self,
         order: order_model.ServiceOrder,
@@ -303,26 +354,11 @@ class RemoteOrder:
         :param lookback_depth: The amount of states to search for failures in the history of
             each failing service instance.
         """
-
-        async def diagnose(item: order_model.ServiceOrderItem) -> typing.Optional[tuple[uuid.UUID, FullDiagnosis]]:
-            instance = remote_service_instance_async.RemoteServiceInstance(
-                remote_orchestrator=self.remote_orchestrator,
-                service_entity_name=item.service_entity,
-                service_id=item.instance_id,
-                lookback_depth=lookback_depth,
-            )
-            try:
-                current_version = (await instance.get()).version
-                return item.instance_id, await instance.diagnose(version=current_version)
-            except Exception:
-                # The diagnosis is a best-effort helper for the user, it should never shadow
-                # the failure we are reporting about.  The instance might for example not
-                # exist at all, if the order failed before creating it.
-                LOGGER.warning("Failed to get a diagnosis for service instance %s", item.instance_id, exc_info=True)
-                return None
-
-        diagnoses = await asyncio.gather(*(diagnose(item) for item in failing_items(order)))
-        return dict(diagnosis for diagnosis in diagnoses if diagnosis is not None)
+        return await self._diagnose_failing_items(
+            order,
+            lambda instance, version: instance.diagnose(version=version),
+            lookback_depth=lookback_depth,
+        )
 
     async def diagnose_failures(self, *, lookback_depth: int = 1) -> dict[uuid.UUID, FullDiagnosis]:
         """
@@ -336,10 +372,39 @@ class RemoteOrder:
         """
         return await self._diagnose_failures(await self.get(), lookback_depth=lookback_depth)
 
+    async def _diagnose_non_compliance(
+        self,
+        order: order_model.ServiceOrder,
+    ) -> dict[uuid.UUID, dict[str, remote_service_instance_async.ResourceCompliance]]:
+        """
+        Get the non-compliant resources of every failing item of the given state of this order.
+
+        :param order: The state of this order to diagnose the failing items of.
+        """
+        non_compliances = await self._diagnose_failing_items(
+            order,
+            lambda instance, version: instance.diagnose_non_compliance(version=version),
+        )
+        return {instance_id: resources for instance_id, resources in non_compliances.items() if resources}
+
+    async def diagnose_non_compliance(
+        self,
+    ) -> dict[uuid.UUID, dict[str, remote_service_instance_async.ResourceCompliance]]:
+        """
+        Get, for every failing item of this order, the compliance of each resource of its
+        service instance which deviates from its desired state, keyed by the id of the
+        service instance the item is about.  Such a resource doesn't fail, it reports a
+        diff, which can be what made the instance transfer to a failure state, and which
+        the diagnosis of the instance doesn't cover.  Instances whose resources all comply
+        with their desired state are simply left out of the result.
+        """
+        return await self._diagnose_non_compliance(await self.get())
+
     async def log_failures(self, *, lookback_depth: int = 1) -> str:
         """
         Log, at INFO level, a summary of all the failing items of this order, including a
-        diagnosis of each failing service instance.  Returns the summary that has been
+        diagnosis of each failing service instance and the deviation of each of its resources
+        which doesn't comply with its desired state.  Returns the summary that has been
         logged.
 
         This is called automatically when the order goes into a bad state, or when we stop
@@ -351,7 +416,8 @@ class RemoteOrder:
         """
         order = await self.get()
         diagnoses = await self._diagnose_failures(order, lookback_depth=lookback_depth)
-        summary = format_failures(order, diagnoses)
+        non_compliances = await self._diagnose_non_compliance(order)
+        summary = format_failures(order, diagnoses, non_compliances)
         LOGGER.info(
             "Failing items of order %s (state: %s): \n%s",
             order.id,

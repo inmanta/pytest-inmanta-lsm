@@ -13,8 +13,11 @@ import uuid
 
 from pytest_inmanta_lsm import remote_orchestrator, remote_service_instance_async
 from pytest_inmanta_lsm.remote_service_instance_async import (  # noqa: F401
+    NON_COMPLIANT_RESOURCE_STATE,
+    AttributeStateChange,
     BadStateError,
     RemoteServiceInstanceError,
+    ResourceCompliance,
     StateTimeoutError,
     VersionExceededError,
     get_service_instance_from_log,

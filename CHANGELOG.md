@@ -2,6 +2,8 @@
 
 ## v4.3.1 - ?
 
+- Report the resources which don't comply with their desired state when an order goes into a bad state or times out: such a resource doesn't fail, it reports a diff, which the diagnosis of the service instance doesn't cover, but which can be what made the instance transfer to a failure state.  The new `RemoteOrder.diagnose_non_compliance` method returns that report for every failing item of an order, and the new `RemoteServiceInstance.resources` and `RemoteServiceInstance.diagnose_non_compliance` methods expose it for a single service instance.
+
 
 ## v4.3.0 - 2026-08-06
 

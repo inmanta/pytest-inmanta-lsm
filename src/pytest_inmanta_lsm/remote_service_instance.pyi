@@ -1,6 +1,8 @@
+import datetime
 import typing
 import uuid
 
+import pydantic
 from _typeshed import Incomplete
 from inmanta_lsm import model
 from inmanta_lsm.diagnose.model import FullDiagnosis
@@ -9,6 +11,7 @@ from pytest_inmanta_lsm import remote_orchestrator as remote_orchestrator
 
 LOGGER: Incomplete
 T = typing.TypeVar("T")
+NON_COMPLIANT_RESOURCE_STATE: str
 
 def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.ServiceInstance:
     """
@@ -18,6 +21,40 @@ def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.Servic
 
     :param log: The ServiceInstanceLog to convert to a ServiceInstance object.
     """
+
+class AttributeStateChange(pydantic.BaseModel):
+    """
+    The deviation of a single attribute of a resource from its desired state.
+
+    :param current: The value the attribute has on the target system.
+    :param desired: The value the attribute should have, according to the desired state.
+    """
+
+    current: object | None
+    desired: object | None
+
+class ResourceCompliance(pydantic.BaseModel):
+    """
+    The compliance of a resource with regard to its desired state, as reported by the
+    compliance report api of the orchestrator.  This mirrors the part of the
+    `inmanta.data.model.ResourceComplianceDiff` model we are interested in: that model can
+    not be imported as it doesn't exist in all the orchestrator versions we support.
+
+    :param report_only: Whether the resource only reports its compliance, without ever
+        enforcing its desired state.
+    :param compliance: The compliance of the resource, `non_compliant` for a resource which
+        deviates from its desired state.
+    :param last_execution_result: The result of the last deployment of the resource.
+    :param last_executed_at: When the resource has last been deployed.
+    :param attribute_diff: For a non-compliant resource, the deviation of each attribute
+        which doesn't have its desired value.
+    """
+
+    report_only: bool
+    compliance: str
+    last_execution_result: str
+    last_executed_at: datetime.datetime | None
+    attribute_diff: dict[str, AttributeStateChange] | None
 
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
     """
@@ -117,6 +154,25 @@ class RemoteServiceInstance:
 
         :param version: The version of the service at which we are looking for
             failures or errors.
+        """
+
+    def resources(self, *, version: int) -> list[model.Resource]:
+        """
+        Get the resources which determine the state of this service instance, together with
+        the state each of them is in.  Those are the resources a resource based transfer of
+        the lifecycle waits for.
+
+        :param version: The current version of the service instance.
+        """
+
+    def diagnose_non_compliance(self, *, version: int) -> dict[str, ResourceCompliance]:
+        """
+        Get the compliance of every resource of this service instance which deviates from its
+        desired state, keyed by resource id.  Such a resource doesn't fail, it reports a diff,
+        which can be what made the instance transfer to a failure state.  Returns an empty
+        dict when all the resources of the instance comply with their desired state.
+
+        :param version: The current version of the service instance.
         """
 
     def wait_for_state(

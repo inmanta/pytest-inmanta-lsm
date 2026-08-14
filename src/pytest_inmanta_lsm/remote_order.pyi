@@ -14,6 +14,7 @@ from pytest_inmanta_lsm import (
 
 LOGGER: Incomplete
 T = typing.TypeVar("T")
+R = typing.TypeVar("R")
 ServiceInstanceTypes = remote_service_instance_async.RemoteServiceInstance | remote_service_instance.RemoteServiceInstance
 
 class RemoteOrderError(RuntimeError, typing.Generic[T]):
@@ -59,7 +60,13 @@ def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOr
     :param order: The order for which we want to collect the failing items.
     """
 
-def format_failures(order: order_model.ServiceOrder, diagnoses: typing.Mapping[uuid.UUID, FullDiagnosis] | None = None) -> str:
+def format_failures(
+    order: order_model.ServiceOrder,
+    diagnoses: typing.Mapping[uuid.UUID, FullDiagnosis] | None = None,
+    non_compliances: (
+        typing.Mapping[uuid.UUID, typing.Mapping[str, remote_service_instance_async.ResourceCompliance]] | None
+    ) = None,
+) -> str:
     """
     Build a human readable summary of all the failing order items of the given order.
 
@@ -67,6 +74,9 @@ def format_failures(order: order_model.ServiceOrder, diagnoses: typing.Mapping[u
     :param diagnoses: The diagnosis of each failing service instance, as returned by
         `diagnose_failures`.  When provided, the diagnosis of an instance is displayed
         next to the status of its order item.
+    :param non_compliances: The non-compliant resources of each failing service instance,
+        as returned by `diagnose_non_compliance`.  When provided, the deviation of those
+        resources is displayed next to the status of the order item of their instance.
     """
 
 class RemoteOrder:
@@ -156,10 +166,21 @@ class RemoteOrder:
             each failing service instance.
         """
 
+    def diagnose_non_compliance(self) -> dict[uuid.UUID, dict[str, remote_service_instance_async.ResourceCompliance]]:
+        """
+        Get, for every failing item of this order, the compliance of each resource of its
+        service instance which deviates from its desired state, keyed by the id of the
+        service instance the item is about.  Such a resource doesn't fail, it reports a
+        diff, which can be what made the instance transfer to a failure state, and which
+        the diagnosis of the instance doesn't cover.  Instances whose resources all comply
+        with their desired state are simply left out of the result.
+        """
+
     def log_failures(self, *, lookback_depth: int = 1) -> str:
         """
         Log, at INFO level, a summary of all the failing items of this order, including a
-        diagnosis of each failing service instance.  Returns the summary that has been
+        diagnosis of each failing service instance and the deviation of each of its resources
+        which doesn't comply with its desired state.  Returns the summary that has been
         logged.
 
         This is called automatically when the order goes into a bad state, or when we stop

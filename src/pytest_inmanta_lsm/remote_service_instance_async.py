@@ -7,12 +7,14 @@ Pytest Inmanta LSM
 """
 
 import asyncio
+import datetime
 import logging
 import time
 import typing
 import uuid
 
 import devtools
+import pydantic
 from inmanta_lsm import model  # type: ignore
 from inmanta_lsm.diagnose.model import FullDiagnosis  # type: ignore
 
@@ -22,6 +24,14 @@ LOGGER = logging.getLogger(__name__)
 
 
 T = typing.TypeVar("T")
+
+
+NON_COMPLIANT_RESOURCE_STATE: typing.Final[str] = "non_compliant"
+"""
+The state, as reported by the orchestrator, of a resource which doesn't comply with its
+desired state.  This is the value of `inmanta.const.ResourceState.non_compliant`, which
+we can not import as it doesn't exist in all the orchestrator versions we support.
+"""
 
 
 def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.ServiceInstance:
@@ -56,6 +66,42 @@ def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.Servic
         # The model.ServiceInstance used in older versions of inmanta-lsm (iso7) had fewer fields than more recent versions,
         # which means that we would have different mypy results for different supported inmanta-lsm versions.
         # We add this ignore in order to have a consistent mypy-baseline between supported iso versions
+
+
+class AttributeStateChange(pydantic.BaseModel):
+    """
+    The deviation of a single attribute of a resource from its desired state.
+
+    :param current: The value the attribute has on the target system.
+    :param desired: The value the attribute should have, according to the desired state.
+    """
+
+    current: typing.Optional[object] = None
+    desired: typing.Optional[object] = None
+
+
+class ResourceCompliance(pydantic.BaseModel):
+    """
+    The compliance of a resource with regard to its desired state, as reported by the
+    compliance report api of the orchestrator.  This mirrors the part of the
+    `inmanta.data.model.ResourceComplianceDiff` model we are interested in: that model can
+    not be imported as it doesn't exist in all the orchestrator versions we support.
+
+    :param report_only: Whether the resource only reports its compliance, without ever
+        enforcing its desired state.
+    :param compliance: The compliance of the resource, `non_compliant` for a resource which
+        deviates from its desired state.
+    :param last_execution_result: The result of the last deployment of the resource.
+    :param last_executed_at: When the resource has last been deployed.
+    :param attribute_diff: For a non-compliant resource, the deviation of each attribute
+        which doesn't have its desired value.
+    """
+
+    report_only: bool
+    compliance: str
+    last_execution_result: str
+    last_executed_at: typing.Optional[datetime.datetime] = None
+    attribute_diff: typing.Optional[dict[str, AttributeStateChange]] = None
 
 
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
@@ -244,6 +290,47 @@ class RemoteServiceInstance:
             version=version,
             rejection_lookbehind=self._lookback - 1,
             failure_lookbehind=self._lookback,
+        )
+
+    async def resources(self, *, version: int) -> list[model.Resource]:
+        """
+        Get the resources which determine the state of this service instance, together with
+        the state each of them is in.  Those are the resources a resource based transfer of
+        the lifecycle waits for.
+
+        :param version: The current version of the service instance.
+        """
+        return await self.remote_orchestrator.request(
+            "lsm_services_resources_list",
+            list[model.Resource],
+            tid=self.remote_orchestrator.environment,
+            service_entity=self.service_entity_name,
+            service_id=self.instance_id,
+            current_version=version,
+        )
+
+    async def diagnose_non_compliance(self, *, version: int) -> dict[str, ResourceCompliance]:
+        """
+        Get the compliance of every resource of this service instance which deviates from its
+        desired state, keyed by resource id.  Such a resource doesn't fail, it reports a diff,
+        which can be what made the instance transfer to a failure state.  Returns an empty
+        dict when all the resources of the instance comply with their desired state.
+
+        :param version: The current version of the service instance.
+        """
+        non_compliant = [
+            resource.resource_id
+            for resource in await self.resources(version=version)
+            if resource.resource_state == NON_COMPLIANT_RESOURCE_STATE
+        ]
+        if not non_compliant:
+            return {}
+
+        return await self.remote_orchestrator.request(
+            "get_compliance_report",
+            dict[str, ResourceCompliance],
+            tid=self.remote_orchestrator.environment,
+            resource_ids=non_compliant,
         )
 
     async def wait_for_state(

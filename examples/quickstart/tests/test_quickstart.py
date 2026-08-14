@@ -526,6 +526,13 @@ def test_order_failure(
     assert diagnoses[instance.instance_id].failures, "The failing deployment should be part of the diagnosis"
     assert str(instance.instance_id) in order.log_failures()
 
+    # The state of the instance is based on its resource, which fails instead of reporting
+    # a deviation from its desired state: there is nothing to report about compliance
+    resource_states = {resource.resource_state for resource in instance.resources(version=instance.get().version)}
+    assert resource_states, "The state of the instance is based on at least one resource"
+    assert remote_service_instance.NON_COMPLIANT_RESOURCE_STATE not in resource_states, resource_states
+    assert order.diagnose_non_compliance() == {}
+
     # The instance is left in the inventory: its resource keeps failing, so it can not
     # reach a state in which it could be cleaned up
 
