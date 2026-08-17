@@ -4,6 +4,7 @@ import uuid
 
 import pydantic
 from _typeshed import Incomplete
+from inmanta.data.model import AttributeStateChange as AttributeStateChange
 from inmanta_lsm import model
 from inmanta_lsm.diagnose.model import FullDiagnosis
 
@@ -21,17 +22,6 @@ def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.Servic
 
     :param log: The ServiceInstanceLog to convert to a ServiceInstance object.
     """
-
-class AttributeStateChange(pydantic.BaseModel):
-    """
-    The deviation of a single attribute of a resource from its desired state.
-
-    :param current: The value the attribute has on the target system.
-    :param desired: The value the attribute should have, according to the desired state.
-    """
-
-    current: object | None
-    desired: object | None
 
 class ResourceCompliance(pydantic.BaseModel):
     """
