@@ -106,6 +106,25 @@ def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOr
     return [item for item in order.service_order_items if item.status.state == order_model.OrderItemState.failed]
 
 
+def item_name(item: order_model.ServiceOrderItem) -> str:
+    """
+    Build a human readable name for the service instance the given order item is about.  When
+    the orchestrator reports the service identity of the instance, its value is part of the
+    name, so that the instance can be recognized without resolving its id.
+
+    :param item: The order item to build the name of the service instance for.
+    """
+    # The service identity is not reported by all the versions of the orchestrator we support,
+    # and not all the service entities define one: fall back to the id of the instance alone.
+    identity_value = getattr(item.status, "service_identity_attribute_value", None)
+    if identity_value is None:
+        return f"{item.service_entity}({item.instance_id})"
+
+    identity = getattr(item.status, "service_identity_display_name", None)
+    identity_repr = identity_value if identity is None else f"{identity}={identity_value}"
+    return f"{item.service_entity}({identity_repr}, {item.instance_id})"
+
+
 def format_failures(
     order: order_model.ServiceOrder,
     diagnoses: typing.Optional[typing.Mapping[uuid.UUID, FullDiagnosis]] = None,
@@ -132,7 +151,7 @@ def format_failures(
         if non_compliances is not None and item.instance_id in non_compliances:
             failure["non_compliant_resources"] = non_compliances[item.instance_id]
 
-        failures[f"{item.service_entity}({item.instance_id})"] = failure
+        failures[item_name(item)] = failure
 
     if not failures:
         return "No failing order item."

@@ -44,16 +44,16 @@ class ResourceCompliance(pydantic.BaseModel):
         enforcing its desired state.
     :param compliance: The compliance of the resource, `non_compliant` for a resource which
         deviates from its desired state.
-    :param last_execution_result: The result of the last deployment of the resource.
-    :param last_executed_at: When the resource has last been deployed.
+    :param last_handler_run: The result of the last run of the handler of the resource.
+    :param last_handler_run_at: When the handler of the resource has last been run.
     :param attribute_diff: For a non-compliant resource, the deviation of each attribute
         which doesn't have its desired value.
     """
 
     report_only: bool
     compliance: str
-    last_execution_result: str
-    last_executed_at: datetime.datetime | None
+    last_handler_run: str
+    last_handler_run_at: datetime.datetime | None
     attribute_diff: dict[str, AttributeStateChange] | None
 
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
@@ -173,6 +173,28 @@ class RemoteServiceInstance:
         dict when all the resources of the instance comply with their desired state.
 
         :param version: The current version of the service instance.
+        """
+
+    def format_failure(self, *, version: int) -> str:
+        """
+        Build a human readable report of everything which can explain a failure of this service
+        instance at the given version: the diagnosis of the orchestrator, and the compliance of
+        the resources which deviate from their desired state, which the diagnosis doesn't cover.
+
+        This is logged automatically when the instance goes into a bad state, or when we stop
+        waiting for it because of a timeout.
+
+        :param version: The version of the service instance to report about.
+        """
+
+    def resolve_instance_name(self, *, identity_value: str | None = None) -> str:
+        """
+        Resolve, and cache, a human readable name for this service instance, based on the service
+        identity its service entity defines.  Falls back to `instance_name` when the service
+        entity doesn't define any identity, or when the name can not be resolved.
+
+        :param identity_value: The value the service identity has for this instance, when the
+            caller already knows it.  It is fetched from the orchestrator otherwise.
         """
 
     def wait_for_state(

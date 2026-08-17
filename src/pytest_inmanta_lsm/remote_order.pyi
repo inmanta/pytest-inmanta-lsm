@@ -60,6 +60,15 @@ def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOr
     :param order: The order for which we want to collect the failing items.
     """
 
+def item_name(item: order_model.ServiceOrderItem) -> str:
+    """
+    Build a human readable name for the service instance the given order item is about.  When
+    the orchestrator reports the service identity of the instance, its value is part of the
+    name, so that the instance can be recognized without resolving its id.
+
+    :param item: The order item to build the name of the service instance for.
+    """
+
 def format_failures(
     order: order_model.ServiceOrder,
     diagnoses: typing.Mapping[uuid.UUID, FullDiagnosis] | None = None,

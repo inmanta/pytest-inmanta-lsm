@@ -340,7 +340,7 @@ If you handle the failures of the order yourself (e.g. by passing `bad_states=[]
     non_compliances = order.diagnose_non_compliance()
 ```
 
-The same information is available for a single service instance, without going through an order: `RemoteServiceInstance.resources` lists the resources the state of the instance is based on, and `RemoteServiceInstance.diagnose_non_compliance` reports the deviation of those which don't comply with their desired state.
+The same information is available for a single service instance, without going through an order: `RemoteServiceInstance.resources` lists the resources the state of the instance is based on, and `RemoteServiceInstance.diagnose_non_compliance` reports the deviation of those which don't comply with their desired state.  The full report, diagnosis and compliance together, is logged when the instance goes into a bad state or times out, and `RemoteServiceInstance.format_failure` builds it on demand.
 
 
 ### Second case: mocking the lsm api

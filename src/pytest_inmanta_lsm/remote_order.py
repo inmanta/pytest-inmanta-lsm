@@ -19,6 +19,7 @@ from pytest_inmanta_lsm.remote_order_async import (  # noqa: F401
     ServiceInstanceTypes,
     failing_items,
     format_failures,
+    item_name,
 )
 
 LOGGER = logging.getLogger(__name__)
