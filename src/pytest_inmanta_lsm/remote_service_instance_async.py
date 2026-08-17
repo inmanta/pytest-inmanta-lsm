@@ -7,7 +7,6 @@ Pytest Inmanta LSM
 """
 
 import asyncio
-import datetime
 import logging
 import time
 import typing
@@ -15,11 +14,27 @@ import uuid
 
 import devtools
 import pydantic
-from inmanta.data.model import AttributeStateChange
+from inmanta import const
 from inmanta_lsm import model  # type: ignore
 from inmanta_lsm.diagnose.model import FullDiagnosis  # type: ignore
 
 from pytest_inmanta_lsm import remote_orchestrator
+
+try:
+    # The compliance model of the orchestrator only exists since iso9 (inmanta-core 18.0.0).  The
+    # bare type ignores keep the mypy result consistent for all the orchestrator versions we
+    # support: which of the two branches is taken depends on that version.
+    from inmanta.data.model import ResourceComplianceDiff  # type: ignore
+except ImportError:
+
+    class ResourceComplianceDiff(pydantic.BaseModel):  # type: ignore
+        """
+        Placeholder for the compliance model of the orchestrator.  It is never used on an
+        orchestrator which doesn't have that model, as no resource can deviate from its desired
+        state there: `diagnose_non_compliance` returns before it would reach the compliance
+        report api.
+        """
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -30,8 +45,8 @@ T = typing.TypeVar("T")
 NON_COMPLIANT_RESOURCE_STATE: typing.Final[str] = "non_compliant"
 """
 The state, as reported by the orchestrator, of a resource which doesn't comply with its
-desired state.  This is the value of `inmanta.const.ResourceState.non_compliant`, which
-we can not import as it doesn't exist in all the orchestrator versions we support.
+desired state.  This is the value of `inmanta.const.ResourceState.non_compliant`, which we
+can not import as it only exists since iso9 (inmanta-core 18.0.0), while we also support iso8.
 """
 
 
@@ -67,30 +82,6 @@ def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.Servic
         # The model.ServiceInstance used in older versions of inmanta-lsm (iso7) had fewer fields than more recent versions,
         # which means that we would have different mypy results for different supported inmanta-lsm versions.
         # We add this ignore in order to have a consistent mypy-baseline between supported iso versions
-
-
-class ResourceCompliance(pydantic.BaseModel):
-    """
-    The compliance of a resource with regard to its desired state, as reported by the
-    compliance report api of the orchestrator.  This mirrors the part of the
-    `inmanta.data.model.ResourceComplianceDiff` model we are interested in: that model can
-    not be imported as it doesn't exist in all the orchestrator versions we support.
-
-    :param report_only: Whether the resource only reports its compliance, without ever
-        enforcing its desired state.
-    :param compliance: The compliance of the resource, `non_compliant` for a resource which
-        deviates from its desired state.
-    :param last_handler_run: The result of the last run of the handler of the resource.
-    :param last_handler_run_at: When the handler of the resource has last been run.
-    :param attribute_diff: For a non-compliant resource, the deviation of each attribute
-        which doesn't have its desired value.
-    """
-
-    report_only: bool
-    compliance: str
-    last_handler_run: str
-    last_handler_run_at: typing.Optional[datetime.datetime] = None
-    attribute_diff: typing.Optional[dict[str, AttributeStateChange]] = None
 
 
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
@@ -298,15 +289,21 @@ class RemoteServiceInstance:
             current_version=version,
         )
 
-    async def diagnose_non_compliance(self, *, version: int) -> dict[str, ResourceCompliance]:
+    async def diagnose_non_compliance(self, *, version: int) -> dict[str, ResourceComplianceDiff]:
         """
         Get the compliance of every resource of this service instance which deviates from its
         desired state, keyed by resource id.  Such a resource doesn't fail, it reports a diff,
         which can be what made the instance transfer to a failure state.  Returns an empty
-        dict when all the resources of the instance comply with their desired state.
+        dict when all the resources of the instance comply with their desired state, or when
+        the orchestrator is too old to know about compliance at all (iso8).
 
         :param version: The current version of the service instance.
         """
+        if not hasattr(const.ResourceState, NON_COMPLIANT_RESOURCE_STATE):
+            # Compliance only exists since iso9: on an older orchestrator no resource can
+            # deviate from its desired state, and there is no compliance report api to call.
+            return {}
+
         non_compliant = [
             resource.resource_id
             for resource in await self.resources(version=version)
@@ -317,7 +314,7 @@ class RemoteServiceInstance:
 
         return await self.remote_orchestrator.request(
             "get_compliance_report",
-            dict[str, ResourceCompliance],
+            dict[str, ResourceComplianceDiff],
             tid=self.remote_orchestrator.environment,
             resource_ids=non_compliant,
         )

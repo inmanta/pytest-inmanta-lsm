@@ -129,7 +129,7 @@ def format_failures(
     order: order_model.ServiceOrder,
     diagnoses: typing.Optional[typing.Mapping[uuid.UUID, FullDiagnosis]] = None,
     non_compliances: typing.Optional[
-        typing.Mapping[uuid.UUID, typing.Mapping[str, remote_service_instance_async.ResourceCompliance]]
+        typing.Mapping[uuid.UUID, typing.Mapping[str, remote_service_instance_async.ResourceComplianceDiff]]
     ] = None,
 ) -> str:
     """
@@ -394,7 +394,7 @@ class RemoteOrder:
     async def _diagnose_non_compliance(
         self,
         order: order_model.ServiceOrder,
-    ) -> dict[uuid.UUID, dict[str, remote_service_instance_async.ResourceCompliance]]:
+    ) -> dict[uuid.UUID, dict[str, remote_service_instance_async.ResourceComplianceDiff]]:
         """
         Get the non-compliant resources of every failing item of the given state of this order.
 
@@ -408,7 +408,7 @@ class RemoteOrder:
 
     async def diagnose_non_compliance(
         self,
-    ) -> dict[uuid.UUID, dict[str, remote_service_instance_async.ResourceCompliance]]:
+    ) -> dict[uuid.UUID, dict[str, remote_service_instance_async.ResourceComplianceDiff]]:
         """
         Get, for every failing item of this order, the compliance of each resource of its
         service instance which deviates from its desired state, keyed by the id of the

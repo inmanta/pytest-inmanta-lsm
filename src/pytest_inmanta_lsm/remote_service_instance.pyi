@@ -1,10 +1,8 @@
-import datetime
 import typing
 import uuid
 
-import pydantic
 from _typeshed import Incomplete
-from inmanta.data.model import AttributeStateChange as AttributeStateChange
+from inmanta.data.model import ResourceComplianceDiff  # type: ignore
 from inmanta_lsm import model
 from inmanta_lsm.diagnose.model import FullDiagnosis
 
@@ -22,29 +20,6 @@ def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.Servic
 
     :param log: The ServiceInstanceLog to convert to a ServiceInstance object.
     """
-
-class ResourceCompliance(pydantic.BaseModel):
-    """
-    The compliance of a resource with regard to its desired state, as reported by the
-    compliance report api of the orchestrator.  This mirrors the part of the
-    `inmanta.data.model.ResourceComplianceDiff` model we are interested in: that model can
-    not be imported as it doesn't exist in all the orchestrator versions we support.
-
-    :param report_only: Whether the resource only reports its compliance, without ever
-        enforcing its desired state.
-    :param compliance: The compliance of the resource, `non_compliant` for a resource which
-        deviates from its desired state.
-    :param last_handler_run: The result of the last run of the handler of the resource.
-    :param last_handler_run_at: When the handler of the resource has last been run.
-    :param attribute_diff: For a non-compliant resource, the deviation of each attribute
-        which doesn't have its desired value.
-    """
-
-    report_only: bool
-    compliance: str
-    last_handler_run: str
-    last_handler_run_at: datetime.datetime | None
-    attribute_diff: dict[str, AttributeStateChange] | None
 
 class RemoteServiceInstanceError(RuntimeError, typing.Generic[T]):
     """
@@ -155,12 +130,13 @@ class RemoteServiceInstance:
         :param version: The current version of the service instance.
         """
 
-    def diagnose_non_compliance(self, *, version: int) -> dict[str, ResourceCompliance]:
+    def diagnose_non_compliance(self, *, version: int) -> dict[str, ResourceComplianceDiff]:
         """
         Get the compliance of every resource of this service instance which deviates from its
         desired state, keyed by resource id.  Such a resource doesn't fail, it reports a diff,
         which can be what made the instance transfer to a failure state.  Returns an empty
-        dict when all the resources of the instance comply with their desired state.
+        dict when all the resources of the instance comply with their desired state, or when
+        the orchestrator is too old to know about compliance at all (iso8).
 
         :param version: The current version of the service instance.
         """
