@@ -2,6 +2,7 @@ import typing
 import uuid
 
 from _typeshed import Incomplete
+from inmanta.data.model import ResourceComplianceDiff  # type: ignore
 from inmanta_lsm import model
 from inmanta_lsm.diagnose.model import FullDiagnosis
 
@@ -9,6 +10,7 @@ from pytest_inmanta_lsm import remote_orchestrator as remote_orchestrator
 
 LOGGER: Incomplete
 T = typing.TypeVar("T")
+NON_COMPLIANT_RESOURCE_STATE: str
 
 def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.ServiceInstance:
     """
@@ -117,6 +119,48 @@ class RemoteServiceInstance:
 
         :param version: The version of the service at which we are looking for
             failures or errors.
+        """
+
+    def resources(self, *, version: int) -> list[model.Resource]:
+        """
+        Get the resources which determine the state of this service instance, together with
+        the state each of them is in.  Those are the resources a resource based transfer of
+        the lifecycle waits for.
+
+        :param version: The current version of the service instance.
+        """
+
+    def diagnose_non_compliance(self, *, version: int) -> dict[str, ResourceComplianceDiff]:
+        """
+        Get the compliance of every resource of this service instance which deviates from its
+        desired state, keyed by resource id.  Such a resource doesn't fail, it reports a diff,
+        which can be what made the instance transfer to a failure state.  Returns an empty
+        dict when all the resources of the instance comply with their desired state, or when
+        the orchestrator is too old to know about compliance at all (iso8).
+
+        :param version: The current version of the service instance.
+        """
+
+    def format_failure(self, *, version: int) -> str:
+        """
+        Build a human readable report of everything which can explain a failure of this service
+        instance at the given version: the diagnosis of the orchestrator, and the compliance of
+        the resources which deviate from their desired state, which the diagnosis doesn't cover.
+
+        This is logged automatically when the instance goes into a bad state, or when we stop
+        waiting for it because of a timeout.
+
+        :param version: The version of the service instance to report about.
+        """
+
+    def resolve_instance_name(self, *, identity_value: str | None = None) -> str:
+        """
+        Resolve, and cache, a human readable name for this service instance, based on the service
+        identity its service entity defines.  Falls back to `instance_name` when the service
+        entity doesn't define any identity, or when the name can not be resolved.
+
+        :param identity_value: The value the service identity has for this instance, when the
+            caller already knows it.  It is fetched from the orchestrator otherwise.
         """
 
     def wait_for_state(

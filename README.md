@@ -316,7 +316,9 @@ Instead of building the order items yourself, you can also let the order build t
 ```
 > source: [test_quickstart.py::test_order_full_cycle](./examples/quickstart/tests/test_quickstart.py)
 
-When an order goes into a bad state, or when we stop waiting for it because of a timeout, the failing order items are logged together with the diagnosis (the same one the `lsm_services_diagnose` endpoint exposes) of each failing service instance.  If you handle the failures of the order yourself (e.g. by passing `bad_states=[]` and asserting on the order state in the test), you can trigger the same reporting on demand with `log_failures`, or get the diagnosis of every failing instance as an object with `diagnose_failures`.
+When an order goes into a bad state, or when we stop waiting for it because of a timeout, the failing order items are logged together with the diagnosis (the same one the `lsm_services_diagnose` endpoint exposes) of each failing service instance.  A service instance can also transfer to a failure state because one of its resources deviates from its desired state instead of failing: such a resource is not part of the diagnosis, so the report also includes the compliance of each non-compliant resource, with the diff between its current and its desired state.
+
+If you handle the failures of the order yourself (e.g. by passing `bad_states=[]` and asserting on the order state in the test), you can trigger the same reporting on demand with `log_failures`, or get each part of it as an object with `diagnose_failures` and `diagnose_non_compliance`.
 
 ```python
     order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
@@ -325,13 +327,20 @@ When an order goes into a bad state, or when we stop waiting for it because of a
 
     ...
 
-    # Log a summary of all the failing items of the order, and the diagnosis of the
-    # service instances they are about
+    # Log a summary of all the failing items of the order, the diagnosis of the service
+    # instances they are about, and the resources of those instances which don't comply
+    # with their desired state
     order.log_failures()
 
     # Or get the diagnosis of each failing service instance, keyed by instance id
     diagnoses = order.diagnose_failures()
+
+    # And the non-compliant resources of each failing service instance, keyed by instance
+    # id, then by resource id
+    non_compliances = order.diagnose_non_compliance()
 ```
+
+The same information is available for a single service instance, without going through an order: `RemoteServiceInstance.resources` lists the resources the state of the instance is based on, and `RemoteServiceInstance.diagnose_non_compliance` reports the deviation of those which don't comply with their desired state.  The full report, diagnosis and compliance together, is logged when the instance goes into a bad state or times out, and `RemoteServiceInstance.format_failure` builds it on demand.
 
 
 ### Second case: mocking the lsm api

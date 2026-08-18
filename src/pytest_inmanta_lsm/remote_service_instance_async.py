@@ -13,15 +13,41 @@ import typing
 import uuid
 
 import devtools
+import pydantic
+from inmanta import const
 from inmanta_lsm import model  # type: ignore
 from inmanta_lsm.diagnose.model import FullDiagnosis  # type: ignore
 
 from pytest_inmanta_lsm import remote_orchestrator
 
+try:
+    # The compliance model of the orchestrator only exists since iso9 (inmanta-core 18.0.0).  The
+    # bare type ignores keep the mypy result consistent for all the orchestrator versions we
+    # support: which of the two branches is taken depends on that version.
+    from inmanta.data.model import ResourceComplianceDiff  # type: ignore
+except ImportError:
+
+    class ResourceComplianceDiff(pydantic.BaseModel):  # type: ignore
+        """
+        Placeholder for the compliance model of the orchestrator.  It is never used on an
+        orchestrator which doesn't have that model, as no resource can deviate from its desired
+        state there: `diagnose_non_compliance` returns before it would reach the compliance
+        report api.
+        """
+
+
 LOGGER = logging.getLogger(__name__)
 
 
 T = typing.TypeVar("T")
+
+
+NON_COMPLIANT_RESOURCE_STATE: typing.Final[str] = "non_compliant"
+"""
+The state, as reported by the orchestrator, of a resource which doesn't comply with its
+desired state.  This is the value of `inmanta.const.ResourceState.non_compliant`, which we
+can not import as it only exists since iso9 (inmanta-core 18.0.0), while we also support iso8.
+"""
 
 
 def get_service_instance_from_log(log: model.ServiceInstanceLog) -> model.ServiceInstance:
@@ -246,6 +272,117 @@ class RemoteServiceInstance:
             failure_lookbehind=self._lookback,
         )
 
+    async def resources(self, *, version: int) -> list[model.Resource]:
+        """
+        Get the resources which determine the state of this service instance, together with
+        the state each of them is in.  Those are the resources a resource based transfer of
+        the lifecycle waits for.
+
+        :param version: The current version of the service instance.
+        """
+        return await self.remote_orchestrator.request(
+            "lsm_services_resources_list",
+            list[model.Resource],
+            tid=self.remote_orchestrator.environment,
+            service_entity=self.service_entity_name,
+            service_id=self.instance_id,
+            current_version=version,
+        )
+
+    async def diagnose_non_compliance(self, *, version: int) -> dict[str, ResourceComplianceDiff]:
+        """
+        Get the compliance of every resource of this service instance which deviates from its
+        desired state, keyed by resource id.  Such a resource doesn't fail, it reports a diff,
+        which can be what made the instance transfer to a failure state.  Returns an empty
+        dict when all the resources of the instance comply with their desired state, or when
+        the orchestrator is too old to know about compliance at all (iso8).
+
+        :param version: The current version of the service instance.
+        """
+        if not hasattr(const.ResourceState, NON_COMPLIANT_RESOURCE_STATE):
+            # Compliance only exists since iso9: on an older orchestrator no resource can
+            # deviate from its desired state, and there is no compliance report api to call.
+            return {}
+
+        non_compliant = [
+            resource.resource_id
+            for resource in await self.resources(version=version)
+            if resource.resource_state == NON_COMPLIANT_RESOURCE_STATE
+        ]
+        if not non_compliant:
+            return {}
+
+        return await self.remote_orchestrator.request(
+            "get_compliance_report",
+            dict[str, ResourceComplianceDiff],
+            tid=self.remote_orchestrator.environment,
+            resource_ids=non_compliant,
+        )
+
+    async def format_failure(self, *, version: int) -> str:
+        """
+        Build a human readable report of everything which can explain a failure of this service
+        instance at the given version: the diagnosis of the orchestrator, and the compliance of
+        the resources which deviate from their desired state, which the diagnosis doesn't cover.
+
+        This is logged automatically when the instance goes into a bad state, or when we stop
+        waiting for it because of a timeout.
+
+        :param version: The version of the service instance to report about.
+        """
+        report: dict[str, object] = {"diagnosis": await self.diagnose(version=version)}
+        try:
+            non_compliance = await self.diagnose_non_compliance(version=version)
+        except Exception:
+            # The compliance of the resources is a best-effort addition to the diagnosis, it
+            # should never shadow the failure we are reporting about.
+            LOGGER.warning(
+                "Failed to get the compliance of the resources of service instance %s",
+                self.instance_id,
+                exc_info=True,
+            )
+        else:
+            if non_compliance:
+                report["non_compliant_resources"] = non_compliance
+
+        return str(devtools.debug.format(report))
+
+    async def resolve_instance_name(self, *, identity_value: typing.Optional[str] = None) -> str:
+        """
+        Resolve, and cache, a human readable name for this service instance, based on the service
+        identity its service entity defines.  Falls back to `instance_name` when the service
+        entity doesn't define any identity, or when the name can not be resolved.
+
+        :param identity_value: The value the service identity has for this instance, when the
+            caller already knows it.  It is fetched from the orchestrator otherwise.
+        """
+        if self._instance_name is not None:
+            return self._instance_name
+
+        try:
+            service_entity = await self.remote_orchestrator.request(
+                "lsm_service_catalog_get_entity",
+                model.ServiceEntity,
+                tid=self.remote_orchestrator.environment,
+                service_entity=self.service_entity_name,
+                instance_summary=False,
+            )
+            if service_entity.service_identity is None:
+                # The service entity doesn't have any identity attribute, we don't have anything
+                # nicer to propose than the id of the instance
+                return self.instance_name
+
+            if identity_value is None:
+                identity_value = (await self.get()).service_identity_attribute_value
+
+            self._instance_name = f"{self.service_entity_name}({service_entity.service_identity}={identity_value})"
+        except Exception:
+            # A nice name is only a convenience for the user, it should never make the caller fail
+            LOGGER.debug("Failed to resolve a name for service instance %s", self.instance_id, exc_info=True)
+            return self.instance_name
+
+        return self._instance_name
+
     async def wait_for_state(
         self,
         target_state: str,
@@ -326,13 +463,14 @@ class RemoteServiceInstance:
                     if log.version > last_version and is_done(log):
                         return get_service_instance_from_log(log)
                 except BadStateError:
-                    # We encountered a bad state, print the diagnosis then quit
-                    diagnosis = await self.diagnose(version=log.version)
+                    # We encountered a bad state, print the failure report then quit
+                    instance_name = await self.resolve_instance_name(identity_value=log.service_identity_attribute_value)
+                    failure = await self.format_failure(version=log.version)
                     LOGGER.info(
                         "Service instance %s reached bad state %s: \n%s",
-                        self.instance_name,
+                        instance_name,
                         log.state,
-                        devtools.debug.format(diagnosis),
+                        failure,
                     )
                     raise
 
@@ -351,13 +489,14 @@ class RemoteServiceInstance:
 
             if time.monotonic() - start > timeout:
                 # We reached the timeout, we should stop waiting and raise an exception
-                diagnosis = await self.diagnose(version=log.version)
+                instance_name = await self.resolve_instance_name(identity_value=log.service_identity_attribute_value)
+                failure = await self.format_failure(version=log.version)
                 LOGGER.info(
                     "Service instance %s exceeded timeout while waiting for %s, current state is %s.  %s",
-                    self.instance_name,
+                    instance_name,
                     repr(target_state),
                     repr(last_state) if last_state is not None else "unknown",
-                    devtools.debug.format(diagnosis),
+                    failure,
                 )
                 raise StateTimeoutError(self, target_state, target_version, timeout, last_state, last_version)
 
@@ -416,22 +555,10 @@ class RemoteServiceInstance:
         self._instance_id = service_instance.id
         LOGGER.info("Created instance has ID %s", self.instance_id)
 
-        # Try to create a nice name for our instance, based on the service_identity_display_name
-        service_entity = await self.remote_orchestrator.request(
-            "lsm_service_catalog_get_entity",
-            model.ServiceEntity,
-            tid=self.remote_orchestrator.environment,
-            service_entity=self.service_entity_name,
-            instance_summary=False,
-        )
-        if service_entity.service_identity is not None:
-            # Create a nice display name for our instance, based on the identity attribute the
-            # developer already chose
-            self._instance_name = (
-                f"{self.service_entity_name}"
-                f"({service_entity.service_identity}={service_instance.service_identity_attribute_value})"
-            )
-            LOGGER.info("Created instance has name %s", self.instance_name)
+        # Try to create a nice name for our instance, based on the identity attribute the
+        # developer already chose
+        instance_name = await self.resolve_instance_name(identity_value=service_instance.service_identity_attribute_value)
+        LOGGER.info("Created instance has name %s", instance_name)
 
         if wait_for_state is not None:
             # Wait for our service to reach the target state
