@@ -519,6 +519,48 @@ def test_order_failure(
     assert f"Failing items of order {order.order_id}" in caplog.text
     assert str(instance.instance_id) in caplog.text
 
+
+def test_order_timeout(
+    project: plugin.Project,
+    remote_orchestrator: remote_orchestrator.RemoteOrchestrator,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # setup project
+    project.compile("import quickstart")
+
+    # sync project and export service entities
+    remote_orchestrator.export_service_entities()
+
+    order = remote_order.RemoteOrder(remote_orchestrator=remote_orchestrator)
+    instance = remote_service_instance.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+
+    # Deploying the service takes more than a second: the order is still on its way when
+    # we stop waiting for it
+    order.add_create_instance(
+        instance,
+        {
+            "router_ip": "10.1.9.23",
+            "interface_name": "eth5",
+            "address": "10.0.0.248/24",
+            "vlan_id": 20,
+        },
+    )
+
+    with caplog.at_level(logging.INFO, logger="pytest_inmanta_lsm.remote_order_async"):
+        with pytest.raises(remote_order.OrderStateTimeoutError) as exc_info:
+            order.create(timeout=1)
+
+    # The items which are not done yet, and the state their service instance is hanging in,
+    # are logged and reported in the error itself
+    assert [pending.item.instance_id for pending in exc_info.value.pending] == [instance.instance_id]
+    assert f"Pending items of order {order.order_id}" in caplog.text
+    assert str(instance.instance_id) in caplog.text
+    assert "The order is still waiting for 1 item(s)" in str(exc_info.value)
+    assert str(instance.instance_id) in str(exc_info.value)
+
     # The same reporting can be triggered on demand, for a test suite which handles the
     # failures of the order itself (e.g. with bad_states=[])
     diagnoses = order.diagnose_failures()
