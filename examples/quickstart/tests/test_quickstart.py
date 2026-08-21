@@ -519,6 +519,23 @@ def test_order_failure(
     assert f"Failing items of order {order.order_id}" in caplog.text
     assert str(instance.instance_id) in caplog.text
 
+    # The same reporting can be triggered on demand, for a test suite which handles the
+    # failures of the order itself (e.g. with bad_states=[])
+    diagnoses = order.diagnose_failures()
+    assert set(diagnoses) == {instance.instance_id}
+    assert diagnoses[instance.instance_id].failures, "The failing deployment should be part of the diagnosis"
+    assert str(instance.instance_id) in order.log_failures()
+
+    # The state of the instance is based on its resource, which fails instead of reporting
+    # a deviation from its desired state: there is nothing to report about compliance
+    resource_states = {resource.resource_state for resource in instance.resources(version=instance.get().version)}
+    assert resource_states, "The state of the instance is based on at least one resource"
+    assert remote_service_instance.NON_COMPLIANT_RESOURCE_STATE not in resource_states, resource_states
+    assert order.diagnose_non_compliance() == {}
+
+    # The instance is left in the inventory: its resource keeps failing, so it can not
+    # reach a state in which it could be cleaned up
+
 
 def test_order_timeout(
     project: plugin.Project,
@@ -560,23 +577,6 @@ def test_order_timeout(
     assert str(instance.instance_id) in caplog.text
     assert "The order is still waiting for 1 item(s)" in str(exc_info.value)
     assert str(instance.instance_id) in str(exc_info.value)
-
-    # The same reporting can be triggered on demand, for a test suite which handles the
-    # failures of the order itself (e.g. with bad_states=[])
-    diagnoses = order.diagnose_failures()
-    assert set(diagnoses) == {instance.instance_id}
-    assert diagnoses[instance.instance_id].failures, "The failing deployment should be part of the diagnosis"
-    assert str(instance.instance_id) in order.log_failures()
-
-    # The state of the instance is based on its resource, which fails instead of reporting
-    # a deviation from its desired state: there is nothing to report about compliance
-    resource_states = {resource.resource_state for resource in instance.resources(version=instance.get().version)}
-    assert resource_states, "The state of the instance is based on at least one resource"
-    assert remote_service_instance.NON_COMPLIANT_RESOURCE_STATE not in resource_states, resource_states
-    assert order.diagnose_non_compliance() == {}
-
-    # The instance is left in the inventory: its resource keeps failing, so it can not
-    # reach a state in which it could be cleaned up
 
 
 def test_model_legacy(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
