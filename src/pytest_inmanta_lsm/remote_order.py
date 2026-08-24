@@ -24,6 +24,7 @@ from pytest_inmanta_lsm.remote_order_async import (  # noqa: F401
     format_pending,
     item_name,
     pending_items,
+    state_name,
 )
 
 LOGGER = logging.getLogger(__name__)
