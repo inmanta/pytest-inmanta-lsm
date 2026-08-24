@@ -554,8 +554,8 @@ def test_order_timeout(
         service_entity_name=SERVICE_NAME,
     )
 
-    # Deploying the service takes more than a second: the order is still on its way when
-    # we stop waiting for it
+    # We don't give the order any time at all to complete: it is guaranteed to still be on
+    # its way when we stop waiting for it
     order.add_create_instance(
         instance,
         {
@@ -568,7 +568,7 @@ def test_order_timeout(
 
     with caplog.at_level(logging.INFO, logger="pytest_inmanta_lsm.remote_order_async"):
         with pytest.raises(remote_order.OrderStateTimeoutError) as exc_info:
-            order.create(timeout=1)
+            order.create(timeout=0)
 
     # The items which are not done yet, and the state their service instance is hanging in,
     # are logged and reported in the error itself

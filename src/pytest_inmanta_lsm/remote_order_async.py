@@ -8,6 +8,7 @@ Pytest Inmanta LSM
 
 import asyncio
 import dataclasses
+import enum
 import logging
 import time
 import typing
@@ -122,6 +123,17 @@ def pending_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOr
     return [item for item in order.service_order_items if item.status.state not in done]
 
 
+def state_name(state: object) -> str:
+    """
+    Get a human readable name for the given order item state.  The state is not reported as an
+    enum value by all the versions of the orchestrator we support, some report it as a plain
+    string.
+
+    :param state: The state of an order item, as the orchestrator reported it.
+    """
+    return state.value if isinstance(state, enum.Enum) else str(state)
+
+
 def item_name(item: order_model.ServiceOrderItem) -> str:
     """
     Build a human readable name for the service instance the given order item is about.  When
@@ -188,7 +200,7 @@ class PendingItem:
     blocked_by: typing.Mapping[str, order_model.OrderItemState] = dataclasses.field(default_factory=dict)
 
     def __str__(self) -> str:
-        details = [f"order item is {self.item.status.state.value}"]
+        details = [f"order item is {state_name(self.item.status.state)}"]
 
         if self.instance is not None:
             details.append(f"instance is in state {self.instance.state} since {self.instance.last_updated.isoformat()}")
@@ -200,7 +212,7 @@ class PendingItem:
                 )
 
         if self.blocked_by:
-            blocking = ", ".join(f"{name} is {state.value}" for name, state in self.blocked_by.items())
+            blocking = ", ".join(f"{name} is {state_name(state)}" for name, state in self.blocked_by.items())
             details.append(f"waiting for order item(s): [{blocking}]")
 
         return f"{item_name(self.item)}: " + ", ".join(details)
@@ -664,11 +676,18 @@ class RemoteOrder:
                 await self.log_failures()
                 # On a timeout, the order is usually still in progress, and none of its items
                 # failed: the items which are not done yet are the ones we were waiting for.
-                pending = await self._log_pending(order)
+                try:
+                    pending = await self._log_pending(order)
+                except Exception:
+                    # The report about the pending items is a best-effort addition to the
+                    # timeout, it should never shadow the timeout we are raising about.
+                    LOGGER.warning("Failed to report the pending items of order %s", self.order_id, exc_info=True)
+                    pending = []
                 raise OrderStateTimeoutError(self, target_state, timeout, last_state, pending=pending)
 
-            # Wait then try again
-            await asyncio.sleep(self.RETRY_INTERVAL)
+            # Wait then try again, but never sleep past the deadline: a timeout which is
+            # shorter than our retry interval should be honored as well.
+            await asyncio.sleep(min(self.RETRY_INTERVAL, start + timeout - time.monotonic()))
 
     async def create(
         self,
