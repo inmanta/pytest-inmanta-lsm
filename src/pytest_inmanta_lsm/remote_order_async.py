@@ -7,6 +7,7 @@ Pytest Inmanta LSM
 """
 
 import asyncio
+import dataclasses
 import logging
 import time
 import typing
@@ -83,10 +84,13 @@ class OrderStateTimeoutError(RemoteOrderError[T], TimeoutError):
         timeout: float,
         last_state: typing.Optional[order_model.OrderState],
         *args: object,
+        pending: typing.Sequence["PendingItem"] = (),
     ) -> None:
         msg = f"Timeout of {timeout} seconds reached while waiting for order to go into state {target_state}."
         if last_state is not None:
             msg += f"  Current state: {last_state}"
+        if pending:
+            msg += f"  The order is still waiting for {len(pending)} item(s): \n{format_pending(pending)}"
         super().__init__(
             instance,
             msg,
@@ -95,6 +99,7 @@ class OrderStateTimeoutError(RemoteOrderError[T], TimeoutError):
         self.target_state = target_state
         self.timeout = timeout
         self.last_state = last_state
+        self.pending = pending
 
 
 def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOrderItem]:
@@ -104,6 +109,17 @@ def failing_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOr
     :param order: The order for which we want to collect the failing items.
     """
     return [item for item in order.service_order_items if item.status.state == order_model.OrderItemState.failed]
+
+
+def pending_items(order: order_model.ServiceOrder) -> list[order_model.ServiceOrderItem]:
+    """
+    Get all the order items of the given order which are not done yet.  Those are the items
+    which hold the order back when it doesn't reach its target state in time.
+
+    :param order: The order for which we want to collect the pending items.
+    """
+    done = (order_model.OrderItemState.completed, order_model.OrderItemState.failed)
+    return [item for item in order.service_order_items if item.status.state not in done]
 
 
 def item_name(item: order_model.ServiceOrderItem) -> str:
@@ -123,6 +139,84 @@ def item_name(item: order_model.ServiceOrderItem) -> str:
     identity = getattr(item.status, "service_identity_display_name", None)
     identity_repr = identity_value if identity is None else f"{identity}={identity_value}"
     return f"{item.service_entity}({identity_repr}, {item.instance_id})"
+
+
+def blocking_items(
+    order: order_model.ServiceOrder,
+    item: order_model.ServiceOrderItem,
+) -> dict[str, order_model.OrderItemState]:
+    """
+    Get the state of every item of the given order which the given item is waiting for, keyed by
+    the name of the service instance each of those items is about.  An item which is done doesn't
+    block anymore, it is left out of the result.
+
+    :param order: The order the given item is part of, used to resolve the name of the service
+        instance each dependency is about.
+    :param item: The order item whose dependencies we want to collect.
+    """
+    # The dependencies of an order item are not reported by all the versions of the orchestrator
+    # we support.
+    dependencies: typing.Mapping[str, order_model.OrderItemState] = getattr(item.status, "direct_dependencies", {})
+
+    # The dependencies are reported as instance ids, resolve them into the name of the item they
+    # are about, so that the service which is blocking can be recognized.
+    names = {str(other.instance_id): item_name(other) for other in order.service_order_items}
+    return {
+        names.get(instance_id, instance_id): state
+        for instance_id, state in dependencies.items()
+        if state != order_model.OrderItemState.completed
+    }
+
+
+@dataclasses.dataclass(frozen=True)
+class PendingItem:
+    """
+    An order item which is not done yet, together with the service instance it is about, in
+    the state that instance is currently in.
+
+    :param item: The order item which is not done yet.
+    :param instance: The service instance the item is about, in its current state.  It is
+        None when the state of the instance can not be fetched, e.g. because the item didn't
+        start executing yet, and the instance doesn't exist.
+    :param blocked_by: The state of the other items of the order this item is waiting for,
+        keyed by the name of the service instance each of them is about, as returned by
+        `blocking_items`.
+    """
+
+    item: order_model.ServiceOrderItem
+    instance: typing.Optional[model.ServiceInstance]
+    blocked_by: typing.Mapping[str, order_model.OrderItemState] = dataclasses.field(default_factory=dict)
+
+    def __str__(self) -> str:
+        details = [f"order item is {self.item.status.state.value}"]
+
+        if self.instance is not None:
+            details.append(f"instance is in state {self.instance.state} since {self.instance.last_updated.isoformat()}")
+            progress = self.instance.deployment_progress
+            if progress is not None:
+                details.append(
+                    f"resources: {progress.deployed} deployed, {progress.waiting} waiting, "
+                    f"{progress.failed} failed, out of {progress.total}"
+                )
+
+        if self.blocked_by:
+            blocking = ", ".join(f"{name} is {state.value}" for name, state in self.blocked_by.items())
+            details.append(f"waiting for order item(s): [{blocking}]")
+
+        return f"{item_name(self.item)}: " + ", ".join(details)
+
+
+def format_pending(pending: typing.Sequence[PendingItem]) -> str:
+    """
+    Build a human readable summary of all the order items which are not done yet, as returned
+    by `diagnose_pending`.
+
+    :param pending: The pending order items to summarize.
+    """
+    if not pending:
+        return "No pending order item."
+
+    return "\n".join(f"- {item}" for item in pending)
 
 
 def format_failures(
@@ -419,6 +513,68 @@ class RemoteOrder:
         """
         return await self._diagnose_non_compliance(await self.get())
 
+    async def _pending_items(self, order: order_model.ServiceOrder) -> list[PendingItem]:
+        """
+        Collect every item of the given state of this order which is not done yet, together with
+        the current state of the service instance the item is about.
+
+        :param order: The state of this order to collect the pending items of.
+        """
+
+        async def pending_item(item: order_model.ServiceOrderItem) -> PendingItem:
+            instance = remote_service_instance_async.RemoteServiceInstance(
+                remote_orchestrator=self.remote_orchestrator,
+                service_entity_name=item.service_entity,
+                service_id=item.instance_id,
+            )
+            blocked_by = blocking_items(order, item)
+            try:
+                return PendingItem(item, await instance.get(), blocked_by)
+            except Exception:
+                # The state of the service instance is a best-effort addition to the state of
+                # the order item, it should never shadow the failure we are reporting about.
+                # The instance might for example not exist at all, if the item didn't start
+                # executing yet.
+                LOGGER.warning("Failed to get the state of service instance %s", item.instance_id, exc_info=True)
+                return PendingItem(item, None, blocked_by)
+
+        return list(await asyncio.gather(*(pending_item(item) for item in pending_items(order))))
+
+    async def diagnose_pending(self) -> list[PendingItem]:
+        """
+        Collect every item of this order which is not done yet, together with the current state
+        of the service instance the item is about.  Those are the items which hold the order
+        back when it doesn't reach its target state in time.
+        """
+        return await self._pending_items(await self.get())
+
+    async def _log_pending(self, order: order_model.ServiceOrder) -> list[PendingItem]:
+        """
+        Log, at INFO level, a summary of all the items of the given state of this order which
+        are not done yet, and return those items.
+
+        :param order: The state of this order to report the pending items of.
+        """
+        pending = await self._pending_items(order)
+        LOGGER.info(
+            "Pending items of order %s (state: %s): \n%s",
+            order.id,
+            order.status.state,
+            format_pending(pending),
+        )
+        return pending
+
+    async def log_pending(self) -> str:
+        """
+        Log, at INFO level, a summary of all the items of this order which are not done yet,
+        including the state of the service instance each of them is about.  Returns the summary
+        that has been logged.
+
+        This is called automatically when we stop waiting for the order because of a timeout.
+        It can also be called manually, to know what an order which takes long is waiting for.
+        """
+        return format_pending(await self._log_pending(await self.get()))
+
     async def log_failures(self, *, lookback_depth: int = 1) -> str:
         """
         Log, at INFO level, a summary of all the failing items of this order, including a
@@ -506,7 +662,10 @@ class RemoteOrder:
                     repr(state),
                 )
                 await self.log_failures()
-                raise OrderStateTimeoutError(self, target_state, timeout, last_state)
+                # On a timeout, the order is usually still in progress, and none of its items
+                # failed: the items which are not done yet are the ones we were waiting for.
+                pending = await self._log_pending(order)
+                raise OrderStateTimeoutError(self, target_state, timeout, last_state, pending=pending)
 
             # Wait then try again
             await asyncio.sleep(self.RETRY_INTERVAL)

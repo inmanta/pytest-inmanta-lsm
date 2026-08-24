@@ -15,11 +15,15 @@ from pytest_inmanta_lsm import remote_orchestrator, remote_order_async
 from pytest_inmanta_lsm.remote_order_async import (  # noqa: F401
     BadOrderStateError,
     OrderStateTimeoutError,
+    PendingItem,
     RemoteOrderError,
     ServiceInstanceTypes,
+    blocking_items,
     failing_items,
     format_failures,
+    format_pending,
     item_name,
+    pending_items,
 )
 
 LOGGER = logging.getLogger(__name__)

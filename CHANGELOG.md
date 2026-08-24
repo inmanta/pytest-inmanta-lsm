@@ -4,6 +4,7 @@
 
 - Report the resources which don't comply with their desired state when a service instance or an order goes into a bad state or times out: such a resource doesn't fail, it reports a diff, which the diagnosis of the service instance doesn't cover, but which can be what made the instance transfer to a failure state.  The new `RemoteOrder.diagnose_non_compliance` method returns that report for every failing item of an order, and the new `RemoteServiceInstance.resources`, `RemoteServiceInstance.diagnose_non_compliance` and `RemoteServiceInstance.format_failure` methods expose it for a single service instance.
 - Identify the failing service instances by the value of their service identity, next to their id, in the failure report of an order and in the logs about a single service instance.
+- Report the order items which are not done yet, and the state of the service instance each of them is about, when an order times out: those hanging services are the ones the order was waiting for, and no failure is reported about them.  The summary is logged, and is part of the message of the `OrderStateTimeoutError`, whose new `pending` attribute exposes it as structured data.  The new `RemoteOrder.diagnose_pending` and `RemoteOrder.log_pending` methods allow to trigger the same reporting on demand, for orders which take a long time.
 
 
 ## v4.3.0 - 2026-08-06
