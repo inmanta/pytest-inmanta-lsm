@@ -163,3 +163,57 @@ index SecondTreeChild(_parent, child_name)
 
 implement SecondTreeChild using std::none
 SecondTree.other [0:1] -- SecondTreeChild._parent [1]
+
+
+entity Group:
+    """
+    A plain entity holding the resource set of the members of the group, the members are the
+    services pointing to it through the relation to owner of their binding.
+    """
+    string name
+end
+
+index Group(name)
+
+Group.owned_resources [0:] -- std::Resource
+
+implementation group_resource_set for Group:
+    std::ResourceSet(name=f"group:{self.name}", resources=self.owned_resources)
+end
+
+implement Group using group_resource_set
+
+entity Member extends lsm::ServiceEntity:
+    string name
+    string group
+end
+
+index Member(instance_id)
+
+Member._group [1] -- Group
+
+binding_member = lsm::ServiceBinding(
+    default_version=0,
+    service_entity_name="member",
+    versions=[
+        lsm::ServiceBindingVersion(
+            service_entity="test_multi_version::Member",
+            lifecycle=lsm::fsm::simple_with_delete_validate,
+            service_identity="name",
+            relation_to_owner="_group",
+            version=0,
+        )
+    ]
+)
+
+for instance in lsm::all(binding_member, include_purged_embedded_entities=true):
+    Member(
+        instance_id = instance["id"],
+        entity_binding = lsm::get_service_binding_version(binding_member, 0),
+        name=instance["attributes"]["name"],
+        group=instance["attributes"]["group"],
+        _group=Group(name=instance["attributes"]["group"]),
+    )
+end
+implement Member using parents
+implement Member using tracer

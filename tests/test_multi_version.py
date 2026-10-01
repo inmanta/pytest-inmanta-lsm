@@ -62,6 +62,15 @@ def test_partial_compile_example(testdir, module_venv_active):
     result.assert_outcomes(passed=4)
 
 
+def test_shared_resource_set_example(testdir, module_venv_active):
+    """Partial compiles of services sharing a resource set owned by a plain entity can be validated."""
+
+    utils.add_version_constraint_to_project(testdir.tmpdir)
+
+    result = testdir.runpytest("tests/test_shared_resource_set.py")
+    result.assert_outcomes(passed=2)
+
+
 @pytest.mark.parametrize("reuse_compiler", [False, True])
 def test_multiple_model_texts(testdir, module_venv_active, reuse_compiler: bool):
     """Compiling more than one model text keeps the dataclass entity pairing intact."""
