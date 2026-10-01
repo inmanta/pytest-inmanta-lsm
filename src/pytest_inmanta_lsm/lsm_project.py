@@ -277,6 +277,12 @@ class LsmProject:
         # and updated in each call to `self.post_partial_compile_validation`
         self.shared_resource_set: dict[inmanta.resources.Id, inmanta.resources.Resource] = {}
 
+        # The name of the resource set holding the resources of a service, for the services
+        # whose binding defines a `relation_to_owner` towards an entity which is not a
+        # service (no `owner`): the module decides how such a resource set is named, and
+        # several services can share it.  See `self.get_resource_set`.
+        self.resource_set_resolver: typing.Optional[typing.Callable[[inmanta_lsm.model.ServiceInstance], str]] = None
+
         # We monkeypatch the client and the global cache now so that the project.compile
         # method can still be used normally, to perform "global" compiles (not specific to
         # a service)
@@ -743,9 +749,10 @@ class LsmProject:
         """
         service = self.get_service(service_id)
         service_entity = self.get_service_entity(service.service_entity, service.service_entity_version)
-        if service_entity.relation_to_owner is None:
+        if service_entity.owner is None or service_entity.relation_to_owner is None:
             # This service is not owned by any other service, it is the root of its
-            # own ownership tree
+            # own ownership tree.  A relation to owner without owner doesn't point to
+            # another service, it is not an ownership relation (see `self.get_resource_set`).
             return None
 
         # The relation towards the owner is an inter-service relation, its value is the id
@@ -779,14 +786,41 @@ class LsmProject:
 
         return root
 
+    def get_resource_set(self, service_id: typing.Union[uuid.UUID, str]) -> str:
+        """
+        Get the name of the resource set holding the resources of the service with the given id.
+
+        By default, this is the resource set of the service at the root of its ownership tree,
+        named after the id of that service.  A binding can however define a `relation_to_owner`
+        without any `owner`: lsm then adds the resources of the service to the `owned_resources`
+        of the entity at the end of that relation, which is not a service, and which emits the
+        resource set itself.  Several services can share that resource set.  Its name is only
+        known to the module, which must set `self.resource_set_resolver` to resolve it.
+
+        :param service_id: The id of the service whose resource set we are looking for.
+        """
+        root = self.get_service(self.get_owner_root(service_id))
+        root_entity = self.get_service_entity(root.service_entity, root.service_entity_version)
+        if root_entity.relation_to_owner is None:
+            return str(root.id)
+
+        if self.resource_set_resolver is None:
+            raise LookupError(
+                f"The resources of service {root.id} are owned through its {root_entity.relation_to_owner} "
+                f"relation, which doesn't point to another service.  Set the resource_set_resolver attribute "
+                "of the LsmProject to tell in which resource set they are."
+            )
+
+        return self.resource_set_resolver(root)
+
     @property
     def exporting_resource_sets(self) -> set[str]:
         """
-        Get the ids of all the resource sets which are expected to be emitted by a full compile.
+        Get the names of all the resource sets which are expected to be emitted by a full compile.
         Each service in an exporting state contributes its resources to the resource set of the
-        service at the root of its ownership tree.
+        service at the root of its ownership tree, or to the one `self.get_resource_set` resolves.
         """
-        return {str(self.get_owner_root(id)) for id in self.exporting_services}
+        return {self.get_resource_set(id) for id in self.exporting_services}
 
     def auto_transfer(self, service_id: uuid.UUID) -> inmanta_lsm.model.ServiceInstance:
         """
@@ -902,6 +936,14 @@ class LsmProject:
         # Resolve the initial state for our service and resolve attributes defaults
         service_entity = self.get_service_entity(service_entity_name, service_entity_version)
 
+        candidate_attributes = service_entity.add_defaults(attributes)  # type: ignore
+
+        # The server fills in the value of the service identity of a new instance, the identity
+        # of an instance can not be updated
+        identity = (
+            candidate_attributes.get(service_entity.service_identity) if service_entity.service_identity is not None else None
+        )
+
         # Create the service instance object
         service_instance_attributes = {
             "id": service_id or uuid.uuid4(),
@@ -912,7 +954,7 @@ class LsmProject:
             "desired_state_version": 1,
             "config": {},
             "state": initial_state or service_entity.lifecycle.initial_state,
-            "candidate_attributes": service_entity.add_defaults(attributes),  # type: ignore
+            "candidate_attributes": candidate_attributes,
             "active_attributes": None,
             "rollback_attributes": None,
             "created_at": datetime.datetime.now(),
@@ -920,7 +962,7 @@ class LsmProject:
             "callback": [],
             "deleted": False,
             "deployment_progress": None,
-            "service_identity_attribute_value": None,
+            "service_identity_attribute_value": str(identity) if identity is not None else None,
         }
 
         # The `desired_state_version` field has only recently been added to inmanta_lsm.
@@ -1200,6 +1242,10 @@ class LsmProject:
         set of that root, which contains the resources of every service in the tree.  The owned
         resource patterns are then expected to match the resources of the full tree.
 
+        Services whose binding defines a `relation_to_owner` without `owner` contribute their
+        resources to a resource set emitted by a non-service entity, which several services can
+        share.  Its name is resolved with `self.resource_set_resolver`, see `self.get_resource_set`.
+
         A partial compile may also pull in services outside of the ownership tree of the service
         it is triggered for, when the module extends the selection logic to do so.  Those services
         keep their own resource set, and the `additional_services` argument decides how strict this
@@ -1225,8 +1271,8 @@ class LsmProject:
             If None, no check is done on the resource sets of the other services.
         """
         # Get the id of the resource set the validated service contributes to.  A resource set is
-        # only emitted if at least one service of its ownership tree is in an exporting state.
-        root_id = str(self.get_owner_root(service_id))
+        # only emitted if at least one service contributing to it is in an exporting state.
+        root_id = self.get_resource_set(service_id)
         exporting_resource_sets = self.exporting_resource_sets
 
         resource_sets = get_resource_sets(self.project)
@@ -1237,7 +1283,7 @@ class LsmProject:
         else:
             # Check that the emitted resource sets are exactly the expected ones
             expected_resource_sets = {
-                str(self.get_owner_root(id)) for id in (service_id, *additional_services)
+                self.get_resource_set(id) for id in (service_id, *additional_services)
             } & exporting_resource_sets
             assert resource_sets.keys() == expected_resource_sets
 

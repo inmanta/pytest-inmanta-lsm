@@ -2,6 +2,8 @@
 
 ## v4.3.2 - ?
 
+- Support services whose binding defines a `relation_to_owner` without `owner` in `LsmProject.post_partial_compile_validation`: lsm adds the resources of such a service to the `owned_resources` of the plain entity at the end of that relation, which emits a resource set that several services can share.  `LsmProject.get_owner` doesn't treat that relation as an ownership relation anymore, and the name of the resource set is resolved with the new `LsmProject.resource_set_resolver` attribute.  The new `LsmProject.get_resource_set` method returns the resource set a service contributes to.
+- Fill in the `service_identity_attribute_value` of the service instances created with `LsmProject.create_service`, as the server does.
 
 ## v4.3.1 - 2026-08-26
 
