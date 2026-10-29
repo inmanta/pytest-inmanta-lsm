@@ -190,6 +190,21 @@ def resource_attributes_hash(resource: inmanta.resources.Resource) -> str:
     return m.hexdigest()
 
 
+def parse_service_entity(service_entity: inmanta_lsm.model.ServiceEntity) -> inmanta_lsm.model.ServiceEntity:
+    """
+    Validate the service entity again, as the server does when it parses the api request.
+
+    The entity we receive may hold values that don't match their declared type, as pydantic doesn't validate
+    assignments, and doesn't revalidate a model instance either. Validating a python dump of the entity converts
+    these values to their declared type, and avoids pydantic serializer warnings whenever the entity is serialized
+    later on. The mocked api doesn't go through json, so neither does this dump. Aliases are kept, as the api
+    encoder does.
+
+    :param service_entity: The service entity, as sent to the api.
+    """
+    return inmanta_lsm.model.ServiceEntity.model_validate(service_entity.model_dump(by_alias=True, warnings=False))
+
+
 def find_matching_pattern(value: str, patterns: typing.Iterable[str]) -> typing.Optional[str]:
     """
     Check if the given resource id matches any of expected members pattern.
@@ -588,7 +603,8 @@ class LsmProject:
         ), "The service catalog has not been initialized, please call self.export_service_entities"
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
 
-        # Don't do any validation, just save the service in the catalog
+        # Parse the entity as the api would; skip the server's catalog checks
+        service_entity_definition = parse_service_entity(service_entity_definition)
         self.service_entity_versions[(service_entity_definition.name, service_entity_definition.version)] = (
             service_entity_definition
         )
@@ -630,6 +646,7 @@ class LsmProject:
         ), "The service catalog has not been initialized, please call self.export_service_entities"
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
 
+        service_entity_definitions = [parse_service_entity(sed) for sed in service_entity_definitions]
         for sed in service_entity_definitions:
             self.service_entity_versions[(service_entity, sed.version)] = sed
             if sed.version == default_version:
