@@ -603,7 +603,7 @@ class LsmProject:
         ), "The service catalog has not been initialized, please call self.export_service_entities"
         assert str(tid) == self.environment, f"{tid} != {self.environment}"
 
-        # Don't do any validation, just save the service in the catalog, typed as the api would
+        # Parse the entity as the api would; skip the server's catalog checks
         service_entity_definition = parse_service_entity(service_entity_definition)
         self.service_entity_versions[(service_entity_definition.name, service_entity_definition.version)] = (
             service_entity_definition
