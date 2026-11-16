@@ -54,6 +54,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_dump,
     inm_lsm_env,
     inm_lsm_env_name,
+    inm_lsm_fork_compile,
     inm_lsm_host,
     inm_lsm_no_clean,
     inm_lsm_no_halt,
@@ -122,13 +123,22 @@ def lsm_reuse_compiler(request: pytest.FixtureRequest) -> bool:
     return inm_lsm_reuse_compiler.resolve(request.config)
 
 
+@pytest.fixture(scope="session")
+def lsm_fork_compile(request: pytest.FixtureRequest) -> bool:
+    """
+    Whether the ``lsm_project`` fixture runs each compile in a forked child, see ``fork_compile``.
+    """
+    return inm_lsm_fork_compile.resolve(request.config)
+
+
 @pytest.fixture(name="lsm_project")
 def lsm_project_fixture(
     project: pytest_inmanta.plugin.Project,
     monkeypatch: pytest.MonkeyPatch,
     remote_orchestrator_partial: bool,
     lsm_reuse_compiler: bool,
-) -> "lsm_project.LsmProject":
+    lsm_fork_compile: bool,
+) -> Iterator["lsm_project.LsmProject"]:
     core_version = version.Version(importlib.metadata.version("inmanta-core"))
     if core_version < version.Version("6"):
         # Before inmanta-core==6.0.0, the compile resets the inmanta plugins between each compile, which makes
@@ -136,13 +146,16 @@ def lsm_project_fixture(
         # https://github.com/inmanta/inmanta-core/blob/fd44f3a765e4865cc7179d825fe345fe0540897a/src/inmanta/module.py#L1525
         pytest.skip(f"The lsm_project fixture is not usable with this version of inmanta-core: {core_version} (< 6)")
 
-    return lsm_project.LsmProject(
+    lsm = lsm_project.LsmProject(
         uuid.uuid4(),
         project,
         monkeypatch=monkeypatch,
         partial_compile=remote_orchestrator_partial,
         reuse_compiler=lsm_reuse_compiler,
+        fork_compile=lsm_fork_compile,
     )
+    yield lsm
+    lsm.close()
 
 
 @pytest.fixture(scope="session")

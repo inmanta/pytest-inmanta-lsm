@@ -135,6 +135,17 @@ inm_lsm_reuse_compiler = BooleanTestParameter(
     group=param_group,
 )
 
+inm_lsm_fork_compile = BooleanTestParameter(
+    argument="--lsm-fork-compile",
+    environment_variable="INMANTA_LSM_FORK_COMPILE",
+    usage=(
+        "EXPERIMENTAL prototype. Run each compile of the lsm_project fixture in a child forked from a typed, "
+        "never executed program, with the garbage collector disabled in the child."
+    ),
+    default=False,
+    group=param_group,
+)
+
 inm_lsm_container_env = BooleanTestParameter(
     argument="--lsm-container-env",
     environment_variable="INMANTA_LSM_CONTAINER_ENV",

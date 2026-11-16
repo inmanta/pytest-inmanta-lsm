@@ -28,6 +28,7 @@ import pytest
 import pytest_inmanta.plugin
 
 from pytest_inmanta_lsm import compile_cache
+from pytest_inmanta_lsm import fork_compile as fork_compile_mod
 
 # Error message to display when the lsm module is not reachable
 INMANTA_LSM_MODULE_NOT_LOADED = (
@@ -51,6 +52,8 @@ except ImportError:
 
 
 LOGGER = logging.getLogger()
+
+T = typing.TypeVar("T")
 
 
 def promote(service: inmanta_lsm.model.ServiceInstance) -> None:
@@ -273,6 +276,7 @@ class LsmProject:
         monkeypatch: pytest.MonkeyPatch,
         partial_compile: bool,
         reuse_compiler: bool = False,
+        fork_compile: bool = False,
     ) -> None:
         inmanta.config.Config.set("config", "environment", str(environment))
         self.services: dict[str, inmanta_lsm.model.ServiceInstance] = {}
@@ -309,6 +313,13 @@ class LsmProject:
         # type-checking the (identical) model only once and reusing the typed program
         # for the subsequent compiles.  Opt-in, see compile_cache for the caveats.
         self.compile_cache: typing.Optional[compile_cache.CompileCache] = None
+        if reuse_compiler and fork_compile:
+            # Fork compiles reuse the typed program as well, without resetting it
+            warnings.warn("Fork compiles are enabled: compiler reuse is disabled", stacklevel=2)
+            reuse_compiler = False
+        self.fork_compiler: typing.Optional[fork_compile_mod.ForkCompiler] = None
+        if fork_compile:
+            self.fork_compiler = fork_compile_mod.ForkCompiler(self, monkeypatch)
         if reuse_compiler:
             warnings.warn(
                 "Compiler reuse (reuse_compiler / --lsm-reuse-compiler) is an EXPERIMENTAL, "
@@ -675,7 +686,7 @@ class LsmProject:
         """
         try:
             # Import lsm module in function scope for usage with v1 modules
-            import inmanta_plugins.lsm  # type: ignore
+            import inmanta_plugins.lsm  # type: ignore  # noqa: F401
         except ImportError as e:
             raise RuntimeError(INMANTA_LSM_MODULE_NOT_LOADED) from e
 
@@ -683,7 +694,38 @@ class LsmProject:
         with pytest.MonkeyPatch.context() as m:
             # https://github.com/inmanta/inmanta-lsm/blob/f6b9c7b8a861b233c682349e36d478f0afcb89b8/src/inmanta_lsm/service_catalog.py#L705
             m.setenv(ENV_NO_INSTANCES, "true")
-            self.project.compile(model, no_dedent=False)
+            if self.fork_compiler is not None:
+                # The export needs the live compile result: do it in the compile child
+                self.fork_compiler.compile(model, no_dedent=False, after=self._export_compiled_service_entities)
+            else:
+                self.project.compile(model, no_dedent=False)
+                self._export_compiled_service_entities()
+
+        # Save the model used in the export
+        self.model = model
+
+    def close(self) -> None:
+        """Stop the compile child of the last fork compile, if any"""
+        if self.fork_compiler is not None:
+            self.fork_compiler.close()
+
+    def add_fork_compile_state(self, dump: typing.Callable[[], T], load: typing.Callable[[T], None]) -> None:
+        """
+        Keep state that a compile changes in the test process with fork compiles (e.g. a mocked external
+        inventory): `dump` runs in the compile child after each compile, `load` gets its result (pickled) in
+        the test process.  Does nothing without fork compiles.
+        """
+        if self.fork_compiler is not None:
+            self.fork_compiler.states.append((dump, typing.cast(typing.Callable[[object], None], load)))
+
+    def reset_service_catalog(self) -> None:
+        """Empty the service entity catalog"""
+        self.service_entities = {}
+        self.service_entity_versions = {}
+
+    def _export_compiled_service_entities(self) -> None:
+        """Export the service entities of the last compile, see `export_service_entities`"""
+        import inmanta_plugins.lsm  # type: ignore
 
         # Get the exporter, it should have been set during the compile
         # above
@@ -697,10 +739,7 @@ class LsmProject:
             if binding in self.project.types
         }
 
-        # Save the model used in the export, and reset the service entity catalog
-        self.model = model
-        self.service_entities = {}
-        self.service_entity_versions = {}
+        self.reset_service_catalog()
 
         # Delegate the proper export to the existing logic in lsm module
         inmanta_plugins.lsm.do_export_service_entities(
