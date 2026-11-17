@@ -109,7 +109,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
 def lsm_reuse_compiler(request: pytest.FixtureRequest) -> bool:
     """
     Whether the ``lsm_project`` fixture should reuse the parsed/typed program
-    across the compiles of a single test.  Override this fixture to force it on
+    across the compiles of the same model, within a test and across tests.  Override this fixture to force it on
     or off for a test suite, or set it globally with the ``--lsm-reuse-compiler``
     option / ``INMANTA_LSM_REUSE_COMPILER`` environment variable.
 

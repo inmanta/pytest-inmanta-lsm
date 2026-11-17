@@ -6,9 +6,15 @@ Pytest Inmanta LSM
 :license: Inmanta EULA
 """
 
+import gc
 import textwrap
+import typing
+import weakref
 
-from pytest_inmanta_lsm.compile_cache import CompileCache
+from pytest_inmanta_lsm.compile_cache import CompileCache, _ProgramStore, _TypedProgram
+
+if typing.TYPE_CHECKING:
+    from inmanta.module import Project
 
 
 def test_cache_key_normalisation_round_trip() -> None:
@@ -34,3 +40,50 @@ def test_cache_key_keeps_different_models_apart() -> None:
     """Only the surrounding newlines are normalised away."""
     assert CompileCache._cache_key("import std") != CompileCache._cache_key("import std\nimport std::testing")
     assert CompileCache._cache_key("import std") != CompileCache._cache_key("    import std")
+
+
+class _CyclicProject:
+    """Stands in for a loaded project: cyclic, so only the garbage collector frees it."""
+
+    def __init__(self) -> None:
+        self.cycle = self
+
+
+def make_program() -> _TypedProgram:
+    return _TypedProgram(typing.cast("Project", _CyclicProject()))
+
+
+def test_program_store_evicts_least_recently_used() -> None:
+    store = _ProgramStore(max_size=2)
+    first, second, third = make_program(), make_program(), make_program()
+    store.add(("project", "first"), first)
+    store.add(("project", "second"), second)
+
+    assert store.get(("project", "first")) is first
+    store.add(("project", "third"), third)
+
+    assert store.get(("project", "second")) is None
+    assert list(store.programs()) == [first, third]
+
+
+def test_program_store_frees_evicted_programs() -> None:
+    """Frozen programs that are evicted are freed together, once as many were evicted as the store holds."""
+    store = _ProgramStore(max_size=2)
+    projects = []
+    for name in ["first", "second"]:
+        program = make_program()
+        projects.append(weakref.ref(program.project))
+        store.add(("project", name), program)
+    del program
+    try:
+        store.freeze()
+
+        store.add(("project", "third"), make_program())
+        assert gc.get_freeze_count() > 0
+        assert projects[0]() is not None
+
+        store.add(("project", "fourth"), make_program())
+        assert gc.get_freeze_count() == 0
+        assert [project() for project in projects] == [None, None]
+    finally:
+        gc.unfreeze()
