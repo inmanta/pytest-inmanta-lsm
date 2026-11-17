@@ -411,10 +411,13 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
 > varying the LSM service data.  The `--lsm-reuse-compiler` option (env var
 > `INMANTA_LSM_REUSE_COMPILER`, or the `lsm_reuse_compiler` fixture) parses and
 > type-checks the model only once and reuses the typed program for every
-> subsequent compile, which can significantly speed up such tests.  Typed
-> programs are shared by all tests of the session (the last 2, set
-> `INMANTA_LSM_REUSE_COMPILER_CACHE_SIZE` to change that) and are excluded from
-> garbage collection with `gc.freeze()`.
+> subsequent compile, which can significantly speed up such tests.  The last
+> typed programs are shared by all tests of the session (2 by default, set with
+> `--lsm-reuse-compiler-cache-size` / `INMANTA_LSM_REUSE_COMPILER_CACHE_SIZE`)
+> and are excluded from garbage collection with `gc.freeze()`.  Dropped programs
+> are freed in batches, so up to twice that number can be in memory, per worker.
+> A model that loads a module the test changes on disk (`Project.add_mock_file`,
+> `Project.create_module`) is always parsed again.
 >
 > This is **opt-in** and **disabled by default**.  It reaches into
 > `inmanta-core` and `pytest-inmanta` internals and, while guarded by a

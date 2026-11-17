@@ -8,11 +8,16 @@ Pytest Inmanta LSM
 
 import pathlib
 
+import inmanta.compiler
+import pytest
+import pytest_inmanta.plugin
+
 import pytest_inmanta_lsm.lsm_project
 
 # Not the `import test_multi_version` that the project fixture loads (and writes to main.cf) before each test
 MODEL = "import test_multi_version\nimport std"
-OTHER_MODEL = MODEL + "\nimport std::testing"
+# Doesn't load the lsm and test_multi_version modules, whose resources and plugins MODEL needs
+OTHER_MODEL = "import std"
 
 
 def compile_parent(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject, model: str) -> None:
@@ -38,10 +43,24 @@ def test_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
     compile_parent(lsm_project, MODEL)
 
 
-def test_other_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
-    compile_parent(lsm_project, OTHER_MODEL)
+def test_other_model(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject, project: pytest_inmanta.plugin.Project) -> None:
+    project.compile(OTHER_MODEL)
 
 
-def test_model_again(lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject) -> None:
-    """With compiler reuse, this test reuses the program typed by test_model."""
+def test_model_again(
+    lsm_project: pytest_inmanta_lsm.lsm_project.LsmProject,
+    lsm_reuse_compiler: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With compiler reuse, this test reuses the program typed by test_model, without parsing the model again."""
+    parsed = 0
+    parse = inmanta.compiler.Compiler.compile
+
+    def counting_parse(compiler: inmanta.compiler.Compiler) -> object:
+        nonlocal parsed
+        parsed += 1
+        return parse(compiler)
+
+    monkeypatch.setattr(inmanta.compiler.Compiler, "compile", counting_parse)
     compile_parent(lsm_project, MODEL)
+    assert (parsed == 0) == lsm_reuse_compiler

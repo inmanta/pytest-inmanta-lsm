@@ -135,6 +135,17 @@ inm_lsm_reuse_compiler = BooleanTestParameter(
     group=param_group,
 )
 
+inm_lsm_reuse_compiler_cache_size = IntegerTestParameter(
+    argument="--lsm-reuse-compiler-cache-size",
+    environment_variable="INMANTA_LSM_REUSE_COMPILER_CACHE_SIZE",
+    usage=(
+        "Number of typed programs that compiler reuse (--lsm-reuse-compiler) keeps for the whole test session. "
+        "Up to twice as many can be in memory, as dropped programs are freed in batches."
+    ),
+    default=2,
+    group=param_group,
+)
+
 inm_lsm_container_env = BooleanTestParameter(
     argument="--lsm-container-env",
     environment_variable="INMANTA_LSM_CONTAINER_ENV",

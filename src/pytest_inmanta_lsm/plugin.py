@@ -33,7 +33,7 @@ from pytest_inmanta.test_parameter import (
     TestParameter,
 )
 
-from pytest_inmanta_lsm import lsm_project
+from pytest_inmanta_lsm import compile_cache, lsm_project
 from pytest_inmanta_lsm.orchestrator_container import (
     DoNotCleanOrchestratorContainer,
     OrchestratorContainer,
@@ -63,6 +63,7 @@ from pytest_inmanta_lsm.parameters import (
     inm_lsm_remote_host,
     inm_lsm_remote_shell,
     inm_lsm_reuse_compiler,
+    inm_lsm_reuse_compiler_cache_size,
     inm_lsm_srv_port,
     inm_lsm_ssh_port,
     inm_lsm_ssh_user,
@@ -122,12 +123,28 @@ def lsm_reuse_compiler(request: pytest.FixtureRequest) -> bool:
     return inm_lsm_reuse_compiler.resolve(request.config)
 
 
+@pytest.fixture(scope="session")
+def lsm_program_store(request: pytest.FixtureRequest) -> Generator[compile_cache.ProgramStore, None, None]:
+    """
+    The typed programs that compiler reuse (see `lsm_reuse_compiler`) shares with all tests of the session, excluded
+    from garbage collection.  Its size is set with the ``--lsm-reuse-compiler-cache-size`` option /
+    ``INMANTA_LSM_REUSE_COMPILER_CACHE_SIZE`` environment variable.
+    """
+    size = inm_lsm_reuse_compiler_cache_size.resolve(request.config)
+    if size < 1:
+        raise pytest.UsageError(f"{inm_lsm_reuse_compiler_cache_size.argument} must be at least 1, got {size}")
+    store = compile_cache.ProgramStore(size, freeze=True)
+    yield store
+    store.close()
+
+
 @pytest.fixture(name="lsm_project")
 def lsm_project_fixture(
     project: pytest_inmanta.plugin.Project,
     monkeypatch: pytest.MonkeyPatch,
     remote_orchestrator_partial: bool,
     lsm_reuse_compiler: bool,
+    lsm_program_store: compile_cache.ProgramStore,
 ) -> "lsm_project.LsmProject":
     core_version = version.Version(importlib.metadata.version("inmanta-core"))
     if core_version < version.Version("6"):
@@ -142,6 +159,7 @@ def lsm_project_fixture(
         monkeypatch=monkeypatch,
         partial_compile=remote_orchestrator_partial,
         reuse_compiler=lsm_reuse_compiler,
+        program_store=lsm_program_store if lsm_reuse_compiler else None,
     )
 
 
