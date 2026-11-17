@@ -29,7 +29,8 @@ classifiers = [
 dependencies = [
     "pytest-inmanta>=2.5,<5.0",
     "inmanta-lsm",
-    "devtools"
+    "devtools",
+    "rpyc>=6,<7",
 ]
 
 [project.urls]
