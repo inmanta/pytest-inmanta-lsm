@@ -32,6 +32,10 @@ subsequent ("warm") compile skips parse and ``define_types`` and only:
     * re-runs the execution phase (which re-reads the LSM data and re-emits the
       resources).
 
+With the `lsm_program_store` fixture, typed programs are kept for the whole
+session, so a later test that compiles the same model reuses them too, and they
+are excluded from garbage collection (see `ProgramStore`).
+
 The output (the exported desired state) is identical to a normal compile.  The
 only observable difference is in the ``requires`` ordering of a few LSM internal
 resources, which is already non-deterministic between two stock compiles.
@@ -51,7 +55,10 @@ resources, which is already non-deterministic between two stock compiles.
 
 from __future__ import annotations
 
+import collections
+import gc
 import logging
+import os
 import typing
 
 import pytest
@@ -65,6 +72,7 @@ if typing.TYPE_CHECKING:
     from inmanta.execute.scheduler import Scheduler
     from inmanta.module import Project
     from inmanta.plugins import Plugin
+    from pytest_inmanta.plugin import Project as PytestInmantaProject
 
 LOGGER = logging.getLogger(__name__)
 
@@ -100,23 +108,98 @@ class _TypedProgram:
         self.root_ns: typing.Optional["Namespace"] = None
 
 
+#: Key of a typed program: the project directory and the canonical model text.
+ProgramKey = tuple[str, str]
+
+
+class ProgramStore:
+    """
+    The typed programs kept for reuse, least recently used first.
+
+    A typed program is a large graph of cyclic objects (about 2M objects for a big model) that lives as long as it
+    is cached, so every full collection of the garbage collector would scan it again.  With `freeze`, the whole
+    heap is moved to the permanent generation with `gc.freeze()` after every typing phase, and the collector never
+    scans it.  A frozen program that is evicted or replaced is only freed when the heap is unfrozen and collected,
+    which scans every cached program, so that happens once `max_size` programs were dropped, not on every drop:
+    up to `2 * max_size` typed programs can be in memory.  The owner of a store with `freeze` must call `close`.
+    """
+
+    def __init__(self, max_size: int, *, freeze: bool) -> None:
+        if max_size < 1:
+            raise ValueError(f"A program store holds at least one program, got max_size={max_size}")
+        self.max_size = max_size
+        self.freeze = freeze
+        self._programs: collections.OrderedDict[ProgramKey, _TypedProgram] = collections.OrderedDict()
+        self._frozen = False
+        # Dropped programs that are frozen, so not freed yet
+        self._frozen_dropped = 0
+
+    def get(self, key: ProgramKey) -> typing.Optional[_TypedProgram]:
+        program = self._programs.get(key)
+        if program is not None:
+            self._programs.move_to_end(key)
+        return program
+
+    def add(self, key: ProgramKey, program: _TypedProgram) -> None:
+        """Add a program, replacing the one with the same key and evicting the least recently used ones."""
+        if self._programs.pop(key, None) is not None:
+            self._drop()
+        self._programs[key] = program
+        while len(self._programs) > self.max_size:
+            self._programs.popitem(last=False)
+            self._drop()
+        if self._frozen_dropped >= self.max_size:
+            self._unfreeze()
+
+    def programs(self) -> typing.Iterator[_TypedProgram]:
+        return iter(self._programs.values())
+
+    def freeze_heap(self) -> None:
+        """With `freeze`, collect the garbage and move all objects that are left to the permanent generation."""
+        if not self.freeze:
+            return
+        gc.collect()
+        gc.freeze()
+        self._frozen = True
+
+    def close(self) -> None:
+        """Drop all programs and free them."""
+        self._programs.clear()
+        if self._frozen:
+            self._unfreeze()
+
+    def _drop(self) -> None:
+        if self._frozen:
+            self._frozen_dropped += 1
+
+    def _unfreeze(self) -> None:
+        gc.unfreeze()
+        gc.collect()
+        self._frozen = False
+        self._frozen_dropped = 0
+
+
+#: Default number of typed programs a `ProgramStore` keeps.
+DEFAULT_CACHE_SIZE = 2
+
+
 class CompileCache:
     """
     Installs the compiler-reuse machinery for the lifetime of a single test.
 
     The patches are applied through the test's ``monkeypatch`` fixture, so they
     are automatically undone at the end of the test and never leak into another
-    test in the same process.  State is kept on the instance (not globally) so
-    concurrent :class:`LsmProject` objects do not interfere.
+    test in the same process.  The typed programs are kept in `store`, which can
+    outlive the test: the `lsm_program_store` fixture shares one store with all
+    tests of the session, so a model compiled by an earlier test is not typed again.
     """
 
-    #: Private attribute used to tag an ``inmanta.module.Project`` with the model
-    #: text it was loaded for, so the ``do_compile`` wrapper can find its cache.
-    _MODEL_TAG = "_lsm_reuse_model"
+    #: Private attribute used to tag an ``inmanta.module.Project`` with the typed
+    #: program it was loaded for, so the ``do_compile`` wrapper can find it.
+    _PROGRAM_TAG = "_lsm_reuse_program"
 
-    def __init__(self) -> None:
-        # model text -> cached typed program
-        self._states: dict[str, _TypedProgram] = {}
+    def __init__(self, store: ProgramStore) -> None:
+        self._store = store
         # id() of the schedulers currently running a warm compile, for which
         # define_types must be skipped.
         self._warm_schedulers: set[int] = set()
@@ -150,6 +233,10 @@ class CompileCache:
             (compiler_mod, "Finalizers"),
             (compiler_mod, "ProjectLoader"),
             (compiler_mod.ProjectLoader, "_reset_module_state"),
+            (compiler_mod.ProjectLoader, "_save_compiler_state"),
+            (compiler_mod.ProjectLoader, "_reset_compiler_state"),
+            (compiler_mod.ProjectLoader, "_restore_compiler_state"),
+            (compiler_mod.ProjectLoader, "_dynamic_modules"),
             (compiler_config, "track_dataflow"),
             (compiler_config, "feature_compiler_cache"),
             (compiler_config.feature_compiler_cache, "get"),
@@ -158,6 +245,7 @@ class CompileCache:
             (Entity, "get_paired_dataclass"),
             (Entity, "pair_dataclass_stage1"),
             (PytestInmantaProject, "_create_project_and_load"),
+            (PytestInmantaProject, "_load_plugins"),
         ]
         for owner, name in required:
             if not hasattr(owner, name):
@@ -190,16 +278,17 @@ class CompileCache:
         orig_define_types = scheduler_mod.Scheduler.define_types
 
         def create_project_and_load(pi_project: PytestInmantaProject, model: str) -> Project:
-            key = self._cache_key(model)
-            state = self._states.get(key)
-            if state is not None and state.compiled:
+            key = (pi_project._test_project_dir, self._cache_key(model))
+            state = self._store.get(key)
+            if state is not None and state.compiled and not self._loads_dynamic_modules(state.project):
                 # Warm: reuse the already parsed and typed project, so its AST is
                 # not rebuilt and the parser cache is not read again.
-                compiler_mod.module.Project.set(state.project, clean=False)
+                self._load_warm_project(pi_project, model, state.project)
                 return state.project
             project = orig_create(pi_project, model)
-            self._states[key] = _TypedProgram(project)
-            setattr(project, self._MODEL_TAG, key)
+            state = _TypedProgram(project)
+            self._store.add(key, state)
+            setattr(project, self._PROGRAM_TAG, state)
             return project
 
         def define_types(
@@ -212,13 +301,19 @@ class CompileCache:
                 # Types and plugins are already set on the scheduler/compiler by
                 # the warm do_compile; the typing phase must not run again.
                 return None
-            return orig_define_types(sched, compiler, statements, blocks)
+            orig_define_types(sched, compiler, statements, blocks)
+            if not self._store.freeze or self._program_of(compiler_mod.module.Project.get()) is None:
+                # Only programs of the store are freed after a freeze, when the store drops them
+                return None
+            # The execution state of the cached programs is garbage after their next
+            # compile: drop it so it is not frozen with the typed programs.
+            for program in self._store.programs():
+                if program.compiled:
+                    self._reset_execution_state(program)
+            self._store.freeze_heap()
 
         def do_compile(refs: typing.Optional[typing.Mapping[object, object]] = None) -> CompileResult:
-            project = compiler_mod.module.Project.get()
-            model = getattr(project, self._MODEL_TAG, None)
-            state = self._states.get(model) if isinstance(model, str) else None
-
+            state = self._program_of(compiler_mod.module.Project.get())
             if state is None or not state.compiled:
                 return self._cold_compile(state, refs)
             return self._warm_compile(state, refs)
@@ -297,6 +392,45 @@ class CompileCache:
             self._warm_schedulers.discard(id(sched))
             compiler_mod.Finalizers.call_finalizers(raised)
         return state.types, state.root_ns
+
+    @classmethod
+    def _program_of(cls, project: Project) -> typing.Optional[_TypedProgram]:
+        """The typed program the project was loaded for, if it was loaded through the cache."""
+        state = getattr(project, cls._PROGRAM_TAG, None)
+        return state if isinstance(state, _TypedProgram) else None
+
+    @staticmethod
+    def _loads_dynamic_modules(project: Project) -> bool:
+        """
+        Whether the project loads a module that the test can change on disk (the mock files and modules of
+        pytest-inmanta), which a reused program would not see.
+        """
+        import inmanta.compiler as compiler_mod
+
+        return not compiler_mod.ProjectLoader._dynamic_modules.isdisjoint(project.modules)
+
+    @staticmethod
+    def _load_warm_project(pi_project: PytestInmantaProject, model: str, project: Project) -> None:
+        """
+        Do what `_create_project_and_load` does for a project that is already loaded, without loading it again.
+
+        The model is written to main.cf, because tests read it back.  The registries of plugins, resources,
+        handlers and references are restored for the modules of this project: a load of another project
+        since the previous compile of this one reset them to the modules of that other project.
+        """
+        import inmanta.compiler as compiler_mod
+
+        with open(os.path.join(pi_project._test_project_dir, "main.cf"), "w+") as fd:
+            fd.write(model)
+
+        compiler_mod.module.Project.set(project, clean=False)
+        loader = compiler_mod.ProjectLoader
+        loader._save_compiler_state()
+        loader._reset_compiler_state()
+        loader._restore_compiler_state(project)
+
+        if pi_project._should_load_plugins is not None:
+            pi_project._plugins = pi_project._load_plugins()
 
     @staticmethod
     def _cache_key(model: str) -> str:

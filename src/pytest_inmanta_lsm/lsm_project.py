@@ -273,7 +273,15 @@ class LsmProject:
         monkeypatch: pytest.MonkeyPatch,
         partial_compile: bool,
         reuse_compiler: bool = False,
+        program_store: typing.Optional[compile_cache.ProgramStore] = None,
     ) -> None:
+        """
+        :param reuse_compiler: Reuse the typed program for the compiles of the same model, see `compile_cache`.
+        :param program_store: Where `reuse_compiler` keeps the typed programs, to share them with other tests.  By
+            default, they are only kept for this LsmProject and not excluded from garbage collection.
+        """
+        if program_store is not None and not reuse_compiler:
+            raise ValueError("A program store is only used with reuse_compiler")
         inmanta.config.Config.set("config", "environment", str(environment))
         self.services: dict[str, inmanta_lsm.model.ServiceInstance] = {}
         self.project = project
@@ -317,7 +325,11 @@ class LsmProject:
                 "double-check your results.",
                 stacklevel=2,
             )
-            self.compile_cache = compile_cache.CompileCache()
+            self.compile_cache = compile_cache.CompileCache(
+                program_store
+                if program_store is not None
+                else compile_cache.ProgramStore(compile_cache.DEFAULT_CACHE_SIZE, freeze=False)
+            )
             self.compile_cache.install(self.monkeypatch)
 
     @property

@@ -79,3 +79,13 @@ def test_multiple_model_texts(testdir, module_venv_active, reuse_compiler: bool)
 
     result = testdir.runpytest("tests/test_dataclass.py", *(["--lsm-reuse-compiler"] if reuse_compiler else []))
     result.assert_outcomes(passed=2)
+
+
+@pytest.mark.parametrize("reuse_compiler", [False, True])
+def test_compile_reuse_across_tests(testdir, module_venv_active, reuse_compiler: bool):
+    """A model typed by an earlier test is reused, after a test that compiled another model."""
+
+    utils.add_version_constraint_to_project(testdir.tmpdir)
+
+    result = testdir.runpytest("tests/test_compile_reuse.py", *(["--lsm-reuse-compiler"] if reuse_compiler else []))
+    result.assert_outcomes(passed=3)
