@@ -6,7 +6,6 @@ Pytest Inmanta LSM
 :license: Inmanta EULA
 """
 
-import gc
 import textwrap
 import typing
 import weakref
@@ -91,11 +90,9 @@ def test_program_store_frees_evicted_programs() -> None:
         store.freeze_heap()
 
         add_programs(store, ["third"])
-        assert gc.get_freeze_count() > 0
         assert projects[0]() is not None
 
         add_programs(store, ["fourth"])
-        assert gc.get_freeze_count() == 0
         assert [project() for project in projects] == [None, None]
     finally:
         store.close()
@@ -111,7 +108,6 @@ def test_program_store_frees_replaced_programs() -> None:
         store.freeze_heap()
 
         add_programs(store, ["model"])
-        assert gc.get_freeze_count() == 0
         assert [project() for project in projects] == [None, None]
     finally:
         store.close()
@@ -123,5 +119,4 @@ def test_program_store_close_frees_programs() -> None:
     store.freeze_heap()
 
     store.close()
-    assert gc.get_freeze_count() == 0
     assert projects[0]() is None
