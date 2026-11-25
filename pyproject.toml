@@ -99,3 +99,13 @@ exclude = '''
   | dist
 )/
 '''
+
+[tool.inmanta-sphinx.docs]
+# where the docs of this repo go in the product documentation
+# the docs leave out "Running tests" and everything after it: that part is for contributors
+[[tool.inmanta-sphinx.docs.pages]]
+path = "README.md"
+type = "howto"
+group = "lsm"
+title = "Test a service model with pytest-inmanta-lsm"
+strip_from = "## Running tests"
