@@ -297,7 +297,8 @@ def verify_v2_editable_install() -> None:
     mod: module.Module
     mod, _ = pytest_inmanta.plugin.get_module()
 
-    if isinstance(mod, module.ModuleV1):
+    # Cores without V1 support have no ModuleV1
+    if hasattr(module, "ModuleV1") and isinstance(mod, module.ModuleV1):
         # Module v1 installed, it can't be badly installed, we exit here.
         return
 
