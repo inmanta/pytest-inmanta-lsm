@@ -350,6 +350,29 @@ If you handle the failures of the order yourself (e.g. by passing `bad_states=[]
 The same information is available for a single service instance, without going through an order: `RemoteServiceInstance.resources` lists the resources the state of the instance is based on, and `RemoteServiceInstance.diagnose_non_compliance` reports the deviation of those which don't comply with their desired state.  The full report, diagnosis and compliance together, is logged when the instance goes into a bad state or times out, and `RemoteServiceInstance.format_failure` builds it on demand.
 
 
+#### Upgrade tests
+
+To test an upgrade, deploy a released version of a module first, then the local one in the same environment. `export_service_entities` (and `sync_project`) take `module_versions`, the v2 modules to install from the package index instead of the local project (e.g. `{"dummy": "1.0.0"}` for a module named `dummy`, released as `inmanta-module-dummy`). The pinned version must be available in the python package repository configured in the project (`pip` section of `project.yml`). `trigger_full_compile` runs a full compile of the synced project, to deploy the new model for all the instances, and returns the exported version.
+
+```python
+def test_upgrade(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    project.compile("import quickstart")
+
+    # Released version of the module
+    remote_orchestrator.export_service_entities(module_versions={"quickstart": "1.0.0"})
+
+    instance = remote_service_instance.RemoteServiceInstance(
+        remote_orchestrator=remote_orchestrator,
+        service_entity_name=SERVICE_NAME,
+    )
+    instance.create(attributes={...}, wait_for_state="up")
+
+    # Local version of the module, deployed for all the instances
+    remote_orchestrator.export_service_entities()
+    version = remote_orchestrator.trigger_full_compile()
+    remote_orchestrator.wait_until_deployment_finishes(version)
+```
+
 ### Second case: mocking the lsm api
 
 This toolbox comes with one more fixture: `lsm_project`.  This fixture allows to run compile using the lsm model locally.  It has as advantage that:

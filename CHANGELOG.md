@@ -1,8 +1,10 @@
 # Changelog
 
-## v4.3.3 - ?
+## v4.4.0 - ?
 
 - Describe where the documentation of this repo goes in the product documentation.
+- Add `module_versions` to `RemoteOrchestrator.sync_project` and `export_service_entities`, to install released modules from the package index.
+- Add `RemoteOrchestrator.trigger_full_compile`, to run a full compile of the synced project and get the exported version.
 
 ## v4.3.2 - 2026-11-24
 

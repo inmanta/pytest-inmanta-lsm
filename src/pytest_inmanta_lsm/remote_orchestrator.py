@@ -7,7 +7,9 @@ Pytest Inmanta LSM
 """
 
 import configparser
+import contextlib
 import dataclasses
+import datetime
 import functools
 import logging
 import os
@@ -17,6 +19,7 @@ import subprocess
 import typing
 import urllib.parse
 import uuid
+from collections.abc import Iterator, Mapping
 from pprint import pformat
 from uuid import UUID
 
@@ -766,10 +769,25 @@ class RemoteOrchestrator:
 
         raise ValueError(f"Unsupported pip constraint format: {parsed}")
 
-    def sync_project_folder(self) -> None:
+    def sync_project_folder(self, *, module_versions: Mapping[str, str] | None = None) -> None:
         """
         Sync the project in the given folder with the remote orchestrator.
+
+        :param module_versions: V2 modules to install from the package index, with their pinned
+            version, instead of syncing them from the local project. cf. `sync_project`.
         """
+        if module_versions is None:
+            module_versions = {}
+
+        # Load the project and resolve all modules
+        modules = self.local_project.get_modules()
+        for name in module_versions:
+            if not isinstance(modules.get(name), inmanta.module.ModuleV2):
+                raise ValueError(
+                    f"Can not pin module {name!r}: only v2 modules the project depends on can be installed from the"
+                    f" package index, pinned by their module name (e.g. 'std', not 'inmanta-module-std')"
+                )
+
         local_project_path = pathlib.Path(self.local_project._path)
 
         if self.pip_constraint is not None:
@@ -805,20 +823,22 @@ class RemoteOrchestrator:
 
             excludes.append(str(modules_dir_path.relative_to(local_project_path)))
 
-        # Sync the project folder
-        self.sync_local_folder(local_project_path, self.remote_project_path, excludes=excludes)
+        # Sync the project folder, with the pinned modules in its requirements
+        with self._pinned_requirements(module_versions):
+            self.sync_local_folder(local_project_path, self.remote_project_path, excludes=excludes)
 
         # Fake that the project is a git repo
         self.run_command(["mkdir", "-p", str(self.remote_project_path / ".git")])
 
         libs_path = self.remote_project_path / "libs"
 
-        # Load the project and resolve all modules
-        modules = self.local_project.get_modules()
-
         # Sync all the modules except for v2 in non-editable install mode
         synced_modules: set[str] = set()
         for module in modules.values():
+            if module.name in module_versions:
+                # Pinned modules are installed from the package index
+                continue
+
             if hasattr(inmanta.module, "ModuleV2") and isinstance(module, inmanta.module.ModuleV2) and not module.is_editable():
                 # Module v2 which are not editable installs should not be synced
                 continue
@@ -832,9 +852,10 @@ class RemoteOrchestrator:
 
             synced_modules.add(module.name)
 
-        # Make sure all the modules we synced appear to be version controlled
-        mkdir_module = ["mkdir"] + [x for module in synced_modules for x in ["-p", module + "/.git"]]
-        self.run_command(mkdir_module, cwd=str(libs_path))
+        # Make sure all the modules we synced appear to be version controlled.
+        # The libs folder is created too: no module is synced when all of them are pinned or installed.
+        mkdir_module = ["mkdir", "-p", str(libs_path)] + [str(libs_path / module / ".git") for module in synced_modules]
+        self.run_command(mkdir_module)
 
         # Delete all modules which are on the remote libs folder but we didn't sync
         # We do this to avoid any side effect from a module that our project doesn't require but
@@ -843,6 +864,31 @@ class RemoteOrchestrator:
         skip_folders = [x for module in synced_modules for x in ["!", "-name", module]]
         clear_extra = ["find", ".", "-maxdepth", "1", *skip_folders, "-exec", "rm", "-rf", "{}", "+"]
         self.run_command(clear_extra, cwd=str(libs_path))
+
+    @contextlib.contextmanager
+    def _pinned_requirements(self, module_versions: Mapping[str, str]) -> Iterator[None]:
+        """
+        Add the pinned modules to the requirements.txt of the local project, restore it on exit.
+        """
+        if not module_versions:
+            yield
+            return
+
+        requirements = pathlib.Path(self.local_project._path, "requirements.txt")
+        original = requirements.read_text() if requirements.exists() else None
+        pins = "".join(
+            f"{inmanta.module.ModuleV2Source.get_package_name_for(name)}=={version}\n"
+            for name, version in module_versions.items()
+        )
+        LOGGER.debug("Pin modules in %s: %s", requirements, pins)
+        requirements.write_text((original + "\n" if original else "") + pins)
+        try:
+            yield
+        finally:
+            if original is None:
+                requirements.unlink()
+            else:
+                requirements.write_text(original)
 
     def cache_libs_folder(self) -> None:
         """
@@ -917,23 +963,35 @@ class RemoteOrchestrator:
         )
         LOGGER.debug("Installation logs: %s", result)
 
-    def sync_project(self) -> None:
-        """Synchronize the project to the lab orchestrator"""
+    def sync_project(self, *, module_versions: Mapping[str, str] | None = None) -> None:
+        """
+        Synchronize the project to the lab orchestrator.
+
+        :param module_versions: V2 modules to install from the package index instead of the local
+            project, as module name -> released version. The pins are added to the project
+            requirements, so they are installed with the same index and constraints as any other
+            dependency. The next sync without pins installs the local modules again. This
+            allows e.g. to deploy a released version of a module before upgrading to the local one.
+            The pinned versions must be available in the package repository configured in the project.
+        """
         source_script = pathlib.Path(__file__).parent / "resources/setup_project.py"
         destination_script = pathlib.Path(self.local_project._path, ".inm_lsm_setup_project.py")
         LOGGER.debug(f"Copying module V2 install script ({source_script}) in project folder {destination_script}")
         destination_script.write_text(source_script.read_text())
 
         LOGGER.info("Sending service model to the lab orchestrator")
-        self.sync_project_folder()
+        self.sync_project_folder(module_versions=module_versions)
         self.install_project()
 
-    def export_service_entities(self) -> None:
+    def export_service_entities(self, *, module_versions: Mapping[str, str] | None = None) -> None:
         """
         Sync the project to the remote orchestrator and export the service entities.
+
+        :param module_versions: V2 modules to install from the package index instead of the local
+            project, as module name -> released version. cf. `sync_project`.
         """
         # Sync the project with the remote orchestrator
-        self.sync_project()
+        self.sync_project(module_versions=module_versions)
 
         if self.server_version < Version("5.dev"):
             inmanta_command = ["inmanta"]
@@ -958,6 +1016,77 @@ class RemoteOrchestrator:
             # https://github.com/inmanta/inmanta-lsm/blob/f6b9c7b8a861b233c682349e36d478f0afcb89b8/src/inmanta_lsm/service_catalog.py#L705
             env={ENV_NO_INSTANCES: "true"},
         )
+
+    def trigger_full_compile(self, *, timeout: int = 600) -> int:
+        """
+        Request a full compile of the synced project, wait for it to succeed and return the exported version.
+
+        This is a regular compile, which exports the resources of all the service instances. It doesn't
+        update the service catalog, `export_service_entities` does. The server doesn't reinstall the
+        project's modules from the package index (update=False), so the synced project is compiled.
+
+        :param timeout: How long to wait for the compile to finish, in seconds.
+        :raise AssertionError: If the compile fails, doesn't export a version or times out.
+        """
+        # notify_change returns no compile id, a unique message identifies our compile among the LSM ones
+        message = f"pytest-inmanta-lsm full compile {uuid.uuid4()}"
+        newest = self._get_compile_reports(limit=1)
+        result = self.client.notify_change(id=self.environment, update=False, metadata={"type": "api", "message": message})
+        assert result.code == 200, str(result.result)
+        compile_id = self._find_compile(message, requested_after=uuid.UUID(str(newest[0]["id"])) if newest else None)
+
+        details: inmanta.data.model.CompileDetails | None = None
+
+        def is_completed() -> bool:
+            nonlocal details
+            details = self.sync_request(
+                "compile_details", inmanta.data.model.CompileDetails, tid=self.environment, id=compile_id
+            )
+            return details.completed is not None
+
+        retry_limited(is_completed, timeout=timeout, retry_interval=2)
+        assert details is not None
+        assert details.success, f"Full compile failed: {pformat(details.model_dump())}"
+        assert details.version is not None, f"Full compile did not export a version: {pformat(details.model_dump())}"
+        return details.version
+
+    def _get_compile_reports(self, **kwargs: object) -> list[dict[str, object]]:
+        """
+        Get the compile reports of the environment, newest first.
+        """
+        result = self.client.get_compile_reports(tid=self.environment, **kwargs)
+        assert result.code == 200 and result.result is not None, str(result.result)
+        return result.result["data"]
+
+    def _find_compile(self, message: str, *, requested_after: uuid.UUID | None) -> uuid.UUID:
+        """
+        Find the compile requested with the given metadata message.
+
+        notify_change stores the compile before it returns. More compiles may have been requested since
+        ours, we page through the reports, newest first, down to the newest compile from before our request.
+
+        :param message: The metadata message of our compile.
+        :param requested_after: The newest compile before our request, None if there was none.
+        :raise AssertionError: If our compile is not in the reports, e.g. when server compiles are disabled.
+        """
+        paging: dict[str, object] = {}
+        while True:
+            reports = self._get_compile_reports(limit=50, **paging)
+            for report in reports:
+                if str(report["id"]) == str(requested_after):
+                    reports = []
+                    break
+                metadata = report.get("metadata") or {}
+                assert isinstance(metadata, dict)
+                if metadata.get("message") == message:
+                    return uuid.UUID(str(report["id"]))
+            if not reports:
+                raise AssertionError(
+                    f"No compile was queued for full compile request {message!r}, are server compiles enabled"
+                    f" in environment {self.environment}?"
+                )
+            last = reports[-1]
+            paging = {"end": datetime.datetime.fromisoformat(str(last["requested"])), "last_id": last["id"]}
 
     def wait_for_released(self, version: int | None = None, *, timeout: int = 3, retry_interval: float = 1.0) -> None:
         """
