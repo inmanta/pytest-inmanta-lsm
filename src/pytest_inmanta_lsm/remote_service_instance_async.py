@@ -22,6 +22,22 @@ from packaging.version import Version
 
 from pytest_inmanta_lsm import remote_orchestrator
 
+try:
+    # The compliance model of the orchestrator only exists since iso9 (inmanta-core 18.0.0).  The
+    # bare type ignores keep the mypy result consistent for all the orchestrator versions we
+    # support: which of the two branches is taken depends on that version.
+    from inmanta.data.model import ResourceComplianceDiff  # type: ignore
+except ImportError:
+
+    class ResourceComplianceDiff(pydantic.BaseModel):  # type: ignore
+        """
+        Placeholder for the compliance model of the orchestrator.  It is never used on an
+        orchestrator which doesn't have that model, as no resource can deviate from its desired
+        state there: `diagnose_non_compliance` returns before it would reach the compliance
+        report api.
+        """
+
+
 RESOURCES_STATE_QUERY = """
 query InstanceResources($filter: ResourceFilter!, $after: String) {
   resources(filter: $filter, first: 100, after: $after) {
@@ -43,20 +59,22 @@ query InstanceResources($filter: ResourceFilter!, $after: String) {
 }
 """
 
-try:
-    # The compliance model of the orchestrator only exists since iso9 (inmanta-core 18.0.0).  The
-    # bare type ignores keep the mypy result consistent for all the orchestrator versions we
-    # support: which of the two branches is taken depends on that version.
-    from inmanta.data.model import ResourceComplianceDiff  # type: ignore
-except ImportError:
 
-    class ResourceComplianceDiff(pydantic.BaseModel):  # type: ignore
+class ResourceState(pydantic.BaseModel):
+    """
+    Deployment state of a resource, as reported by the GraphQL api of the orchestrator.
+    """
+
+    is_deploying: bool = pydantic.Field(alias="isDeploying")
+    last_handler_run: str = pydantic.Field(alias="lastHandlerRun")
+    compliance: typing.Optional[str]
+
+    @property
+    def deployed(self) -> bool:
         """
-        Placeholder for the compliance model of the orchestrator.  It is never used on an
-        orchestrator which doesn't have that model, as no resource can deviate from its desired
-        state there: `diagnose_non_compliance` returns before it would reach the compliance
-        report api.
+        Whether the resource is done deploying, successfully, and complies with its desired state.
         """
+        return not self.is_deploying and self.last_handler_run == "SUCCESSFUL" and self.compliance == "COMPLIANT"
 
 
 LOGGER = logging.getLogger(__name__)
@@ -420,10 +438,11 @@ class RemoteServiceInstance:
         if not await self._poll(is_done, timeout=timeout):
             raise TimeoutError(f"Service instance {self.instance_name} still has compiles in progress after {timeout}s")
 
-    async def resource_states(self, *, version: int) -> dict[str, dict[str, object]]:
+    async def resource_states(self, *, version: int) -> dict[str, ResourceState]:
         """
         Get the deployment state of each resource of the desired state of this service instance at
-        the given version, by resource id.  Empty as long as that desired state is not exported.
+        the given version, by resource id.  Empty as long as that desired state is not exported, or
+        when the instance has no resources at that version.
 
         Requires iso >= 9.4.
 
@@ -435,7 +454,7 @@ class RemoteServiceInstance:
                 f"got {self.remote_orchestrator.server_version}"
             )
 
-        states: dict[str, dict[str, object]] = {}
+        states: dict[str, ResourceState] = {}
         after: typing.Optional[str] = None
         while True:
             result = await self.remote_orchestrator.async_client.graphql(
@@ -454,7 +473,7 @@ class RemoteServiceInstance:
             graphql_result = result.result["data"]
             assert not graphql_result["errors"], str(graphql_result)
             resources = graphql_result["data"]["resources"]
-            states.update({edge["node"]["resourceId"]: edge["node"]["state"] for edge in resources["edges"]})
+            states.update({edge["node"]["resourceId"]: ResourceState(**edge["node"]["state"]) for edge in resources["edges"]})
             if not resources["pageInfo"]["hasNextPage"]:
                 return states
             after = resources["pageInfo"]["endCursor"]
@@ -465,7 +484,9 @@ class RemoteServiceInstance:
 
         Reaching a state doesn't mean its desired state is deployed: e.g. entering `up` triggers a
         compile, whose resources deploy while the instance already is `up`.  The desired state is
-        deployed once all its resources are done deploying, successful and compliant.
+        deployed once all its resources are done deploying, successful and compliant.  A desired
+        state without any resources is never considered deployed, as it can not be told apart from
+        a desired state which is not exported yet.
 
         Requires iso >= 9.4.
 
@@ -477,18 +498,12 @@ class RemoteServiceInstance:
         if timeout is None:
             timeout = self.DEFAULT_TIMEOUT
 
-        pending: dict[str, dict[str, object]] = {}
+        pending: dict[str, ResourceState] = {}
 
         async def is_deployed() -> bool:
             states = await self.resource_states(version=version)
             pending.clear()
-            pending.update(
-                {
-                    resource_id: state
-                    for resource_id, state in states.items()
-                    if state["isDeploying"] or state["compliance"] != "COMPLIANT" or state["lastHandlerRun"] != "SUCCESSFUL"
-                }
-            )
+            pending.update({resource_id: state for resource_id, state in states.items() if not state.deployed})
             LOGGER.debug(
                 "Service instance %s version %d: %d of %d resources not deployed",
                 self.instance_name,
@@ -501,7 +516,11 @@ class RemoteServiceInstance:
         if not await self._poll(is_deployed, timeout=timeout):
             raise TimeoutError(
                 f"Desired state of service instance {self.instance_name} version {version} not deployed after {timeout}s: "
-                + (str(devtools.debug.format(pending)) if pending else "not exported yet")
+                + (
+                    devtools.pformat(pending)
+                    if pending
+                    else "no resources found, the desired state is not exported yet or has no resources"
+                )
             )
 
     async def resolve_instance_name(self, *, identity_value: typing.Optional[str] = None) -> str:

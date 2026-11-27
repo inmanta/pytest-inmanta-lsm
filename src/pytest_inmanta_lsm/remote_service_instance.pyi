@@ -7,6 +7,7 @@ from inmanta_lsm import model
 from inmanta_lsm.diagnose.model import FullDiagnosis
 
 from pytest_inmanta_lsm import remote_orchestrator as remote_orchestrator
+from pytest_inmanta_lsm.remote_service_instance_async import ResourceState
 
 LOGGER: Incomplete
 T = typing.TypeVar("T")
@@ -174,10 +175,11 @@ class RemoteServiceInstance:
         :raises TimeoutError: If a compile still involves the instance after the timeout.
         """
 
-    def resource_states(self, *, version: int) -> dict[str, dict[str, object]]:
+    def resource_states(self, *, version: int) -> dict[str, ResourceState]:
         """
         Get the deployment state of each resource of the desired state of this service instance at
-        the given version, by resource id.  Empty as long as that desired state is not exported.
+        the given version, by resource id.  Empty as long as that desired state is not exported, or
+        when the instance has no resources at that version.
 
         Requires iso >= 9.4.
 
@@ -190,7 +192,9 @@ class RemoteServiceInstance:
 
         Reaching a state doesn't mean its desired state is deployed: e.g. entering `up` triggers a
         compile, whose resources deploy while the instance already is `up`.  The desired state is
-        deployed once all its resources are done deploying, successful and compliant.
+        deployed once all its resources are done deploying, successful and compliant.  A desired
+        state without any resources is never considered deployed, as it can not be told apart from
+        a desired state which is not exported yet.
 
         Requires iso >= 9.4.
 

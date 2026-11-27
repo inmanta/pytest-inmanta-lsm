@@ -9,6 +9,7 @@ Pytest Inmanta LSM
 import configparser
 import contextlib
 import dataclasses
+import datetime
 import functools
 import logging
 import os
@@ -964,6 +965,7 @@ class RemoteOrchestrator:
             requirements, so they are installed with the same index and constraints as any other
             dependency.  The next sync without pins installs the local modules again.  This
             allows e.g. to deploy a released version of a module before upgrading to the local one.
+            The pinned versions must be available in the package repository configured in the project.
         """
         source_script = pathlib.Path(__file__).parent / "resources/setup_project.py"
         destination_script = pathlib.Path(self.local_project._path, ".inm_lsm_setup_project.py")
@@ -1023,22 +1025,41 @@ class RemoteOrchestrator:
         message = f"pytest-inmanta-lsm full compile {uuid.uuid4()}"
         result = self.client.notify_change(id=self.environment, update=False, metadata={"type": "api", "message": message})
         assert result.code == 200, str(result.result)
+        compile_id = self._find_compile(message)
 
-        report: dict[str, object] | None = None
+        details: inmanta.data.model.CompileDetails | None = None
 
         def is_completed() -> bool:
-            nonlocal report
-            result = self.client.get_compile_reports(tid=self.environment, limit=20)
-            assert result.code == 200 and result.result is not None, str(result.result)
-            report = next((r for r in result.result["data"] if r["metadata"].get("message") == message), None)
-            return report is not None and bool(report["completed"])
+            nonlocal details
+            details = self.sync_request(
+                "compile_details", inmanta.data.model.CompileDetails, tid=self.environment, id=compile_id
+            )
+            return details.completed is not None
 
         retry_limited(is_completed, timeout=timeout, retry_interval=2)
-        assert report is not None
-        assert report["success"], f"Full compile failed: {pformat(report)}"
-        version = report["version"]
-        assert isinstance(version, int), f"Full compile did not export a version: {pformat(report)}"
-        return version
+        assert details is not None
+        assert details.success, f"Full compile failed: {pformat(details.model_dump())}"
+        assert details.version is not None, f"Full compile did not export a version: {pformat(details.model_dump())}"
+        return details.version
+
+    def _find_compile(self, message: str) -> uuid.UUID:
+        """
+        Find the id of the compile requested with the given metadata message, newest compiles first.
+
+        notify_change stores the compile before it returns, so it is always found.  We page through the
+        reports, more compiles may have been requested since ours.
+        """
+        paging: dict[str, object] = {}
+        while True:
+            result = self.client.get_compile_reports(tid=self.environment, limit=50, **paging)
+            assert result.code == 200 and result.result is not None, str(result.result)
+            reports = result.result["data"]
+            assert reports, f"No compile found with message {message!r}"
+            for report in reports:
+                if report["metadata"].get("message") == message:
+                    return uuid.UUID(report["id"])
+            last = reports[-1]
+            paging = {"end": datetime.datetime.fromisoformat(last["requested"]), "last_id": last["id"]}
 
     def wait_for_released(self, version: int | None = None, *, timeout: int = 3, retry_interval: float = 1.0) -> None:
         """
