@@ -177,11 +177,10 @@ class RemoteServiceInstance:
 
     def resource_states(self, *, version: int) -> dict[str, ResourceState]:
         """
-        Get the deployment state of each resource of the desired state of this service instance at
-        the given version, by resource id.  Empty as long as that desired state is not exported, or
-        when the instance has no resources at that version.
+        Get the deployment state of the resources of this instance version, by resource id.
 
-        Requires iso >= 9.4.
+        Empty as long as the desired state of the instance at that version is not exported, or when
+        the instance has no resources at that version.  Requires iso >= 9.4.
 
         :param version: The version of the service instance.
         """
@@ -192,7 +191,8 @@ class RemoteServiceInstance:
 
         Reaching a state doesn't mean its desired state is deployed: e.g. entering `up` triggers a
         compile, whose resources deploy while the instance already is `up`.  The desired state is
-        deployed once all its resources are done deploying, successful and compliant.  A desired
+        deployed once all its resources are settled (cf. `ResourceState.settled`): deployed successfully
+        and compliant, or not deployable within this version because of unknown attributes.  A desired
         state without any resources is never considered deployed, as it can not be told apart from
         a desired state which is not exported yet.
 

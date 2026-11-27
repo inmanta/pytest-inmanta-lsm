@@ -15,6 +15,8 @@ import types
 import uuid
 from unittest.mock import AsyncMock, Mock
 
+import inmanta.module
+import inmanta.protocol.methods_v2
 import inmanta_lsm.const
 import pytest
 from packaging.version import Version
@@ -40,6 +42,16 @@ def orchestrator(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> rem
     return orchestrator
 
 
+@pytest.fixture
+def graphql_variables(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A client api whose graphql method accepts variables, as in inmanta-core >= 18.1."""
+
+    def graphql(query: str, variables: dict[str, object] | None = None) -> None:
+        return None
+
+    monkeypatch.setattr(inmanta.protocol.methods_v2, "graphql", graphql, raising=False)
+
+
 def test_pinned_requirements(orchestrator: remote_orchestrator.RemoteOrchestrator, tmp_path: pathlib.Path) -> None:
     """The pins are added to the project requirements, which are restored afterwards."""
     requirements = tmp_path / "requirements.txt"
@@ -62,21 +74,53 @@ def test_pinned_requirements(orchestrator: remote_orchestrator.RemoteOrchestrato
         assert requirements.read_text() == "inmanta-module-std"
 
 
+@pytest.mark.parametrize("name", ["v1_mod", "missing", "inmanta-module-std"])
+def test_pin_invalid_module(
+    orchestrator: remote_orchestrator.RemoteOrchestrator, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """Only v2 modules of the project can be pinned, by module name."""
+    modules = {"std": Mock(spec=inmanta.module.ModuleV2), "v1_mod": Mock(spec=inmanta.module.ModuleV1)}
+    monkeypatch.setattr(
+        remote_orchestrator.RemoteOrchestrator,
+        "local_project",
+        property(lambda self: types.SimpleNamespace(get_modules=lambda: modules)),
+    )
+    with pytest.raises(ValueError, match=f"Can not pin module '{name}'"):
+        orchestrator.sync_project_folder(module_versions={name: "1.0.0"})
+
+
+def fake_compile_reports(
+    orchestrator: remote_orchestrator.RemoteOrchestrator, *, before: dict[str, object], newer: dict[str, object], ours: bool
+) -> Mock:
+    """
+    get_compile_reports of an environment with a compile from before our request, then ours (if queued), then a newer one.
+
+    The reports come one per page, newest first.
+    """
+
+    def get_compile_reports(**kwargs: object) -> types.SimpleNamespace:
+        if kwargs["limit"] == 1:
+            # The newest compile before our request
+            return ok({"data": [before]})
+        if "last_id" not in kwargs:
+            return ok({"data": [newer]})
+        message = orchestrator.client.notify_change.call_args.kwargs["metadata"]["message"]
+        own = [{"id": str(COMPILE_ID), "metadata": {"message": message}, "requested": "2026-01-01T00:00:00"}]
+        return ok({"data": (own if ours else []) + [before]})
+
+    return Mock(side_effect=get_compile_reports)
+
+
+COMPILE_ID = uuid.uuid4()
+BEFORE = {"id": str(uuid.uuid4()), "metadata": None, "requested": "2025-12-31T00:00:00"}
+NEWER = {"id": str(uuid.uuid4()), "metadata": {"message": "lsm compile"}, "requested": "2026-01-01T00:00:01"}
+
+
 @pytest.mark.parametrize("success", [True, False])
 def test_trigger_full_compile(orchestrator: remote_orchestrator.RemoteOrchestrator, success: bool) -> None:
     """Our compile is identified by its message, on a later page when more compiles were requested since."""
-    compile_id = uuid.uuid4()
-    other = {"id": str(uuid.uuid4()), "metadata": {"message": "lsm compile"}, "requested": "2026-01-01T00:00:01"}
-
-    def get_compile_reports(**kwargs: object) -> types.SimpleNamespace:
-        if "last_id" not in kwargs:
-            return ok({"data": [other]})
-        message = orchestrator.client.notify_change.call_args.kwargs["metadata"]["message"]
-        return ok({"data": [{"id": str(compile_id), "metadata": {"message": message}}]})
-
-    orchestrator.client = types.SimpleNamespace(
-        notify_change=Mock(return_value=ok(None)), get_compile_reports=Mock(side_effect=get_compile_reports)
-    )
+    orchestrator.client = types.SimpleNamespace(notify_change=Mock(return_value=ok(None)))
+    orchestrator.client.get_compile_reports = fake_compile_reports(orchestrator, before=BEFORE, newer=NEWER, ours=True)
     orchestrator.sync_request = Mock(  # type: ignore[method-assign]
         return_value=types.SimpleNamespace(completed=datetime.datetime.now(), success=success, version=2, model_dump=dict)
     )
@@ -87,10 +131,19 @@ def test_trigger_full_compile(orchestrator: remote_orchestrator.RemoteOrchestrat
         with pytest.raises(AssertionError, match="Full compile failed"):
             orchestrator.trigger_full_compile()
     assert orchestrator.client.notify_change.call_args.kwargs["update"] is False
-    assert orchestrator.client.get_compile_reports.call_count == 2
-    assert orchestrator.client.get_compile_reports.call_args.kwargs["last_id"] == other["id"]
+    assert orchestrator.client.get_compile_reports.call_count == 3
+    assert orchestrator.client.get_compile_reports.call_args.kwargs["last_id"] == NEWER["id"]
     assert orchestrator.client.get_compile_reports.call_args.kwargs["end"] == datetime.datetime(2026, 1, 1, 0, 0, 1)
-    assert orchestrator.sync_request.call_args.kwargs["id"] == compile_id
+    assert orchestrator.sync_request.call_args.kwargs["id"] == COMPILE_ID
+
+
+def test_trigger_full_compile_not_queued(orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    """The search stops at the newest compile from before our request, older ones are not fetched."""
+    orchestrator.client = types.SimpleNamespace(notify_change=Mock(return_value=ok(None)))
+    orchestrator.client.get_compile_reports = fake_compile_reports(orchestrator, before=BEFORE, newer=NEWER, ours=False)
+    with pytest.raises(AssertionError, match="No compile was queued"):
+        orchestrator.trigger_full_compile()
+    assert orchestrator.client.get_compile_reports.call_count == 3
 
 
 @pytest.mark.parametrize(
@@ -120,15 +173,24 @@ def test_is_compiling(
     assert asyncio.run(instance.is_compiling()) is compiling
 
 
-def test_wait_for_deployed(orchestrator: remote_orchestrator.RemoteOrchestrator, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Wait for all the resources of the instance version, over several pages, to be deployed."""
+def test_wait_for_deployed(
+    orchestrator: remote_orchestrator.RemoteOrchestrator, monkeypatch: pytest.MonkeyPatch, graphql_variables: None
+) -> None:
+    """Wait for all the resources of the instance version, over several pages, to be settled."""
     monkeypatch.setattr(remote_service_instance_async.RemoteServiceInstance, "RETRY_INTERVAL", 0)
-    deployed = {"isDeploying": False, "compliance": "COMPLIANT", "lastHandlerRun": "SUCCESSFUL"}
+    deployed = {"isDeploying": False, "blocked": "NOT_BLOCKED", "compliance": "COMPLIANT", "lastHandlerRun": "SUCCESSFUL"}
     deploying = {**deployed, "isDeploying": True}
     # A resource that never deployed
-    new = {"isDeploying": False, "compliance": None, "lastHandlerRun": "NEW"}
-    # Successive results of the api: not exported, one resource deploying, all deployed
-    polls = [[[]], [[("a", deployed)], [("b", deploying)]], [[("a", deployed)], [("b", deployed)]]]
+    new = {"isDeploying": False, "blocked": "NOT_BLOCKED", "compliance": "HAS_UPDATE", "lastHandlerRun": "NEW"}
+    # Resources that can't deploy within this version: unknown attribute, depends on one
+    undefined = {**new, "compliance": "UNDEFINED"}
+    blocked = {**new, "blocked": "BLOCKED"}
+    # Successive results of the api: not exported, one resource deploying, all settled
+    polls = [
+        [[]],
+        [[("a", deployed)], [("b", deploying)]],
+        [[("a", deployed)], [("b", deployed), ("c", undefined), ("d", blocked)]],
+    ]
     filters: list[object] = []
 
     async def graphql(*, query: str, variables: dict[str, object]) -> types.SimpleNamespace:
@@ -141,7 +203,7 @@ def test_wait_for_deployed(orchestrator: remote_orchestrator.RemoteOrchestrator,
             "pageInfo": {"hasNextPage": page < len(pages) - 1, "endCursor": str(page + 1)},
             "edges": [{"node": {"resourceId": rid, "state": state}} for rid, state in pages[page]],
         }
-        return ok({"data": {"data": {"resources": resources}, "errors": None}})
+        return ok({"data": {"data": {"resources": resources}}})
 
     orchestrator.async_client = types.SimpleNamespace(graphql=AsyncMock(side_effect=graphql))
     instance = remote_service_instance_async.RemoteServiceInstance(orchestrator, "test", service_id=uuid.uuid4())
@@ -167,4 +229,18 @@ def test_wait_for_deployed_old_orchestrator(orchestrator: remote_orchestrator.Re
     orchestrator._server_version = Version("9.3.0")
     instance = remote_service_instance_async.RemoteServiceInstance(orchestrator, "test", service_id=uuid.uuid4())
     with pytest.raises(RuntimeError, match="iso 9.4"):
+        asyncio.run(instance.wait_for_deployed(version=1))
+
+
+def test_wait_for_deployed_old_client(
+    orchestrator: remote_orchestrator.RemoteOrchestrator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A client api without graphql variables, as in inmanta-core < 18.1, is reported before any request."""
+
+    def graphql(query: str) -> None:
+        return None
+
+    monkeypatch.setattr(inmanta.protocol.methods_v2, "graphql", graphql, raising=False)
+    instance = remote_service_instance_async.RemoteServiceInstance(orchestrator, "test", service_id=uuid.uuid4())
+    with pytest.raises(RuntimeError, match="GraphQL variables"):
         asyncio.run(instance.wait_for_deployed(version=1))

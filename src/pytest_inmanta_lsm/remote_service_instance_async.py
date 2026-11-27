@@ -7,12 +7,14 @@ Pytest Inmanta LSM
 """
 
 import asyncio
+import inspect
 import logging
 import time
 import typing
 import uuid
 
 import devtools
+import inmanta.protocol.methods_v2
 import inmanta_lsm.const  # type: ignore
 import pydantic
 from inmanta import const
@@ -50,6 +52,7 @@ query InstanceResources($filter: ResourceFilter!, $after: String) {
         resourceId
         state {
           isDeploying
+          blocked
           lastHandlerRun
           compliance
         }
@@ -66,15 +69,24 @@ class ResourceState(pydantic.BaseModel):
     """
 
     is_deploying: bool = pydantic.Field(alias="isDeploying")
+    blocked: str
     last_handler_run: str = pydantic.Field(alias="lastHandlerRun")
     compliance: typing.Optional[str]
 
     @property
-    def deployed(self) -> bool:
+    def settled(self) -> bool:
         """
-        Whether the resource is done deploying, successfully, and complies with its desired state.
+        Whether the deployment of the resource is over for its current desired state.
+
+        Either it is deployed successfully and complies with its desired state, or it can not be deployed
+        within this version: it has unknown attributes (compliance UNDEFINED), or depends on such a resource
+        (BLOCKED).  Only a new compile can change the latter.
         """
-        return not self.is_deploying and self.last_handler_run == "SUCCESSFUL" and self.compliance == "COMPLIANT"
+        if self.is_deploying:
+            return False
+        if self.compliance == "UNDEFINED" or self.blocked == "BLOCKED":
+            return True
+        return self.last_handler_run == "SUCCESSFUL" and self.compliance == "COMPLIANT"
 
 
 LOGGER = logging.getLogger(__name__)
@@ -440,11 +452,10 @@ class RemoteServiceInstance:
 
     async def resource_states(self, *, version: int) -> dict[str, ResourceState]:
         """
-        Get the deployment state of each resource of the desired state of this service instance at
-        the given version, by resource id.  Empty as long as that desired state is not exported, or
-        when the instance has no resources at that version.
+        Get the deployment state of the resources of this instance version, by resource id.
 
-        Requires iso >= 9.4.
+        Empty as long as the desired state of the instance at that version is not exported, or when
+        the instance has no resources at that version.  Requires iso >= 9.4.
 
         :param version: The version of the service instance.
         """
@@ -452,6 +463,13 @@ class RemoteServiceInstance:
             raise RuntimeError(
                 f"Resource states of a service instance require iso 9.4 or later, "
                 f"got {self.remote_orchestrator.server_version}"
+            )
+        # Feature detection: the client api only accepts graphql variables since inmanta-core 18.1
+        graphql_method = getattr(inmanta.protocol.methods_v2, "graphql", None)
+        if graphql_method is None or "variables" not in inspect.signature(graphql_method).parameters:
+            raise RuntimeError(
+                "Resource states of a service instance require an inmanta-core client with GraphQL variables support"
+                " (inmanta-core >= 18.1), upgrade inmanta-core in the test environment"
             )
 
         states: dict[str, ResourceState] = {}
@@ -471,7 +489,7 @@ class RemoteServiceInstance:
             assert result.code == 200 and result.result is not None, str(result.result)
             # The GraphQL result ({"data": ..., "errors": ...}) comes in the "data" envelope of the api
             graphql_result = result.result["data"]
-            assert not graphql_result["errors"], str(graphql_result)
+            assert not graphql_result.get("errors") and graphql_result.get("data"), str(graphql_result)
             resources = graphql_result["data"]["resources"]
             states.update({edge["node"]["resourceId"]: ResourceState(**edge["node"]["state"]) for edge in resources["edges"]})
             if not resources["pageInfo"]["hasNextPage"]:
@@ -484,7 +502,8 @@ class RemoteServiceInstance:
 
         Reaching a state doesn't mean its desired state is deployed: e.g. entering `up` triggers a
         compile, whose resources deploy while the instance already is `up`.  The desired state is
-        deployed once all its resources are done deploying, successful and compliant.  A desired
+        deployed once all its resources are settled (cf. `ResourceState.settled`): deployed successfully
+        and compliant, or not deployable within this version because of unknown attributes.  A desired
         state without any resources is never considered deployed, as it can not be told apart from
         a desired state which is not exported yet.
 
@@ -503,9 +522,9 @@ class RemoteServiceInstance:
         async def is_deployed() -> bool:
             states = await self.resource_states(version=version)
             pending.clear()
-            pending.update({resource_id: state for resource_id, state in states.items() if not state.deployed})
+            pending.update({resource_id: state for resource_id, state in states.items() if not state.settled})
             LOGGER.debug(
-                "Service instance %s version %d: %d of %d resources not deployed",
+                "Service instance %s version %d: %d of %d resources not settled",
                 self.instance_name,
                 version,
                 len(pending),

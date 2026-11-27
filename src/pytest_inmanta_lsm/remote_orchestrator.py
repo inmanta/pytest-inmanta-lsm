@@ -779,6 +779,15 @@ class RemoteOrchestrator:
         if module_versions is None:
             module_versions = {}
 
+        # Load the project and resolve all modules
+        modules = self.local_project.get_modules()
+        for name in module_versions:
+            if not isinstance(modules.get(name), inmanta.module.ModuleV2):
+                raise ValueError(
+                    f"Can not pin module {name!r}: only v2 modules the project depends on can be installed from the"
+                    f" package index, pinned by their module name (e.g. 'std', not 'inmanta-module-std')"
+                )
+
         local_project_path = pathlib.Path(self.local_project._path)
 
         if self.pip_constraint is not None:
@@ -822,9 +831,6 @@ class RemoteOrchestrator:
         self.run_command(["mkdir", "-p", str(self.remote_project_path / ".git")])
 
         libs_path = self.remote_project_path / "libs"
-
-        # Load the project and resolve all modules
-        modules = self.local_project.get_modules()
 
         # Sync all the modules except for v2 in non-editable install mode
         synced_modules: set[str] = set()
@@ -1023,9 +1029,10 @@ class RemoteOrchestrator:
         """
         # notify_change returns no compile id, a unique message identifies our compile among the LSM ones
         message = f"pytest-inmanta-lsm full compile {uuid.uuid4()}"
+        newest = self._get_compile_reports(limit=1)
         result = self.client.notify_change(id=self.environment, update=False, metadata={"type": "api", "message": message})
         assert result.code == 200, str(result.result)
-        compile_id = self._find_compile(message)
+        compile_id = self._find_compile(message, requested_after=uuid.UUID(str(newest[0]["id"])) if newest else None)
 
         details: inmanta.data.model.CompileDetails | None = None
 
@@ -1042,24 +1049,43 @@ class RemoteOrchestrator:
         assert details.version is not None, f"Full compile did not export a version: {pformat(details.model_dump())}"
         return details.version
 
-    def _find_compile(self, message: str) -> uuid.UUID:
+    def _get_compile_reports(self, **kwargs: object) -> list[dict[str, object]]:
         """
-        Find the id of the compile requested with the given metadata message, newest compiles first.
+        Get the compile reports of the environment, newest first.
+        """
+        result = self.client.get_compile_reports(tid=self.environment, **kwargs)
+        assert result.code == 200 and result.result is not None, str(result.result)
+        return result.result["data"]
 
-        notify_change stores the compile before it returns, so it is always found.  We page through the
-        reports, more compiles may have been requested since ours.
+    def _find_compile(self, message: str, *, requested_after: uuid.UUID | None) -> uuid.UUID:
+        """
+        Find the compile requested with the given metadata message.
+
+        notify_change stores the compile before it returns.  More compiles may have been requested since
+        ours, we page through the reports, newest first, down to the newest compile from before our request.
+
+        :param message: The metadata message of our compile.
+        :param requested_after: The newest compile before our request, None if there was none.
+        :raise AssertionError: If our compile is not in the reports, e.g. when server compiles are disabled.
         """
         paging: dict[str, object] = {}
         while True:
-            result = self.client.get_compile_reports(tid=self.environment, limit=50, **paging)
-            assert result.code == 200 and result.result is not None, str(result.result)
-            reports = result.result["data"]
-            assert reports, f"No compile found with message {message!r}"
+            reports = self._get_compile_reports(limit=50, **paging)
             for report in reports:
-                if report["metadata"].get("message") == message:
-                    return uuid.UUID(report["id"])
+                if str(report["id"]) == str(requested_after):
+                    reports = []
+                    break
+                metadata = report.get("metadata") or {}
+                assert isinstance(metadata, dict)
+                if metadata.get("message") == message:
+                    return uuid.UUID(str(report["id"]))
+            if not reports:
+                raise AssertionError(
+                    f"No compile was queued for full compile request {message!r}, are server compiles enabled"
+                    f" in environment {self.environment}?"
+                )
             last = reports[-1]
-            paging = {"end": datetime.datetime.fromisoformat(last["requested"]), "last_id": last["id"]}
+            paging = {"end": datetime.datetime.fromisoformat(str(last["requested"])), "last_id": last["id"]}
 
     def wait_for_released(self, version: int | None = None, *, timeout: int = 3, retry_interval: float = 1.0) -> None:
         """
