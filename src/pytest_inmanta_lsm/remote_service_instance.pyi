@@ -153,6 +153,53 @@ class RemoteServiceInstance:
         :param version: The version of the service instance to report about.
         """
 
+    def is_compiling(self) -> bool:
+        """
+        Whether a queued or running compile involves this service instance.
+
+        LSM sets the instance id in the environment variables of the compile, space separated when
+        partial compiles are merged.  A compile without instance id is a full compile, which involves
+        all the instances.
+        """
+
+    def wait_for_compiles(self, *, timeout: float | None = None) -> None:
+        """
+        Wait until no queued or running compile involves this service instance.
+
+        Useful before changing the project on the orchestrator (e.g. `export_service_entities`), which
+        must not happen while a compile for the instance is running.
+
+        :param timeout: How long to wait, in seconds.  If set to None, uses the DEFAULT_TIMEOUT
+            attribute of the object.
+        :raises TimeoutError: If a compile still involves the instance after the timeout.
+        """
+
+    def resource_states(self, *, version: int) -> dict[str, dict[str, object]]:
+        """
+        Get the deployment state of each resource of the desired state of this service instance at
+        the given version, by resource id.  Empty as long as that desired state is not exported.
+
+        Requires iso >= 9.4.
+
+        :param version: The version of the service instance.
+        """
+
+    def wait_for_deployed(self, *, version: int, timeout: float | None = None) -> None:
+        """
+        Wait until the desired state of this service instance at the given version is deployed.
+
+        Reaching a state doesn't mean its desired state is deployed: e.g. entering `up` triggers a
+        compile, whose resources deploy while the instance already is `up`.  The desired state is
+        deployed once all its resources are done deploying, successful and compliant.
+
+        Requires iso >= 9.4.
+
+        :param version: The version of the service instance.
+        :param timeout: How long to wait, in seconds.  If set to None, uses the DEFAULT_TIMEOUT
+            attribute of the object.
+        :raises TimeoutError: If the desired state is not deployed after the timeout.
+        """
+
     def resolve_instance_name(self, *, identity_value: str | None = None) -> str:
         """
         Resolve, and cache, a human readable name for this service instance, based on the service

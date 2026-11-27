@@ -3,6 +3,10 @@
 ## v4.3.3 - ?
 
 - Describe where the documentation of this repo goes in the product documentation.
+- Add `module_versions` to `RemoteOrchestrator.sync_project` and `export_service_entities`, to install released modules from the package index.
+- Add `RemoteOrchestrator.trigger_full_compile`, to run a full compile of the synced project and get the exported version.
+- Add `RemoteServiceInstance.wait_for_compiles` and `is_compiling`, to wait until no compile involves the service instance.
+- Add `RemoteServiceInstance.wait_for_deployed` and `resource_states`, to wait until the desired state of an instance version is deployed (iso >= 9.4).
 
 ## v4.3.2 - 2026-11-24
 
