@@ -27,7 +27,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "pytest-inmanta>=2.5,<5.0",
+    "pytest-inmanta>=2.5,<6.0",
     "inmanta-lsm",
     "devtools"
 ]

@@ -788,22 +788,11 @@ class RemoteOrchestrator:
             str(self.remote_project_path),
         )
 
-        modules_dir_paths: list[pathlib.Path] = [
-            local_project_path / module_dir for module_dir in self.local_project.metadata.modulepath
-        ]
-
         # All the files to exclude when syncing the project, either because
         # we will sync them separately later, or because their content doesn't
-        # have anything to do on the remote orchestrator
-        excludes = [".env", "env", ".cfcache", "__pycache__", ".env-py*"]
-
-        # Exclude modules dirs, as we will sync them separately later
-        for modules_dir_path in modules_dir_paths:
-            if local_project_path not in modules_dir_path.parents:
-                # This folder wouldn't have been synced anyway
-                continue
-
-            excludes.append(str(modules_dir_path.relative_to(local_project_path)))
+        # have anything to do on the remote orchestrator.  The modules in libs
+        # are synced separately below.
+        excludes = [".env", "env", ".cfcache", "__pycache__", ".env-py*", "libs"]
 
         # Sync the project folder
         self.sync_local_folder(local_project_path, self.remote_project_path, excludes=excludes)

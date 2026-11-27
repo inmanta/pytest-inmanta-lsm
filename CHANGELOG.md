@@ -3,6 +3,8 @@
 ## v4.3.3 - ?
 
 - Describe where the documentation of this repo goes in the product documentation.
+- Fix compatibility with versions of inmanta-core that no longer support V1 modules.
+- Allow pytest-inmanta 5.
 
 ## v4.3.2 - 2026-11-24
 
