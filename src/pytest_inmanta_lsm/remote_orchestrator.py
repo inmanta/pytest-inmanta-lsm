@@ -852,9 +852,10 @@ class RemoteOrchestrator:
 
             synced_modules.add(module.name)
 
-        # Make sure all the modules we synced appear to be version controlled
-        mkdir_module = ["mkdir"] + [x for module in synced_modules for x in ["-p", module + "/.git"]]
-        self.run_command(mkdir_module, cwd=str(libs_path))
+        # Make sure all the modules we synced appear to be version controlled.
+        # The libs folder is created too: no module is synced when all of them are pinned or installed.
+        mkdir_module = ["mkdir", "-p", str(libs_path)] + [str(libs_path / module / ".git") for module in synced_modules]
+        self.run_command(mkdir_module)
 
         # Delete all modules which are on the remote libs folder but we didn't sync
         # We do this to avoid any side effect from a module that our project doesn't require but
