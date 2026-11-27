@@ -355,25 +355,22 @@ The same information is available for a single service instance, without going t
 To test an upgrade, deploy a released version of a module first, then the local one in the same environment.  `export_service_entities` (and `sync_project`) take `module_versions`, the v2 modules to install from the package index instead of the local project (e.g. `{"dummy": "1.0.0"}` for a module named `dummy`, released as `inmanta-module-dummy`).  The pinned version must be available in the python package repository configured in the project (`pip` section of `project.yml`).  `trigger_full_compile` runs a full compile of the synced project, to deploy the new model for all the instances, and returns the exported version.
 
 ```python
-async def upgrade_scenario(remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
-    # Released version of the module
-    await asyncio.to_thread(remote_orchestrator.export_service_entities, module_versions={"quickstart": "1.0.0"})
+def test_upgrade(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
+    project.compile("import quickstart")
 
-    instance = remote_service_instance_async.RemoteServiceInstance(
+    # Released version of the module
+    remote_orchestrator.export_service_entities(module_versions={"quickstart": "1.0.0"})
+
+    instance = remote_service_instance.RemoteServiceInstance(
         remote_orchestrator=remote_orchestrator,
         service_entity_name=SERVICE_NAME,
     )
-    up = await instance.create(attributes={...}, wait_for_state="up")
-    # Being up doesn't mean the desired state of the instance is deployed (iso >= 9.4)
-    await instance.wait_for_deployed(version=up.version)
-
-    # The project must not change on the orchestrator while a compile for the instance is running
-    await instance.wait_for_compiles()
+    instance.create(attributes={...}, wait_for_state="up")
 
     # Local version of the module, deployed for all the instances
-    await asyncio.to_thread(remote_orchestrator.export_service_entities)
-    version = await asyncio.to_thread(remote_orchestrator.trigger_full_compile)
-    await asyncio.to_thread(remote_orchestrator.wait_until_deployment_finishes, version)
+    remote_orchestrator.export_service_entities()
+    version = remote_orchestrator.trigger_full_compile()
+    remote_orchestrator.wait_until_deployment_finishes(version)
 ```
 
 ### Second case: mocking the lsm api

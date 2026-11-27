@@ -7,7 +7,6 @@ from inmanta_lsm import model
 from inmanta_lsm.diagnose.model import FullDiagnosis
 
 from pytest_inmanta_lsm import remote_orchestrator as remote_orchestrator
-from pytest_inmanta_lsm.remote_service_instance_async import ResourceState
 
 LOGGER: Incomplete
 T = typing.TypeVar("T")
@@ -152,56 +151,6 @@ class RemoteServiceInstance:
         waiting for it because of a timeout.
 
         :param version: The version of the service instance to report about.
-        """
-
-    def is_compiling(self) -> bool:
-        """
-        Whether a queued or running compile involves this service instance.
-
-        LSM sets the instance id in the environment variables of the compile, space separated when
-        partial compiles are merged.  A compile without instance id is a full compile, which involves
-        all the instances.
-        """
-
-    def wait_for_compiles(self, *, timeout: float | None = None) -> None:
-        """
-        Wait until no queued or running compile involves this service instance.
-
-        Useful before changing the project on the orchestrator (e.g. `export_service_entities`), which
-        must not happen while a compile for the instance is running.
-
-        :param timeout: How long to wait, in seconds.  If set to None, uses the DEFAULT_TIMEOUT
-            attribute of the object.
-        :raises TimeoutError: If a compile still involves the instance after the timeout.
-        """
-
-    def resource_states(self, *, version: int) -> dict[str, ResourceState]:
-        """
-        Get the deployment state of the resources of this instance version, by resource id.
-
-        Empty as long as the desired state of the instance at that version is not exported, or when
-        the instance has no resources at that version.  Requires iso >= 9.4.
-
-        :param version: The version of the service instance.
-        """
-
-    def wait_for_deployed(self, *, version: int, timeout: float | None = None) -> None:
-        """
-        Wait until the desired state of this service instance at the given version is deployed.
-
-        Reaching a state doesn't mean its desired state is deployed: e.g. entering `up` triggers a
-        compile, whose resources deploy while the instance already is `up`.  The desired state is
-        deployed once all its resources are settled (cf. `ResourceState.settled`): deployed successfully
-        and compliant, or not deployable within this version because of unknown attributes.  A desired
-        state without any resources is never considered deployed, as it can not be told apart from
-        a desired state which is not exported yet.
-
-        Requires iso >= 9.4.
-
-        :param version: The version of the service instance.
-        :param timeout: How long to wait, in seconds.  If set to None, uses the DEFAULT_TIMEOUT
-            attribute of the object.
-        :raises TimeoutError: If the desired state is not deployed after the timeout.
         """
 
     def resolve_instance_name(self, *, identity_value: str | None = None) -> str:

@@ -7,20 +7,16 @@ Pytest Inmanta LSM
 """
 
 import asyncio
-import inspect
 import logging
 import time
 import typing
 import uuid
 
 import devtools
-import inmanta.protocol.methods_v2
-import inmanta_lsm.const  # type: ignore
 import pydantic
 from inmanta import const
 from inmanta_lsm import model  # type: ignore
 from inmanta_lsm.diagnose.model import FullDiagnosis  # type: ignore
-from packaging.version import Version
 
 from pytest_inmanta_lsm import remote_orchestrator
 
@@ -38,55 +34,6 @@ except ImportError:
         state there: `diagnose_non_compliance` returns before it would reach the compliance
         report api.
         """
-
-
-RESOURCES_STATE_QUERY = """
-query InstanceResources($filter: ResourceFilter!, $after: String) {
-  resources(filter: $filter, first: 100, after: $after) {
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-    edges {
-      node {
-        resourceId
-        state {
-          isDeploying
-          blocked
-          lastHandlerRun
-          compliance
-        }
-      }
-    }
-  }
-}
-"""
-
-
-class ResourceState(pydantic.BaseModel):
-    """
-    Deployment state of a resource, as reported by the GraphQL api of the orchestrator.
-    """
-
-    is_deploying: bool = pydantic.Field(alias="isDeploying")
-    blocked: str
-    last_handler_run: str = pydantic.Field(alias="lastHandlerRun")
-    compliance: typing.Optional[str]
-
-    @property
-    def settled(self) -> bool:
-        """
-        Whether the deployment of the resource is over for its current desired state.
-
-        Either it is deployed successfully and complies with its desired state, or it can not be deployed
-        within this version: it has unknown attributes (compliance UNDEFINED), or depends on such a resource
-        (BLOCKED).  Only a new compile can change the latter.
-        """
-        if self.is_deploying:
-            return False
-        if self.compliance == "UNDEFINED" or self.blocked == "BLOCKED":
-            return True
-        return self.last_handler_run == "SUCCESSFUL" and self.compliance == "COMPLIANT"
 
 
 LOGGER = logging.getLogger(__name__)
@@ -399,148 +346,6 @@ class RemoteServiceInstance:
                 report["non_compliant_resources"] = non_compliance
 
         return str(devtools.debug.format(report))
-
-    async def _poll(self, is_done: typing.Callable[[], typing.Awaitable[bool]], *, timeout: float) -> bool:
-        """
-        Call is_done until it returns True or the timeout is reached, return its last result.
-        """
-        start = time.monotonic()
-        while not await is_done():
-            if time.monotonic() - start > timeout:
-                return False
-            await asyncio.sleep(self.RETRY_INTERVAL)
-        return True
-
-    async def is_compiling(self) -> bool:
-        """
-        Whether a queued or running compile involves this service instance.
-
-        LSM sets the instance id in the environment variables of the compile, space separated when
-        partial compiles are merged.  A compile without instance id is a full compile, which involves
-        all the instances.
-        """
-        result = await self.remote_orchestrator.async_client.get_compile_queue(tid=self.remote_orchestrator.environment)
-        assert result.code == 200 and result.result is not None, str(result.result)
-        for run in result.result["queue"]:
-            ids = " ".join(
-                (env or {}).get(inmanta_lsm.const.ENV_INSTANCE_ID, "")
-                for env in (run.get("requested_environment_variables"), run.get("mergeable_environment_variables"))
-            ).split()
-            if not ids or str(self.instance_id) in ids:
-                return True
-        return False
-
-    async def wait_for_compiles(self, *, timeout: typing.Optional[float] = None) -> None:
-        """
-        Wait until no queued or running compile involves this service instance.
-
-        Useful before changing the project on the orchestrator (e.g. `export_service_entities`), which
-        must not happen while a compile for the instance is running.
-
-        :param timeout: How long to wait, in seconds.  If set to None, uses the DEFAULT_TIMEOUT
-            attribute of the object.
-        :raises TimeoutError: If a compile still involves the instance after the timeout.
-        """
-        if timeout is None:
-            timeout = self.DEFAULT_TIMEOUT
-
-        async def is_done() -> bool:
-            return not await self.is_compiling()
-
-        if not await self._poll(is_done, timeout=timeout):
-            raise TimeoutError(f"Service instance {self.instance_name} still has compiles in progress after {timeout}s")
-
-    async def resource_states(self, *, version: int) -> dict[str, ResourceState]:
-        """
-        Get the deployment state of the resources of this instance version, by resource id.
-
-        Empty as long as the desired state of the instance at that version is not exported, or when
-        the instance has no resources at that version.  Requires iso >= 9.4.
-
-        :param version: The version of the service instance.
-        """
-        if self.remote_orchestrator.server_version < Version("9.4.dev"):
-            raise RuntimeError(
-                f"Resource states of a service instance require iso 9.4 or later, "
-                f"got {self.remote_orchestrator.server_version}"
-            )
-        # Feature detection: the client api only accepts graphql variables since inmanta-core 18.1
-        graphql_method = getattr(inmanta.protocol.methods_v2, "graphql", None)
-        if graphql_method is None or "variables" not in inspect.signature(graphql_method).parameters:
-            raise RuntimeError(
-                "Resource states of a service instance require an inmanta-core client with GraphQL variables support"
-                " (inmanta-core >= 18.1), upgrade inmanta-core in the test environment"
-            )
-
-        states: dict[str, ResourceState] = {}
-        after: typing.Optional[str] = None
-        while True:
-            result = await self.remote_orchestrator.async_client.graphql(
-                query=RESOURCES_STATE_QUERY,
-                variables={
-                    "filter": {
-                        "environment": str(self.remote_orchestrator.environment),
-                        "serviceInstance": [str(self.instance_id)],
-                        "instanceVersion": version,
-                    },
-                    "after": after,
-                },
-            )
-            assert result.code == 200 and result.result is not None, str(result.result)
-            # The GraphQL result ({"data": ..., "errors": ...}) comes in the "data" envelope of the api
-            graphql_result = result.result["data"]
-            assert not graphql_result.get("errors") and graphql_result.get("data"), str(graphql_result)
-            resources = graphql_result["data"]["resources"]
-            states.update({edge["node"]["resourceId"]: ResourceState(**edge["node"]["state"]) for edge in resources["edges"]})
-            if not resources["pageInfo"]["hasNextPage"]:
-                return states
-            after = resources["pageInfo"]["endCursor"]
-
-    async def wait_for_deployed(self, *, version: int, timeout: typing.Optional[float] = None) -> None:
-        """
-        Wait until the desired state of this service instance at the given version is deployed.
-
-        Reaching a state doesn't mean its desired state is deployed: e.g. entering `up` triggers a
-        compile, whose resources deploy while the instance already is `up`.  The desired state is
-        deployed once all its resources are settled (cf. `ResourceState.settled`): deployed successfully
-        and compliant, or not deployable within this version because of unknown attributes.  A desired
-        state without any resources is never considered deployed, as it can not be told apart from
-        a desired state which is not exported yet.
-
-        Requires iso >= 9.4.
-
-        :param version: The version of the service instance.
-        :param timeout: How long to wait, in seconds.  If set to None, uses the DEFAULT_TIMEOUT
-            attribute of the object.
-        :raises TimeoutError: If the desired state is not deployed after the timeout.
-        """
-        if timeout is None:
-            timeout = self.DEFAULT_TIMEOUT
-
-        pending: dict[str, ResourceState] = {}
-
-        async def is_deployed() -> bool:
-            states = await self.resource_states(version=version)
-            pending.clear()
-            pending.update({resource_id: state for resource_id, state in states.items() if not state.settled})
-            LOGGER.debug(
-                "Service instance %s version %d: %d of %d resources not settled",
-                self.instance_name,
-                version,
-                len(pending),
-                len(states),
-            )
-            return bool(states) and not pending
-
-        if not await self._poll(is_deployed, timeout=timeout):
-            raise TimeoutError(
-                f"Desired state of service instance {self.instance_name} version {version} not deployed after {timeout}s: "
-                + (
-                    devtools.pformat(pending)
-                    if pending
-                    else "no resources found, the desired state is not exported yet or has no resources"
-                )
-            )
 
     async def resolve_instance_name(self, *, identity_value: typing.Optional[str] = None) -> str:
         """
