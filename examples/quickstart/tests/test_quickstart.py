@@ -141,6 +141,10 @@ def test_full_cycle(
     result = client.lsm_service_catalog_get_entity(remote_orchestrator.environment, SERVICE_NAME)
     assert result.code == 200
 
+    # Full compile of the synced project, deploys its desired state
+    version = remote_orchestrator.trigger_full_compile()
+    remote_orchestrator.wait_until_deployment_finishes(version)
+
     # Create a first service that should be deployed
     first_service = service_full_cycle(
         remote_orchestrator=remote_orchestrator,
