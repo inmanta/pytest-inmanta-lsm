@@ -774,7 +774,7 @@ class RemoteOrchestrator:
         Sync the project in the given folder with the remote orchestrator.
 
         :param module_versions: V2 modules to install from the package index, with their pinned
-            version, instead of syncing them from the local project.  cf. `sync_project`.
+            version, instead of syncing them from the local project. cf. `sync_project`.
         """
         if module_versions is None:
             module_versions = {}
@@ -967,9 +967,9 @@ class RemoteOrchestrator:
         Synchronize the project to the lab orchestrator.
 
         :param module_versions: V2 modules to install from the package index instead of the local
-            project, as module name -> released version.  The pins are added to the project
+            project, as module name -> released version. The pins are added to the project
             requirements, so they are installed with the same index and constraints as any other
-            dependency.  The next sync without pins installs the local modules again.  This
+            dependency. The next sync without pins installs the local modules again. This
             allows e.g. to deploy a released version of a module before upgrading to the local one.
             The pinned versions must be available in the package repository configured in the project.
         """
@@ -987,7 +987,7 @@ class RemoteOrchestrator:
         Sync the project to the remote orchestrator and export the service entities.
 
         :param module_versions: V2 modules to install from the package index instead of the local
-            project, as module name -> released version.  cf. `sync_project`.
+            project, as module name -> released version. cf. `sync_project`.
         """
         # Sync the project with the remote orchestrator
         self.sync_project(module_versions=module_versions)
@@ -1020,8 +1020,8 @@ class RemoteOrchestrator:
         """
         Request a full compile of the synced project, wait for it to succeed and return the exported version.
 
-        This is a regular compile, which exports the resources of all the service instances.  It doesn't
-        update the service catalog, `export_service_entities` does.  The server doesn't reinstall the
+        This is a regular compile, which exports the resources of all the service instances. It doesn't
+        update the service catalog, `export_service_entities` does. The server doesn't reinstall the
         project's modules from the package index (update=False), so the synced project is compiled.
 
         :param timeout: How long to wait for the compile to finish, in seconds.
@@ -1061,7 +1061,7 @@ class RemoteOrchestrator:
         """
         Find the compile requested with the given metadata message.
 
-        notify_change stores the compile before it returns.  More compiles may have been requested since
+        notify_change stores the compile before it returns. More compiles may have been requested since
         ours, we page through the reports, newest first, down to the newest compile from before our request.
 
         :param message: The metadata message of our compile.
