@@ -606,23 +606,21 @@ The test suite consists of two parts:
 - ssh access to this orchestrator
 
 ### Steps
-1. install dependencies:
+1. set the package index that serves the lsm module. pip uses it in the next step, and pytest-inmanta passes it on to the project installed on the orchestrator (see the `--pip-index-url` option of [pytest-inmanta](https://github.com/inmanta/pytest-inmanta#options)).
+```bash
+export PIP_INDEX_URL=<package index that serves inmanta-module-lsm>
+```
+
+2. install dependencies:
 ```bash
  pip install -r  requirements.dev.txt  -r  requirements.txt
 ```
 
-2. pass the config for pytest-inmanta-lsm via environment variables. e.g.
+3. pass the config for pytest-inmanta-lsm via environment variables. e.g.
 ```bash
 export INMANTA_LSM_HOST=<the orchestrator>
 export INMANTA_LSM_USER=<user>
 ```
-
-3. set the repo for inmanta to pull LSM from
-
- ```bash
-export INMANTA_MODULE_REPO=https://USER:LICENSE_TOKEN@modules.inmanta.com/git/inmanta-service-orchestrator/5/{}.git
-```
-Information on how to configure a Python package repository for V2 modules, instead of a Git URL, can be found [here](https://github.com/inmanta/pytest-inmanta#options).
 
 4. run the tests
 
