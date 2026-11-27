@@ -352,7 +352,7 @@ The same information is available for a single service instance, without going t
 
 #### Upgrade tests
 
-To test an upgrade, deploy a released version of a module first, then the local one in the same environment.  `export_service_entities` (and `sync_project`) take `module_versions`, the v2 modules to install from the package index instead of the local project (e.g. `{"dummy": "1.0.0"}` for a module named `dummy`, released as `inmanta-module-dummy`).  The pinned version must be available in the python package repository configured in the project (`pip` section of `project.yml`).  `trigger_full_compile` runs a full compile of the synced project, to deploy the new model for all the instances, and returns the exported version.
+To test an upgrade, deploy a released version of a module first, then the local one in the same environment. `export_service_entities` (and `sync_project`) take `module_versions`, the v2 modules to install from the package index instead of the local project (e.g. `{"dummy": "1.0.0"}` for a module named `dummy`, released as `inmanta-module-dummy`). The pinned version must be available in the python package repository configured in the project (`pip` section of `project.yml`). `trigger_full_compile` runs a full compile of the synced project, to deploy the new model for all the instances, and returns the exported version.
 
 ```python
 def test_upgrade(project: plugin.Project, remote_orchestrator: remote_orchestrator.RemoteOrchestrator) -> None:
